@@ -97,7 +97,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_flags = IFF_TUN;
+	ifr.ifr_flags = IFF_TUN | IFF_VNET_HDR;
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
@@ -137,6 +137,20 @@ static void tun_setup(int do_mktun, int do_rmtun)
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
 				gcfg->tundev);
 		return;
+	}
+
+	//setup offloads
+	int len = 12;
+	if(ioctl(gcfg->tun_fd, TUNSETVNETHDRSZ, &(int){len}))
+	{
+		slog(LOG_ERR,"ioctl TUNSETVNETHDRSZ failed %d\n",errno);
+		exit(1);
+	}
+
+	if(ioctl(gcfg->tun_fd, TUNSETOFFLOAD, TUN_F_ELABLED))
+	{
+		slog(LOG_ERR,"ioctl TUNSETOFFLOAD failed %d\n",errno);
+		exit(1);
 	}
 
 	set_nonblock(gcfg->tun_fd);
@@ -190,10 +204,12 @@ static void signal_setup(void)
 
 static void read_from_tun(void)
 {
-	int ret;
+	int ret;	
 	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
+	struct virtio_net_hdr_v1 *vnet = (struct virtio_net_hdr_v1 *)(gcfg->recv_buf + sizeof(struct tun_pi));
 	struct pkt pbuf, *p = &pbuf;
 
+	//todo optimize using scatter-gather lists
 	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
 	if (ret < 0) {
 		if (errno == EAGAIN)
@@ -202,7 +218,7 @@ static void read_from_tun(void)
 				"device: %s\n", strerror(errno));
 		return;
 	}
-	if (ret < sizeof(struct tun_pi)) {
+	if (ret < (sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr_v1))) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
 		return;
@@ -211,9 +227,15 @@ static void read_from_tun(void)
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
+
+#if 0
+	slog(LOG_DEBUG,"Got size=%d proto=%04x flags=%x type=%x len=%d gso=%d\n",
+		ret,ntohs(pi->proto),vnet->flags,vnet->gso_type,vnet->hdr_len,vnet->gso_size);
+#endif
 	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
-	p->data_len = ret - sizeof(struct tun_pi);
+	p->vnet = vnet;
+	p->data = gcfg->recv_buf + sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr_v1);
+	p->data_len = ret - (sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr_v1));
 	switch (ntohs(pi->proto)) {
 	case ETH_P_IP:
 		handle_ip4(p);

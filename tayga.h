@@ -35,6 +35,7 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
+#include <linux/virtio_net.h>
 
 #include "list.h"
 #include "config.h"
@@ -117,6 +118,7 @@ struct pkt {
 	struct ip6 *ip6;
 	struct ip6_frag *ip6_frag;
 	struct icmp *icmp;
+	struct virtio_net_hdr_v1 *vnet;
 	uint8_t data_proto;
 	uint8_t *data;
 	uint32_t data_len;
@@ -248,6 +250,12 @@ struct config {
 		 (net)->s6_addr32[3] == ((addr)->s6_addr32[3] & \
 			 			(mask)->s6_addr32[3]))
 
+/* Offloads we support */
+#if defined TUN_F_USO4 && defined TUN_F_USO6
+#define TUN_F_ENABLED (TUN_F_CSUM | TUN_F_TSO4 | TUN_F_TSO6 | TUN_F_USO4 | TUN_F_USO6)
+#else
+#define TUN_F_ELABLED (TUN_F_CSUM)
+#endif
 
 /* TAYGA function prototypes */
 

@@ -405,7 +405,7 @@ void read_config(char *conffile)
 	if (!gcfg)
 		goto malloc_fail;
 	memset(gcfg, 0, sizeof(struct config));
-	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi);
+	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr);
 	INIT_LIST_HEAD(&gcfg->map4_list);
 	INIT_LIST_HEAD(&gcfg->map6_list);
 	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */

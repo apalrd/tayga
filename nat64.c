@@ -89,13 +89,15 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip4 ip4;
 		struct icmp icmp;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct iovec iov[2];
 
 	header.pi.flags = 0;
 	header.pi.proto = htons(ETH_P_IP);
+
 	header.ip4.ver_ihl = 0x45;
 	header.ip4.tos = tos;
 	header.ip4.length = htons(sizeof(header.ip4) + sizeof(header.icmp) +
@@ -117,8 +119,8 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
 	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
-		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
-				strerror(errno));
+		slog(LOG_WARNING, "error writing packet to tun device in %s: %s\n",
+				__FUNCTION__,strerror(errno));
 }
 
 static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
@@ -126,6 +128,8 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 {
 	struct icmp icmp;
 	int orig_len;
+
+	slog(LOG_DEBUG,"Asked to send ICMP error type %d code %d\n",type,code);
 
 	/* Don't send ICMP errors in response to ICMP messages other than
 	   echo request */
@@ -175,6 +179,7 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6)
 
 	switch (p->data_proto) {
 	case 1:
+		//FYI should we be doing more work here?
 		cksum = ip6_checksum(ip6, htons(p->ip4->length) -
 						p->header_len, 58);
 		cksum = ones_add(p->icmp->cksum, cksum);
@@ -190,7 +195,7 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6)
 		if (p->data_len < 8)
 			return -1;
 		tck = (uint16_t *)(p->data + 6);
-		if (!*tck)
+		if (!*tck && !(p->vnet->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM))
 			return -1; /* drop UDP packets with no checksum */
 		break;
 	case 6:
@@ -209,9 +214,10 @@ static void xlate_4to6_data(struct pkt *p)
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip6 ip6;
 		struct ip6_frag ip6_frag;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct cache_entry *src = NULL, *dest = NULL;
 	struct iovec iov[2];
 	int no_frag_hdr = 0;
@@ -244,9 +250,19 @@ static void xlate_4to6_data(struct pkt *p)
 	   1456 bytes of payload == 1504 bytes.) */
 	if ((off & (IP4_F_MASK | IP4_F_MF)) == 0) {
 		if (off & IP4_F_DF) {
-			if (gcfg->mtu - MTU_ADJ < p->header_len + p->data_len) {
-				host_send_icmp4_error(3, 4,
-						gcfg->mtu - MTU_ADJ, p);
+			//not using segment offloading, calculate from whole packet
+			if (gcfg->mtu - MTU_ADJ < p->header_len + p->data_len &&
+				!p->vnet->gso_type) 
+			{
+				//icmp fragment required
+				host_send_icmp4_error(3, 4, gcfg->mtu - MTU_ADJ, p);
+				return;
+			}
+			//using segment offloading, calculate from single segment
+			else if(gcfg->mtu - MTU_ADJ < (p->vnet->hdr_len + p->vnet->gso_size))
+			{
+				//icmp fragment required
+				host_send_icmp4_error(3, 4, gcfg->mtu - MTU_ADJ, p);
 				return;
 			}
 			no_frag_hdr = 1;
@@ -269,16 +285,58 @@ static void xlate_4to6_data(struct pkt *p)
 	header.pi.flags = 0;
 	header.pi.proto = htons(ETH_P_IPV6);
 
+	//adjust gso type
+	switch(p->vnet->gso_type)
+	{
+	case 0:
+		break;
+	case VIRTIO_NET_HDR_GSO_TCPV4:
+		//change to a v6 offload and add 20 bytes header
+		header.vnet.gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
+		header.vnet.hdr_len = p->vnet->hdr_len + 20;
+		header.vnet.gso_size = p->vnet->gso_size;
+
+		//validate header length
+		int tcphdr = ((*(uint8_t *)(p->data + 12)) >> 4) * 4;
+		if(header.vnet.hdr_len != (40 + tcphdr))
+		{
+			slog(LOG_WARNING,"Invalid header length in %s line %d: Got "
+				"tcphdr length of %d\n",
+				__FUNCTION__,__LINE__,tcphdr);
+		}
+#if 1
+		slog(LOG_DEBUG,"writing new tcp6 offload type=%x hdrlen=%d gsosize=%d len=%d\n",
+			header.vnet.gso_type,
+			header.vnet.hdr_len,
+			header.vnet.gso_size,
+			p->data_len);
+#endif
+		break;
+	default:
+		slog(LOG_ERR,"Unknown GSO type %d in %s line %d\n",
+		p->vnet->gso_type,__FUNCTION__,__LINE__);
+		break;
+	}
+
+	//checksum offload
+	if(p->vnet->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
+	{
+		header.vnet.csum_offset = 10;
+		header.vnet.csum_start = 40;
+		if(!header.vnet.gso_type) header.vnet.flags |= VIRTIO_NET_HDR_F_NEEDS_CSUM;
+	}
+
 	if (no_frag_hdr) {
 		iov[0].iov_base = &header;
-		iov[0].iov_len = sizeof(struct tun_pi) + sizeof(struct ip6);
+		iov[0].iov_len = sizeof(header) - sizeof(struct ip6_frag);
 		iov[1].iov_base = p->data;
 		iov[1].iov_len = p->data_len;
 
 		if (writev(gcfg->tun_fd, iov, 2) < 0)
-			slog(LOG_WARNING, "error writing packet to tun "
-					"device: %s\n", strerror(errno));
+			slog(LOG_WARNING, "error writing packet  to tun "
+					"device in %s: %s\n", __FUNCTION__,strerror(errno));
 	} else {
+		slog(LOG_WARNING,"Sending IPv6 fragments is a bad idea\n");
 		header.ip6_frag.next_header = header.ip6.next_header;
 		header.ip6_frag.reserved = 0;
 		header.ip6_frag.ident = htonl(ntohs(p->ip4->ident));
@@ -311,9 +369,9 @@ static void xlate_4to6_data(struct pkt *p)
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
 
 			if (writev(gcfg->tun_fd, iov, 2) < 0) {
-				slog(LOG_WARNING, "error writing packet to "
-						"tun device: %s\n",
-						strerror(errno));
+				slog(LOG_WARNING, "error writing fragment to "
+						"tun device in %s: %s\n",
+						__FUNCTION__,strerror(errno));
 				return;
 			}
 		}
@@ -381,10 +439,11 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip6 ip6;
 		struct icmp icmp;
 		struct ip6 ip6_em;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
@@ -523,8 +582,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[1].iov_len = p_em.data_len;
 
 	if (writev(gcfg->tun_fd, iov, 2) < 0)
-		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
-				strerror(errno));
+		slog(LOG_WARNING, "error writing packet to tun device in %s: %s\n",
+				__FUNCTION__,strerror(errno));
 }
 
 void handle_ip4(struct pkt *p)
@@ -561,9 +620,10 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip6 ip6;
 		struct icmp icmp;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct iovec iov[2];
 
 	header.pi.flags = 0;
@@ -586,8 +646,8 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
 	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
-		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
-				strerror(errno));
+		slog(LOG_WARNING, "error writing packet to tun device in %s: %s\n",
+				__FUNCTION__,strerror(errno));
 }
 
 static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
@@ -595,6 +655,8 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 {
 	struct icmp icmp;
 	int orig_len;
+
+	slog(LOG_DEBUG,"Asked to send ICMP6 error type %d code %d\n",type,code);
 
 	/* Don't send ICMP errors in response to ICMP messages other than
 	   echo request */
@@ -697,8 +759,9 @@ static void xlate_6to4_data(struct pkt *p)
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip4 ip4;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct cache_entry *src = NULL, *dest = NULL;
 	struct iovec iov[2];
 
@@ -712,7 +775,10 @@ static void xlate_6to4_data(struct pkt *p)
 		return;
 	}
 
-	if (sizeof(struct ip6) + p->header_len + p->data_len > gcfg->mtu) {
+	//only check MTU if not using segment offload
+	if (!p->vnet->gso_type &&
+		(sizeof(struct ip6) + p->header_len + p->data_len > gcfg->mtu))
+	{
 		host_send_icmp6_error(2, 0, gcfg->mtu, p);
 		return;
 	}
@@ -730,7 +796,49 @@ static void xlate_6to4_data(struct pkt *p)
 
 	header.pi.flags = 0;
 	header.pi.proto = htons(ETH_P_IP);
+	//segmentation offloads
+	if(p->vnet->gso_type)
+	{
+		//adjust vnet checksum locations and header lengths
+		switch(p->vnet->gso_type)
+		{
+		case VIRTIO_NET_HDR_GSO_TCPV6:
+			//change to a v4 offload and subtract 20 bytes header
+			header.vnet.gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+			header.vnet.hdr_len = p->vnet->hdr_len - 20;
+			header.vnet.gso_size = p->vnet->gso_size;
 
+			//validate header length
+			int tcphdr = ((*(uint8_t *)(p->data + 12)) >> 4) * 4;
+			if(header.vnet.hdr_len != (20 + tcphdr))
+			{
+				slog(LOG_WARNING,"Invalid header length in %s line %d: Got "
+					"tcphdr length of %d\n",
+					__FUNCTION__,__LINE__,tcphdr);
+			}
+#if 0
+			slog(LOG_DEBUG,"writing new tcp4 offload type=%x hdrlen=%d gsosize=%d len=%d\n",
+				header.vnet.gso_type,
+				header.vnet.hdr_len,
+				header.vnet.gso_size,
+				p->data_len);
+#endif
+			break;
+		default:
+			slog(LOG_ERR,"Unknown GSO type %d in %s line %d\n",
+			p->vnet->gso_type,__FUNCTION__,__LINE__);
+			break;
+		}
+	}
+
+	//checksum offloaded
+	//GSO assumes checksum must be recalculated, do not flag for GSO
+	if(p->vnet->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM && !header.vnet.gso_type)
+	{
+		header.vnet.csum_offset = 10;
+		header.vnet.csum_start = 20;
+		header.vnet.flags |= VIRTIO_NET_HDR_F_NEEDS_CSUM;
+	}
 	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
 
 	iov[0].iov_base = &header;
@@ -739,8 +847,10 @@ static void xlate_6to4_data(struct pkt *p)
 	iov[1].iov_len = p->data_len;
 
 	if (writev(gcfg->tun_fd, iov, 2) < 0)
-		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
-				strerror(errno));
+	{
+		slog(LOG_WARNING, "error writing packet to tun device in %s: %s\n",
+				__FUNCTION__,strerror(errno));
+	}
 }
 
 static int parse_ip6(struct pkt *p)
@@ -809,10 +919,11 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 {
 	struct {
 		struct tun_pi pi;
+		struct virtio_net_hdr_v1 vnet;
 		struct ip4 ip4;
 		struct icmp icmp;
 		struct ip4 ip4_em;
-	} __attribute__ ((__packed__)) header;
+	} __attribute__ ((__packed__)) header = {0};
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
