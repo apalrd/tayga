@@ -15,7 +15,7 @@
  *  GNU General Public License for more details.
  */
 
-#include <tayga.h>
+#include "tayga.h"
 
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"

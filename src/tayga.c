@@ -15,7 +15,7 @@
  *  GNU General Public License for more details.
  */
 
-#include <tayga.h>
+#include "tayga.h"
 
 #include <stdarg.h>
 #include <signal.h>

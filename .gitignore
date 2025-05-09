@@ -1,8 +1,8 @@
 *.o
-.deps/
-Makefile
 tayga
-config.h
-config.log
-config.status
-stamp-h1
+tayga.conf
+*.tar
+*.d
+tayga-cov
+*.gcno 
+*.gcda

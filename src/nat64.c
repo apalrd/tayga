@@ -15,7 +15,7 @@
  *  GNU General Public License for more details.
  */
 
-#include <tayga.h>
+#include "tayga.h"
 
 extern struct config *gcfg;
 
