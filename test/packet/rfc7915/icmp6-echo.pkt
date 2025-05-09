@@ -1,0 +1,5 @@
+
+// Send ICMPv6 Echo Request
+//+0 < IPV6 2001:db8::64 > 3fff:6464::ac10:1 : ICMP6, echo_request, id 15, seq 1, length 64
++0 < ipv4 192.168.0.1 > 192.168.1.1: icmp echo_request id 15
+// Expect ICMPv4 Echo Request

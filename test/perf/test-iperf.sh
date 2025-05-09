@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Setup test
-source test/setup.sh
+. test/setup.sh
 
 set -x
 # Start iperf server
@@ -13,10 +13,10 @@ if [ ! -f /var/run/iperf.pid ]; then
 fi
 
 # Run iperf from IPv6 to IPv4
-iperf3 -c $TRANSLATION_PREFIX$TEST_SYSTEM_IPV4 -p 6464 -t 10 -B $TEST_SYSTEM_IPV6 -b 10m
+iperf3 -c $TAYGA_PREFIX$TEST_SYSTEM_IPV4 -p 6464 -t 10 -B $TEST_SYSTEM_IPV6 -b 10m
 
 # Run iperf from IPv4 to IPv6
-iperf3 -c $TRANSLATION_PREFIX$TEST_SYSTEM_IPV4 -p 6464 -t 10 -B $TEST_SYSTEM_IPV6 -b 10m -R
+iperf3 -c $TAYGA_PREFIX$TEST_SYSTEM_IPV4 -p 6464 -t 10 -B $TEST_SYSTEM_IPV6 -b 10m -R
 
 
 # Stop iperf server
@@ -26,4 +26,4 @@ rm -f /var/run/iperf.pid || exit 1
 
 set +x
 # Cleanup test
-source test/cleanup.sh
+. test/cleanup.sh

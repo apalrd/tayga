@@ -10,12 +10,12 @@ echo "Setting Up Tayga"
 # Allow overriding tayga binary for coverage testing
 TAYGA="${TAYGA:-./tayga}"
 # IP Range Defaults
-TAYGA_POOL4="${TAYGA_POOL4:-192.168.255.0/24}"  # Tayga pool4 range
-PUBLIC_IPV4="${PUBLIC_IPV4:-203.0.113}"    # Public IP range (/24)
-TEST_SYSTEM_IPV4="${TEST_SYSTEM_IPV4:-172.16.0.1}" # Test System IP
-TRANSLATION_PREFIX="${TRANSLATION_PREFIX:-3fff:6464::}" # Translation prefix
+TAYGA_POOL4="${TAYGA_POOL4:-172.16.0.0/24}"  # Tayga pool4 range
+TAYGA_PREFIX="${TAYGA_PREFIX:-3fff:6464::}" # Translation prefix
+PUBLIC_IPV4="${PUBLIC_IPV4:-192.0.2.1/24}"    # Public IP range (/24)
 PUBLIC_IPV6="${PUBLIC_IPV6:-2001:db8::}"     # Public IP range
-TEST_SYSTEM_IPV6="${TEST_SYSTEM_IPV6:-2001:db8::64}" # Test System IP
+TEST_SYSTEM_IPV4="${TEST_SYSTEM_IPV4:-192.168.1.1}" # Test System IP
+TEST_SYSTEM_IPV6="${TEST_SYSTEM_IPV6:-2001:db8::1}" # Test System IP
 # Configuration File
 TAYGA_CONF="${TAYGA_CONF:-test/tayga.conf}" # Tayga configuration file
 
@@ -31,7 +31,7 @@ ${TAYGA} -c ${TAYGA_CONF} -d --mktun || exit 1
 echo "Bringing up the NAT64 interface"
 ip link set dev nat64 up
 ip addr add ${TAYGA_POOL4} dev nat64
-ip addr add ${TRANSLATION_PREFIX}/96 dev nat64
+ip addr add ${TAYGA_PREFIX}/96 dev nat64
 
 # Add System IPs to a dummy interface
 echo "Creating dummy interface"
