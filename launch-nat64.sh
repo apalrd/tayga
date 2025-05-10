@@ -50,7 +50,7 @@ fi
 
 # Make tunnel adapter
 echo "Creating tunnel adapter"
-/app/tayga -c /app/tayga.conf -d --mktun || exit 1
+./tayga-cov -c /app/tayga.conf -d --mktun || exit 1
 
 # Bring up the interface
 echo "Bringing up the interface"
@@ -65,7 +65,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 
 # Start tayga
 echo "Starting tayga"
-/app/tayga -c /app/tayga.conf -d
+./tayga-cov -c /app/tayga.conf -d
 
 # Delete tunnel adapter on exit
 echo "Deleting tunnel adapter on exit"

@@ -9,16 +9,10 @@
 
 # Set packetdrill defines
 PKT_DEFINES="--debug"
-PKT_DEFINES="$PKT_DEFINES --define TAYGA_ADDR6=$TAYGA_ADDR6"
-PKT_DEFINES="$PKT_DEFINES --define TAYGA_POOL4=$TAYGA_POOL4"
-PKT_DEFINES="$PKT_DEFINES --define TAYGA_PREFIX=$TAYGA_PREFIX"
-PKT_DEFINES="$PKT_DEFINES --define PUBLIC_IPV4=$PUBLIC_IPV4"
-PKT_DEFINES="$PKT_DEFINES --define PUBLIC_IPV6=$PUBLIC_IPV6"
-PKT_DEFINES="$PKT_DEFINES --define TEST_SYSTEM_IPV4=$TEST_SYSTEM_IPV4"
-PKT_DEFINES="$PKT_DEFINES --define TEST_SYSTEM_IPV6=$TEST_SYSTEM_IPV6"
-
+PKT_DEFINES="$PKT_DEFINES --ip_version=ipv4-xlate-ipv6"
+PKT_DEFINES="$PKT_DEFINES --pref64=3fff:6464::/96"
 # Run packetdrill tests
-packetdrill $PKT_DEFINES test/packet/rfc7915/icmp6-echo.pkt || fail
+packetdrill $PKT_DEFINES test/packet/rfc7915/tcp-estab.pkt  || fail
 
 
 # Cleanup test environment
