@@ -6,7 +6,6 @@ import ipaddress
 import atexit
 import time
 from scapy.layers.tuntap import TunTapInterface
-from test_report import test_report
 
 class test_env:
     def cleanup(self):
@@ -103,6 +102,7 @@ class test_env:
         ipr.addr("add", index=tun_index, address=str(self.TestSystemIPv4), mask=24)
         ipr.addr("add", index=tun_index, address=str(self.TestSystemIPv6), mask=64)
         ipr.link("set", index=tun_index, mtu=1500)
+        tun.nonblocking_socket()
         self.tun = tun
 
     def __init__(self,test_name):
@@ -116,6 +116,7 @@ class test_env:
         self.TestSystemIPv4 = ipaddress.ip_address("192.168.1.1")
         self.TestSystemIPv4Xlate = ipaddress.ip_address("3fff:6464::192.168.1.1")
         self.TestSystemIPv6 = ipaddress.ip_address("2001:db8::1")
+        self.TestSystemIPv6Xlate = ipaddress.ip_address("172.16.0.1")
         self.TaygaConf = "test/tayga.conf"
         self.TcpdumpFile = None
         self.Fail = False
@@ -156,18 +157,26 @@ class test_env:
     # Send a packet and check for a suitable response
     def send_and_check(self,packet,response_func,test_name):
         # Send the packet using the test.tun interface
+        if self.debug:
+            print(f"Sending packet for {test_name}:")
+            print(packet.show())
+        # Send the packet
         self.tun.send(packet)
 
         end = time.perf_counter() + self.timeout
         test_stat = False
         while time.perf_counter() < end:
             response_packet = self.tun.recv()
+            if self.debug:
+                print(f"Received packet for {test_name}:")
+                print(response_packet.show())
+            # Check if the received packet matches the expected response
             if response_func(response_packet):
-                print(f"Received a valid response for {test_name}:")
                 if self.debug:
-                    print(response_packet.show())
+                    print(f"Received packet is valid for {test_name}")
                 test_stat = True
                 break
+        # TODO verify IP checksum
 
         if test_stat:
             self.tpass(test_name)
