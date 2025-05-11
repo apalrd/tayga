@@ -278,10 +278,12 @@ class send_and_check:
             res = self.response_func(pkt)
         except Exception as e:
             print(f"Exception occurred while processing packet in {self.test_name}: {e}")
+            print(pkt.show())
             return False
         if res.result() != test_res.RES_NONE:
             if self.test.debug or res.has_fail:
                 print(f"Received packet matching {self.test_name}")
+                print(pkt.show())
             self.test_stat = res
             return True
         return False
