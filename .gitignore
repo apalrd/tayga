@@ -6,3 +6,6 @@ tayga
 tayga-cov
 *.gcno 
 *.gcda
+*.rpt
+*.pcap
+*.pyc
