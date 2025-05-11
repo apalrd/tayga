@@ -110,16 +110,20 @@ class test_env:
         ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.tayga_prefix.network_address), mask=self.tayga_prefix.prefixlen)
 
     def setup_tcpdump(self):
+        iface = "nat64"
+        if self.pcap_test_env:
+            iface = "tun0"
         # If tcpdump file variable is set, start tcpdump
         if self.pcap_file:
-            print("Starting tcpdump")
+            print("Starting tcpdump for interface "+iface)
             self.tcpdump_proc = subprocess.Popen(
-                ["tcpdump", "-i", "nat64", "-w", self.pcap_file],
+                ["tcpdump", "-i", iface, "-w", self.pcap_file],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
+            time.sleep(2)
 
-    def start_tayga(self):
+    def setup_tayga(self):
         # Start Tayga asynchronously and capture output to a file if specified
         if self.tayga_log_file:
             try:
@@ -151,7 +155,6 @@ class test_env:
             sys.exit(1)
 
     def setup_tun(self):
-
         print(f"Creating TUN/TAP interface")
         # Create a TUN/TAP interface
         tun = TunTapInterface(iface="tun0", mode_tun=True, strip_packet_info=False)
@@ -180,9 +183,10 @@ class test_env:
         self.icmp_router_ipv4 = ipaddress.ip_address("203.0.113.1")
         self.icmp_router_ipv6 = ipaddress.ip_address("2001:db8:f00f::1")
         self.tayga_ipv4 = ipaddress.ip_address("172.16.0.3")
-        self.tayga_ipv6 = ipaddress.ip_address("3fff:6464::172.16.0.7")
+        self.tayga_ipv6 = ipaddress.ip_address("3fff:6464::172.16.0.3")
         self.tayga_conf = "test/tayga.conf"
         self.pcap_file = None
+        self.pcap_test_env = False
         self.tayga_log_file = None
         self.test_name = test_name
         self.file_path = test_name + ".rpt"
@@ -190,6 +194,12 @@ class test_env:
         self.test_passed = 0
         self.test_failed = 0
         self.timeout = 1 # seconds
+        # write report header
+        with open(self.file_path, 'w') as report_file:
+            report_file.write("Test Report "+self.test_name+"\n")
+            report_file.write("=" * 40 + "\n")
+            print("Starting Test Report for "+self.test_name)
+            print("="*40)
 
 
     def setup(self):
@@ -198,15 +208,9 @@ class test_env:
         # Setup the test environment
         self.setup_forward()
         self.setup_nat64()
-        self.setup_tcpdump()
-        self.start_tayga()
+        self.setup_tayga()
         self.setup_tun()
-        # write report header
-        with open(self.file_path, 'w') as report_file:
-            report_file.write("Test Report "+self.test_name+"\n")
-            report_file.write("=" * 40 + "\n")
-            print("Starting Test Report for "+self.test_name)
-            print("="*40)
+        self.setup_tcpdump()
 
 
     def tpass(self, test_name):
@@ -270,10 +274,6 @@ class send_and_check:
         if pkt.haslayer(IP) and pkt[IP].dst == "224.0.0.252":
             return False
         # Check if the received packet matches the expected response
-        if self.test.debug:
-            print(f"Received packet for {self.test_name}:")
-            print(pkt.show())
-        # Check if the received packet matches the expected response
         try:
             res = self.response_func(pkt)
         except Exception as e:
@@ -330,14 +330,11 @@ class send_and_none:
         # Toss LLMNR
         if pkt.haslayer(IP) and pkt[IP].dst == "224.0.0.252":
             return False
-        # Check if the received packet matches the expected response
-        if self.test.debug:
-            print(f"Received packet for {self.test_name}:")
-            print(pkt.show())
         # Got an unexpected packet
-        print(f"Received unexpected packet for {self.test_name}:")
-        print(pkt.show())
-        self.test_state = False
+        print(f"Received unexpected packet for {self.test_name}")
+        if self.test.debug:
+            print(pkt.show())
+        self.test_stat = False
         return True
 
     def __init__(self,test,packet,test_name):
@@ -359,6 +356,7 @@ class send_and_none:
         if self.test_stat:
             self.test.tpass(self.test_name)
         else:
+            print("Failing Test "+self.test_name)
             self.test.tfail(self.test_name, self.test_err)
 
     def failed(self):
