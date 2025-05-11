@@ -48,31 +48,33 @@ class test_env:
         print("Stopping Tayga")
         ipr = IPRoute()
         
-        # Kill tcpdump process by PID file
-        try:
-            with open("/var/run/tcpdump.pid", "r") as f:
-                pid = int(f.read().strip())
-            os.kill(pid, 9)
-            os.remove("/var/run/tcpdump.pid")
-        except FileNotFoundError:
-            if self.debug:
-                print("Tcpdump PID file not found, skipping process termination")
-        except ProcessLookupError:
+        # Kill tcpdump process using the subprocess object
+        if hasattr(self, 'tcpdump_proc') and self.tcpdump_proc:
+            try:
+                self.tcpdump_proc.terminate()
+                self.tcpdump_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.tcpdump_proc.kill()
+                print("Tcpdump process did not terminate gracefully, force killed")
+        else:
             if self.debug:
                 print("Tcpdump process not found, skipping process termination")
 
-        # Kill Tayga process by PID file
-        try:
-            with open("/var/run/tayga.pid", "r") as f:
-                pid = int(f.read().strip())
-            os.kill(pid, 9)
-            os.remove("/var/run/tayga.pid")
-        except FileNotFoundError:
-            if self.debug:
-                print("Tayga PID file not found, skipping process termination")
-        except ProcessLookupError:
+        # Kill Tayga process using the subprocess object
+        if hasattr(self, 'tayga_proc') and self.tayga_proc:
+            try:
+                self.tayga_proc.terminate()
+                self.tayga_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.tayga_proc.kill()
+                print("Tayga process did not terminate gracefully, force killed")
+        else:
             if self.debug:
                 print("Tayga process not found, skipping process termination")
+
+        #Close tayga log file
+        if hasattr(self, 'tayga_log') and self.tayga_log is not None:
+            self.tayga_log.close()
 
         # Remove the NAT64 interface
         try:
@@ -97,33 +99,54 @@ class test_env:
             print("Bringing up the NAT64 interface")
         # Bring Up Interface
         try:
-            subprocess.run([self.Tayga, "-c", self.TaygaConf, "-d", "--mktun"], check=True)
+            subprocess.run([self.tayga_bin, "-c", self.tayga_conf, "-d", "--mktun"], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error while bringing up interface: {e}")
         # Set NAT64 interface up
         ipr.link('set', index=ipr.link_lookup(ifname='nat64')[0], state='up')
         # Add IPv4 address to NAT64 interface
-        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.TaygaPool4.network_address), mask=self.TaygaPool4.prefixlen)
+        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
         # Add IPv6 address to NAT64 interface
-        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.TaygaPrefix.network_address), mask=self.TaygaPrefix.prefixlen)
+        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.tayga_prefix.network_address), mask=self.tayga_prefix.prefixlen)
 
     def setup_tcpdump(self):
         # If tcpdump file variable is set, start tcpdump
-        if self.TcpdumpFile:
+        if self.pcap_file:
             print("Starting tcpdump")
-            tcpdump_proc = subprocess.Popen(["tcpdump", "-i", "nat64", "-w", self.TcpdumpFile])
-            with open("/var/run/tcpdump.pid", "w") as f:
-                f.write(str(tcpdump_proc.pid))
+            self.tcpdump_proc = subprocess.Popen(
+                ["tcpdump", "-i", "nat64", "-w", self.pcap_file],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
     def start_tayga(self):
-        # Start Tayga
+        # Start Tayga asynchronously and capture output to a file if specified
+        if self.tayga_log_file:
+            try:
+                self.tayga_log = open(self.tayga_log_file, "w")
+            except OSError as e:
+                print(f"Error while opening output file: {e}")
+                sys.exit(1)
+        else:
+            self.tayga_log = None
+
         try:
-            subprocess.run([self.Tayga, "-c", self.TaygaConf, "-p", "/var/run/tayga.pid"], check=True)
-        except subprocess.CalledProcessError as e:
+            self.tayga_proc = subprocess.Popen(
+            [self.tayga_bin, "-c", self.tayga_conf,"-d"],
+            stdout=self.tayga_log if self.tayga_log else subprocess.DEVNULL,
+            stderr=subprocess.STDOUT
+            )
+        except subprocess.SubprocessError as e:
             print(f"Error while starting Tayga: {e}")
+            if self.tayga_log:
+                self.tayga_log.close()
+            sys.exit(1)
+
+        # Wait for a short time to ensure Tayga starts
+        time.sleep(1)
 
         # Check if Tayga started successfully
-        if not os.path.isfile("/var/run/tayga.pid"):
+        if self.tayga_proc.poll() is not None:  # Check if the process has already terminated
             print("Tayga failed to start")
             sys.exit(1)
 
@@ -135,30 +158,32 @@ class test_env:
         ipr = IPRoute()
         tun_index = ipr.link_lookup(ifname="tun0")[0]
         ipr.link("set", index=tun_index, state="up")
-        ipr.addr("add", index=tun_index, address=str(self.TestSystemIPv4), mask=24)
-        ipr.addr("add", index=tun_index, address=str(self.TestSystemIPv6), mask=64)
+        ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv4), mask=24)
+        ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv6), mask=64)
         ipr.link("set", index=tun_index, mtu=1500)
         self.tun = tun
 
     def __init__(self,test_name):
         #These are the default values for the test environment
         self.debug = False
-        self.Tayga = "./tayga"
-        self.TaygaPool4 = ipaddress.ip_network("172.16.0.0/24")
-        self.TaygaPrefix = ipaddress.ip_network("3fff:6464::/96")
-        self.PublicIPv4 = ipaddress.ip_address("192.168.1.2")
-        self.PublicIPv4Xlate = ipaddress.ip_address("3fff:6464::192.168.1.2")
-        self.PublicIPv6 = ipaddress.ip_address("2001:db8::2")
-        self.PublicIPv6Xlate = ipaddress.ip_address("172.16.0.2")
-        self.TestSystemIPv4 = ipaddress.ip_address("192.168.1.1")
-        self.TestSystemIPv4Xlate = ipaddress.ip_address("3fff:6464::192.168.1.1")
-        self.TestSystemIPv6 = ipaddress.ip_address("2001:db8::1")
-        self.TestSystemIPv6Xlate = ipaddress.ip_address("172.16.0.1")
-        self.IcmpRouterIPv4 = ipaddress.ip_address("203.0.113.1")
-        self.IcmpRouterIPv6 = ipaddress.ip_address("2001:db8:f00f::1")
-        self.TaygaConf = "test/tayga.conf"
-        self.TcpdumpFile = None
-        self.Fail = False
+        self.tayga_bin = "./tayga"
+        self.tayga_pool4 = ipaddress.ip_network("172.16.0.0/24")
+        self.tayga_prefix = ipaddress.ip_network("3fff:6464::/96")
+        self.public_ipv4 = ipaddress.ip_address("192.168.1.2")
+        self.public_ipv4_xlate = ipaddress.ip_address("3fff:6464::192.168.1.2")
+        self.public_ipv6 = ipaddress.ip_address("2001:db8::2")
+        self.public_ipv6_xlate = ipaddress.ip_address("172.16.0.2")
+        self.test_sys_ipv4 = ipaddress.ip_address("192.168.1.1")
+        self.test_sys_ipv4_xlate = ipaddress.ip_address("3fff:6464::192.168.1.1")
+        self.test_sys_ipv6 = ipaddress.ip_address("2001:db8::1")
+        self.test_sys_ipv6_xlate = ipaddress.ip_address("172.16.0.1")
+        self.icmp_router_ipv4 = ipaddress.ip_address("203.0.113.1")
+        self.icmp_router_ipv6 = ipaddress.ip_address("2001:db8:f00f::1")
+        self.tayga_ipv4 = ipaddress.ip_address("172.16.0.3")
+        self.tayga_ipv6 = ipaddress.ip_address("3fff:6464::172.16.0.7")
+        self.tayga_conf = "test/tayga.conf"
+        self.pcap_file = None
+        self.tayga_log_file = None
         self.test_name = test_name
         self.file_path = test_name + ".rpt"
         self.test_results = []
@@ -237,12 +262,23 @@ class send_and_check:
                 return False
             if ipaddress.IPv6Address(pkt[IPv6].dst).is_link_local:
                 return False
+        # Toss IPv4 IGMP
+        if pkt.haslayer(IP):
+            if pkt[IP].proto == 2:
+                return False
+        # Toss LLMNR
+        if pkt.haslayer(IP) and pkt[IP].dst == "224.0.0.252":
+            return False
         # Check if the received packet matches the expected response
         if self.test.debug:
             print(f"Received packet for {self.test_name}:")
             print(pkt.show())
         # Check if the received packet matches the expected response
-        res = self.response_func(pkt)
+        try:
+            res = self.response_func(pkt)
+        except Exception as e:
+            print(f"Exception occurred while processing packet in {self.test_name}: {e}")
+            return False
         if res.result() != test_res.RES_NONE:
             if self.test.debug or res.has_fail:
                 print(f"Received packet matching {self.test_name}")
@@ -285,6 +321,13 @@ class send_and_none:
                 return False
             if ipaddress.IPv6Address(pkt[IPv6].dst).is_link_local:
                 return False
+        # Toss IPv4 IGMP
+        if pkt.haslayer(IP):
+            if pkt[IP].proto == 2:
+                return False
+        # Toss LLMNR
+        if pkt.haslayer(IP) and pkt[IP].dst == "224.0.0.252":
+            return False
         # Check if the received packet matches the expected response
         if self.test.debug:
             print(f"Received packet for {self.test_name}:")
