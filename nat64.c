@@ -506,11 +506,20 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			slog(LOG_DEBUG,"Drop packet due to parameter problem at %s:%d\n",__FUNCTION__,__LINE__);
 			return;
 		}
+		static const int32_t new_ptr_tbl[] = {0,1,4,4,-1,-1,-1,-1,7,6,-1,-1,8,8,8,8,24,24,24,24};
+		int32_t old_ptr = (ntohl(p->icmp->word) >> 24);
+		if(old_ptr > 19) {
+			slog(LOG_DEBUG,"Drop packet due to parameter problem - invalid pointer at %s:%d\n",__FUNCTION__,__LINE__);
+			return;
+		}
+		if(new_ptr_tbl[old_ptr] < 0) {
+			slog(LOG_DEBUG,"Drop packet due to parameter problem, not translatable\n");
+			return;
+		}
 		header.icmp.type = 4;
 		header.icmp.code = 0;
-		/* XXX do this and remove return */
-		slog(LOG_DEBUG,"Hit unimplemented case at %s:%d\n",__FUNCTION__,__LINE__);
-		return;
+		header.icmp.word = htonl(new_ptr_tbl[old_ptr]);
+		break;
 	default:
 		slog(LOG_DEBUG,"Hit default case in %s:%d (ICMP Type)\n",__FUNCTION__,__LINE__);
 		return;
@@ -919,17 +928,37 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		header.icmp.word = 0;
 		break;
 	case 4: /* Parameter Problem */
-		if (p->icmp->code == 1) {
+		/* Erroneous Header Field Encountered */
+		if (p->icmp->code == 0) {
+			static const int32_t new_ptr_tbl[] = {0,1,-1,-1,2,2,9,8};
+			int32_t old_ptr = ntohl(p->icmp->word);
+			int32_t new_ptr;
+			if(old_ptr > 39) {
+				slog(LOG_DEBUG,"Drop packet due to parameter problem - invalid pointer at %s:%d\n",__FUNCTION__,__LINE__);
+				return;
+			} else if(old_ptr > 23) {
+				new_ptr = 16;
+			} else if(old_ptr > 7) {
+				new_ptr = 12;
+			} else {
+				new_ptr = new_ptr_tbl[old_ptr];
+			}
+			if(new_ptr < 0) {
+				slog(LOG_DEBUG,"Drop packet due to parameter problem, not translatable\n");
+				return;
+			}
+			header.icmp.type = 12;
+			header.icmp.code = 0;
+			header.icmp.word = (htonl(new_ptr << 24));
+			break;
+		/* Unrecognized Next Header Type*/
+		} else if (p->icmp->code == 1) {
 			header.icmp.type = 3; /* Destination Unreachable */
 			header.icmp.code = 2; /* Protocol Unreachable */
 			header.icmp.word = 0;
 			break;
-		} else if (p->icmp->code != 0) {
-			return;
 		}
-		header.icmp.type = 12; /* Parameter Problem */
-		header.icmp.code = 0;
-		/* XXX do this and remove return */
+		slog(LOG_DEBUG,"Dropping unknown ICMPv6 parameter problem packet\n");
 		return;
 	default:
 		return;
