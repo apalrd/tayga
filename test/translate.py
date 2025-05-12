@@ -1,14 +1,17 @@
+#
+#   part of TAYGA <https://github.com/apalrd/tayga> test suite
+#   Copyright (C) 2025  Andrew Palardy <andrew@apalrd.net>
+# 
+#   test/translate.py - IP/ICMP Packet Translation Tests
+#   ref. RFC 7915 (obsoletes RFC 6145, 2765), RFC 6791
+#
+
 from test_env import (
     test_env, 
     send_and_check, 
-    send_and_none, 
-    test_res, 
+    send_and_none,
     test_result,
-    route_dest,
-    router
 )
-import subprocess
-import ipaddress
 from random import randbytes
 from scapy.all import IP, ICMP, UDP, IPv6, Raw
 from scapy.layers.inet6 import (
@@ -27,7 +30,7 @@ from scapy.layers.inet6 import (
 import time
 
 ## Test Environment global
-test = test_env("test/rfc7915")
+test = test_env("test/translate")
 
 ####
 #  Generic ICMPv4 Validator
@@ -981,9 +984,9 @@ def sec_5_5():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_log_file = "test/rfc7915.log"
+test.tayga_log_file = "test/translate.log"
 test.tayga_bin = "./tayga-cov"
-test.pcap_file = "test/rfc7915.pcap"
+test.pcap_file = "test/translate.pcap"
 #test.pcap_test_env = True
 test.setup()
 

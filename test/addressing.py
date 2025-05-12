@@ -1,3 +1,11 @@
+#
+#   part of TAYGA <https://github.com/apalrd/tayga> test suite
+#   Copyright (C) 2025  Andrew Palardy <andrew@apalrd.net>
+# 
+#   test/addressing.py - IPv6 Addressing Tests
+#   ref. RFC 6052, RFC 8125
+#
+
 from test_env import (
     test_env, 
     send_and_check, 
@@ -10,7 +18,7 @@ from scapy.all import IP, UDP, IPv6, Raw
 import time
 
 # Create an instance of TestEnv
-test = test_env("test/rfc6052")
+test = test_env("test/addressing")
 
 
 ####
@@ -791,9 +799,9 @@ def sec_5_1():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_log_file = "test/rfc6052.log"
+test.tayga_log_file = "test/addressing.log"
 test.tayga_bin = "./tayga-cov"
-test.pcap_file = "test/rfc6052.pcap"
+test.pcap_file = "test/addressing.pcap"
 #test.pcap_test_env = True
 test.setup()
 
