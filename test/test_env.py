@@ -8,39 +8,123 @@ import time
 from scapy.layers.tuntap import TunTapInterface
 from scapy.all import IPv6, IP
 from enum import Enum
+import socket
+
+class route_dest(Enum):
+    ROUTE_NORMAL = 0 # route to Tayga
+    ROUTE_BLACKHOLE = 1
+    ROUTE_UNREACHABLE = 2
+    ROUTE_ADMIN_PROHIBIT = 3
+    ROUTE_THROW = 4    
+
+
+class router:
+    def __init__(self, route: str,dest: route_dest = route_dest.ROUTE_NORMAL):
+        self.dest = dest
+        self.route = ipaddress.ip_network(route)
+        self.ipr = IPRoute()
+
+    def apply(self):
+        try:
+            if self.dest == route_dest.ROUTE_BLACKHOLE:
+                self.ipr.route("add", dst=str(self.route), type="blackhole")
+            elif self.dest == route_dest.ROUTE_UNREACHABLE:
+                self.ipr.route("add", dst=str(self.route), type="unreachable")
+            elif self.dest == route_dest.ROUTE_ADMIN_PROHIBIT:
+                self.ipr.route("add", dst=str(self.route), type="prohibit")
+            elif self.dest == route_dest.ROUTE_THROW:
+                self.ipr.route("add", dst=str(self.route), type="throw")
+            else:
+                self.ipr.route("add", dst=str(self.route), oif=self.ipr.link_lookup(ifname="nat64")[0])            
+        except Exception as e:
+            print(f"Failed to add route to {self.route}: {e}")
+    def remove(self):
+        try:
+            self.ipr.route("del", dst=str(self.route))
+        except Exception as e:
+            print(f"Failed to remove route to {self.route}: {e}")
 
 class test_res(Enum):
     RES_NONE = 0
     RES_PASS = 1
     RES_FAIL = 2
 
+class single_res():
+    def __init__(self,res:test_res,msg:str):
+        self.res = res
+        self.msg = msg
+
 class test_result:
     def __init__(self):
-        self.has_result = False
         self.has_fail = False
-        self.err = []
+        self.res = []
 
     def check(self,msg,condition):
-        if(not condition):
+        if not condition:
             self.has_fail = True
-            self.err.append(msg)
-        self.has_result = True
+        self.res.append(single_res((test_res.RES_PASS if condition else test_res.RES_FAIL),msg))
+
 
     def compare(self,msg,left,right):
         if(left != right):
             self.has_fail = True
-            self.err.append(msg+": got ("+str(left)+") expected ("+str(right)+")")
-        self.has_result = True
+            self.res.append(single_res(test_res.RES_FAIL,(msg+": got ("+str(left)+") expected ("+str(right)+")")))
+        else:
+            self.res.append(single_res(test_res.RES_PASS,msg))
+
+    def failed(self):
+        failures = sum(1 for result in self.res if result.res is test_res.RES_FAIL)
+        return (failures > 0)
 
     def result(self):
-        if not self.has_result:
+        results = len(self.res)
+        failures = sum(1 for result in self.res if result.res == test_res.RES_FAIL)
+        if results == 0:
             return test_res.RES_NONE
-        elif self.has_fail:
+        elif failures > 0:
             return test_res.RES_FAIL
         return test_res.RES_PASS
     
     def error(self):
-        return ','.join(self.err)
+        err = []
+        for result in self.res:
+            if result.res == test_res.RES_FAIL:
+                err.append(result.msg)
+        return ','.join(err)
+    
+#Tayga conf file generator
+class confgen:
+    def __init__(self):
+        self.default()
+
+    def default(self):
+        self.device= "nat64"
+        self.ipv4_addr = "172.16.0.3"
+        self.ipv6_addr = None
+        self.prefix = "3fff:6464::/96"
+        self.wkpf_strict = False
+        self.dynamic_pool = "172.16.0.0/24"
+        self.data_dir = "/tmp/tayga"
+        self.map = []
+        self.map.append("172.16.0.1 2001:db8::1")
+        self.map.append("172.16.0.2 2001:db8::2")
+
+    def generate(self):
+        with open("test/tayga.conf", 'w') as conf_file:
+            conf_file.write("tun-device "+self.device+"\n")
+            conf_file.write("ipv4-addr "+self.ipv4_addr+"\n")
+            if self.ipv6_addr is not None:
+                conf_file.write("ipv6-addr "+self.ipv6_addr+"\n")
+            conf_file.write("prefix "+self.prefix+"\n")
+            if self.wkpf_strict:
+                conf_file.write("wkpf-strict yes\n")
+            else:
+                conf_file.write("wkpf-strict no\n")
+            conf_file.write("dynamic-pool "+self.dynamic_pool+"\n")
+            conf_file.write("data-dir "+self.data_dir+"\n")
+            for entry in self.map:
+                conf_file.write("map "+entry+"\n")
+
 
 
 class test_env:
@@ -50,15 +134,13 @@ class test_env:
         
         # Kill tcpdump process using the subprocess object
         if hasattr(self, 'tcpdump_proc') and self.tcpdump_proc:
+            time.sleep(0.5) #Let TCPdump finish packets in transit
             try:
                 self.tcpdump_proc.terminate()
                 self.tcpdump_proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.tcpdump_proc.kill()
                 print("Tcpdump process did not terminate gracefully, force killed")
-        else:
-            if self.debug:
-                print("Tcpdump process not found, skipping process termination")
 
         # Kill Tayga process using the subprocess object
         if hasattr(self, 'tayga_proc') and self.tayga_proc:
@@ -99,7 +181,8 @@ class test_env:
             print("Bringing up the NAT64 interface")
         # Bring Up Interface
         try:
-            subprocess.run([self.tayga_bin, "-c", self.tayga_conf, "-d", "--mktun"], check=True)
+            self.tayga_conf.generate()
+            subprocess.run([self.tayga_bin, "-c", self.tayga_conf_file, "-d", "--mktun"], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error while bringing up interface: {e}")
         # Set NAT64 interface up
@@ -124,19 +207,22 @@ class test_env:
             time.sleep(2)
 
     def setup_tayga(self):
+        # Generate configl
+        self.tayga_conf.generate()
+        print("Starting Tayga")
         # Start Tayga asynchronously and capture output to a file if specified
-        if self.tayga_log_file:
+        if self.tayga_log_file and not hasattr(self, 'tayga_log'):
             try:
                 self.tayga_log = open(self.tayga_log_file, "w")
             except OSError as e:
                 print(f"Error while opening output file: {e}")
                 sys.exit(1)
-        else:
+        elif not hasattr(self, "tayga_log"):
             self.tayga_log = None
 
         try:
             self.tayga_proc = subprocess.Popen(
-            [self.tayga_bin, "-c", self.tayga_conf,"-d"],
+            [self.tayga_bin, "-c", self.tayga_conf_file,"-d"],
             stdout=self.tayga_log if self.tayga_log else subprocess.DEVNULL,
             stderr=subprocess.STDOUT
             )
@@ -161,9 +247,12 @@ class test_env:
         ipr = IPRoute()
         tun_index = ipr.link_lookup(ifname="tun0")[0]
         ipr.link("set", index=tun_index, state="up")
+        ipr.link("set", index=tun_index, mtu=1500)
         ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv4), mask=24)
         ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv6), mask=64)
-        ipr.link("set", index=tun_index, mtu=1500)
+        ipr.route("add",dst="default",oif=tun_index)
+        ipr.route("add",dst="::/0",oif=tun_index,family=socket.AF_INET6)
+
         self.tun = tun
 
     def __init__(self,test_name):
@@ -184,7 +273,7 @@ class test_env:
         self.icmp_router_ipv6 = ipaddress.ip_address("2001:db8:f00f::1")
         self.tayga_ipv4 = ipaddress.ip_address("172.16.0.3")
         self.tayga_ipv6 = ipaddress.ip_address("3fff:6464::172.16.0.3")
-        self.tayga_conf = "test/tayga.conf"
+        self.tayga_conf_file = "test/tayga.conf"
         self.pcap_file = None
         self.pcap_test_env = False
         self.tayga_log_file = None
@@ -194,6 +283,7 @@ class test_env:
         self.test_passed = 0
         self.test_failed = 0
         self.timeout = 1 # seconds
+        self.tayga_conf = confgen()
         # write report header
         with open(self.file_path, 'w') as report_file:
             report_file.write("Test Report "+self.test_name+"\n")
@@ -211,6 +301,28 @@ class test_env:
         self.setup_tayga()
         self.setup_tun()
         self.setup_tcpdump()
+
+    def reload(self):
+        print("Restarting Tayga with new configuration")
+        # Kill Tayga process using the subprocess object
+        if hasattr(self, 'tayga_proc') and self.tayga_proc:
+            try:
+                self.tayga_proc.terminate()
+                self.tayga_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.tayga_proc.kill()
+                print("Tayga process did not terminate gracefully, force killed")
+        else:
+            if self.debug:
+                print("Tayga process not found, skipping process termination")
+
+        # Regenerate the conf file and restart
+        self.setup_tayga()
+
+    def xlate(self, ipv4, prefix = None):
+        if prefix is None:
+            prefix = str(self.tayga_prefix.network_address)
+        return str(ipaddress.ip_address(prefix + str(ipaddress.ip_address(ipv4))))
 
 
     def tpass(self, test_name):
@@ -304,9 +416,10 @@ class send_and_check:
         # Use the sniff method to wait for a response
         self.test.tun.sniff(timeout=self.test.timeout,stop_filter=self.recv_validate,store=False)
 
-        if not self.test_stat.has_result:
+
+        if self.test_stat.result() == test_res.RES_NONE:
             self.test.tfail(self.test_name,"No valid response received")
-        elif self.test_stat.has_fail:
+        elif self.test_stat.result() == test_res.RES_FAIL:
             self.test.tfail(self.test_name,self.test_stat.error())
         else:
             self.test.tpass(self.test_name)
