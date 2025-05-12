@@ -1,4 +1,14 @@
-from test_env import test_env, send_and_check, send_and_none, test_res, test_result
+from test_env import (
+    test_env, 
+    send_and_check, 
+    send_and_none, 
+    test_res, 
+    test_result,
+    route_dest,
+    router
+)
+import subprocess
+import ipaddress
 from random import randbytes
 from scapy.all import IP, ICMP, UDP, IPv6, Raw
 from scapy.layers.inet6 import (
@@ -154,12 +164,16 @@ def ip_val(pkt):
 def sec_4_1():
     global test
     # Normal Translation Fields
+    test.tfail("Normal Translation Fields","Not Implemented")
 
     # Illegal Source Address
+    test.tfail("Illegal Source Address","Not Implemented")
 
     # IPv4 Source Route Option
+    test.tfail("IPv4 Source Route Option","Not Implemented")
 
     # IPv4 Requires Fragmentation
+    test.tfail("IPv4 Requires Fragmentation","Not Implemented")
 
     test.section("IPv4 -> IPv6 (RFC 7915 4.1)")
 #############################################
@@ -542,7 +556,7 @@ def sec_4_2():
     # ICMPv4 Packets with Extensions (RFC4884)
     ####
 
-    #TBD
+    test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
 
     test.section("ICMPv4 -> ICMPv6 (RFC 7915 4.2)")
 #############################################
@@ -575,14 +589,19 @@ def sec_4_4():
 def sec_4_5():
     global test
     # TCP Header
+    test.tfail("TCP Header","Not Implemented")
 
     # UDP Header w/ checksum
+    test.tfail("UDP Header w/ checksum","Not Implemented")
 
     # UDP Header w/o checksum
+    test.tfail("UDP Header w/o checksum","Not Implemented")
 
     # ICMP Header
+    test.tfail("ICMP Header","Not Implemented")
 
     # No other protocols are required, but we may want to test them
+    test.tfail("Other Protocols","Not Implemented")
 
     test.section("Transport-Layer Header (RFC 7915 4.5)")
 #############################################
@@ -597,14 +616,12 @@ def sec_5_1():
     expect_addr2 = test.public_ipv4
 
     # Normal Translation
-    test.debug = True
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=64) / Raw(randbytes(64))
     send_and_check(test,expect_ref,ip_val, "Basic Translation Small Packet")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=512) / Raw(randbytes(512))
     send_and_check(test,expect_ref,ip_val, "Basic Translation Medium Packet")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=1420) / Raw(randbytes(1420))
     send_and_check(test,expect_ref,ip_val, "Basic Translation Larger Packet")
-    test.debug = False
 
     # TOS value tests
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=24,plen=1420) / Raw(randbytes(1420))
@@ -655,20 +672,16 @@ def sec_5_1():
     send_and_none(test,expect_ref, "Hop-By-Hop + Routing Segments Left Option")
 
     # Fragmentation Needed
-
-    # TODO
+    test.tfail("Fragmentation Needed","Not Implemented")
 
     # IPv6 Fragment Header
-
-    # TODO
+    test.tfail("IPv6 Fragment Header","Not Implemented")
 
     # Illegal Source Address
-
-    # TODO
+    test.tfail("Illegal Source Address","Not Implemented")
 
     # Illegal Dest Address
-
-    # TODO
+    test.tfail("Illegal Dest Address","Not Implemented")
 
     test.section("IPv6 to IPv4 Translation (RFC 7915 5.1)")
 #############################################
@@ -771,6 +784,7 @@ def sec_5_2():
     send_and_check(test,send_pkt,icmp4_val, "Port Unreachable")
 
     # Others should be dropped (TODO?)
+    test.tfail("Invalid Error Codes","Not Implemented")
 
     ####
     # Other Errors (Type 2 / Type 3 / Type 4)
@@ -806,18 +820,13 @@ def sec_5_2():
 
 
     # Parameter Problem Erroneous Header
-
-    # TODO
+    test.tfail("Parameter Problem Erroneous Header","Not Implemented")
 
     # Parameter Proboem Unrecognized Next Header
-
-    # TODO
+    test.tfail("Parameter Proboem Unrecognized Next Header","Not Implemented")
 
     # Other Error Types
-
-    # TODO
-
-    # todo section 7
+    test.tfail("Other Error Types","Not Implemented")
 
     #############################################
     #  ICMPv6 Errors without a mapping address (RFC 7915 5.2)
@@ -889,8 +898,10 @@ def sec_5_2():
 
 
     # Parameter Problem Erroneous Header
+    test.tfail("Parameter Problem Erroneous Header","Not Implemented")
 
     # Parameter Proboem Unrecognized Next Header
+    test.tfail("Parameter Proboem Unrecognized Next Header","Not Implemented")
 
     # reset expected
     expect_id = -1
@@ -903,8 +914,10 @@ def sec_5_2():
 #############################################
 def sec_5_3():
     # One Nested Header
+    test.tfail("One Nested Header","Not Implemented")
 
     # Two Nested Headers
+    test.tfail("Two Nested Headers","Not Implemented")
 
 
     test.section("ICMP Inner Translation (RFC 7915 5.3)")
@@ -935,10 +948,6 @@ def sec_5_4():
     # Hop Limit Exceeded In Tayga (ICMP Error)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoReply(id=43,seq=88)
     send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
-    
-    # Invalid Address?
-
-    # TODO
 
     # reset expected
     expect_id = -1
@@ -950,24 +959,30 @@ def sec_5_4():
 #############################################
 def sec_5_5():
     # TCP Header
+    test.tfail("TCP Header","Not Implemented")
 
     # UDP Header w/ checksum
+    test.tfail("UDP Header w/ checksum","Not Implemented")
 
     # UDP Header w/o checksum
+    test.tfail("UDP Header w/o checksum","Not Implemented")
 
     # ICMP Header
+    test.tfail("ICMP Header","Not Implemented")
 
     # No other protocols are required, but we may want to test them   
     test.section("Transport-Layer Header (RFC 7915 5.5)")
 
+    
 
 
-
-# Create an instance of TestEnv and call setup()
+# Test was created at top of file
+# Setup, call tests, etc.
 
 #test.debug = True
 test.timeout = 0.1
 test.tayga_log_file = "test/rfc7915.log"
+test.tayga_bin = "./tayga-cov"
 test.pcap_file = "test/rfc7915.pcap"
 #test.pcap_test_env = True
 test.setup()
@@ -983,7 +998,6 @@ sec_5_3()
 sec_5_4()
 sec_5_5()
 
-time.sleep(0.5)
 test.cleanup()
 #Print test report
 test.report()
