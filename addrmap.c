@@ -95,6 +95,7 @@ int is_private_ip4_addr(const struct in_addr *a)
 int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len)
 {
 	mask->s_addr = htonl(~(0xffffffff >> len));
+	if (len == 32) mask->s_addr = 0xffffffff;
 	if (addr && (addr->s_addr & ~mask->s_addr))
 		return -1;
 	return 0;
@@ -417,8 +418,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 
 	map4 = find_map4(addr4);
 
-	if (!map4)
+	if (!map4) {
+		slog(LOG_DEBUG,"Invalid map4 at %s:%d\n",__FUNCTION__,__LINE__);
 		return -1;
+	}
 
 	switch (map4->type) {
 	case MAP_TYPE_STATIC:
@@ -431,10 +434,13 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	case MAP_TYPE_RFC6052:
 		s = container_of(map4, struct map_static, map4);
 		if (append_to_prefix(addr6, addr4, &s->map6.addr,
-					s->map6.prefix_len) < 0)
+					s->map6.prefix_len) < 0) {
+			slog(LOG_DEBUG,"Append_to_prefix failed at %s:%d\n",__FUNCTION__,__LINE__);
 			return -1;
+		}
 		break;
 	case MAP_TYPE_DYNAMIC_POOL:
+		slog(LOG_DEBUG,"Address map is dynamic pool at %s:%d\n",__FUNCTION__,__LINE__);
 		return -1;
 	case MAP_TYPE_DYNAMIC_HOST:
 		d = container_of(map4, struct map_dynamic, map4);
@@ -442,6 +448,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		d->last_use = now;
 		break;
 	default:
+		slog(LOG_DEBUG,"Hit default case in %s:%d\n",__FUNCTION__,__LINE__);
 		return -1;
 	}
 

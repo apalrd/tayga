@@ -252,6 +252,32 @@ static void read_from_signalfd(void)
 	}
 }
 
+void print_maps(void)
+{
+	struct list_head *entry;
+	struct map4 *s4;
+	struct map6 *s6;
+	char temp[64],temp2[64];
+
+	slog(LOG_DEBUG,"Map4 List:\n");
+	list_for_each(entry, &gcfg->map4_list) {
+		s4 = list_entry(entry, struct map4, list);
+
+		slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
+			inet_ntop(AF_INET,&s4->addr,temp,64),
+			s4->prefix_len,s4->type,
+			inet_ntop(AF_INET,&s4->mask,temp2,64));
+	}
+	slog(LOG_DEBUG,"Map6 List:\n");
+	list_for_each(entry, &gcfg->map6_list) {
+		s6 = list_entry(entry, struct map6, list);
+
+		slog(LOG_DEBUG,"Entry %s/%d type %d\n",
+			inet_ntop(AF_INET6,&s6->addr,temp,64),
+			s6->prefix_len,s6->type);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int c, ret, longind;
@@ -533,6 +559,7 @@ int main(int argc, char **argv)
 					"like dynamic mappings to be "
 					"persistent.\n", conffile);
 	}
+	print_maps();
 
 	if (gcfg->cache_size)
 		create_cache();

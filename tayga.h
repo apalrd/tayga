@@ -39,6 +39,13 @@
 #include "list.h"
 #include "config.h"
 
+//for coverage testing
+static void dummy()
+{
+	volatile static int temp;
+	temp++;
+}
+
 
 /* Configuration knobs */
 

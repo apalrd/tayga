@@ -3,7 +3,7 @@
 CC := gcc
 CFLAGS := -Wall -O2 -Isrc
 LDFLAGS := 
-SOURCES := src/nat64.c src/addrmap.c src/dynamic.c src/tayga.c src/conffile.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga
 TARGET-COV := $(TARGET)-cov
 
@@ -22,6 +22,9 @@ $(TARGET): $(SOURCES)
 
 $(TARGET-COV): $(TARGET)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage
+
+cov-report:
+	gcov -a -g -f *.gcno
 
 clean:
 	rm -f $(TARGET) $(DEPS) $(TARGET-COV) *.gcda *.gcno
