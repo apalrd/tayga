@@ -95,8 +95,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	} __attribute__ ((__packed__)) header;
 	struct iovec iov[2];
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IP);
 	header.ip4.ver_ihl = 0x45;
 	header.ip4.tos = tos;
 	header.ip4.length = htons(sizeof(header.ip4) + sizeof(header.icmp) +
@@ -156,6 +155,7 @@ static void host_handle_icmp4(struct pkt *p)
 		break;
 	}
 }
+
 
 static void xlate_header_4to6(struct pkt *p, struct ip6 *ip6,
 		int payload_length)
@@ -270,8 +270,7 @@ static void xlate_4to6_data(struct pkt *p)
 	if (dest)
 		dest->flags |= CACHE_F_SEEN_4TO6;
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 
 	if (no_frag_hdr) {
 		iov[0].iov_base = &header;
@@ -548,8 +547,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 						sizeof(header.ip6_em)),
 				ip_checksum(p_em.data, p_em.data_len)));
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 
 	iov[0].iov_base = &header;
 	iov[0].iov_len = sizeof(header);
@@ -600,8 +598,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	} __attribute__ ((__packed__)) header;
 	struct iovec iov[2];
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 	header.ip6.ver_tc_fl = htonl((0x6 << 28) | (tc << 20));
 	header.ip6.payload_length = htons(sizeof(header.icmp) + data_len);
 	header.ip6.next_header = 58;
@@ -762,8 +759,7 @@ static void xlate_6to4_data(struct pkt *p)
 	if (dest)
 		dest->flags |= CACHE_F_SEEN_6TO4;
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi, ETH_P_IP);
 
 	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
 
@@ -972,8 +968,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 							sizeof(header.ip4_em)),
 				ip_checksum(p_em.data, p_em.data_len));
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi, ETH_P_IP);
 
 	iov[0].iov_base = &header;
 	iov[0].iov_len = sizeof(header);

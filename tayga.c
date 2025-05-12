@@ -85,6 +85,7 @@ void read_random_bytes(void *d, int len)
 	}
 }
 
+#ifdef __linux__
 static void tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
@@ -162,6 +163,113 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
 }
+#endif
+
+#ifdef __FreeBSD__
+static void tun_setup(int do_mktun, int do_rmtun)
+{
+	struct ifreq ifr;
+	int fd, do_rename = 0, multi_af;
+	char devname[64];
+
+	if (strncmp(gcfg->tundev, "tun", 3))
+		do_rename = 1;
+
+	if ((do_mktun || do_rmtun) && do_rename)
+	{
+		slog(LOG_CRIT,
+			"tunnel interface name needs to match tun[0-9]+ pattern "
+				"for --mktun to work\n");
+		exit(1);
+	}
+
+	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg->tundev);
+
+	gcfg->tun_fd = open(devname, O_RDWR);
+	if (gcfg->tun_fd < 0) {
+		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
+				devname, strerror(errno));
+		exit(1);
+	}
+
+	if (do_mktun) {
+		slog(LOG_NOTICE, "Created persistent tun device %s\n",
+				gcfg->tundev);
+		return;
+	} else if (do_rmtun) {
+
+		/* Close socket before removal */
+		close(gcfg->tun_fd);
+
+		fd = socket(PF_INET, SOCK_DGRAM, 0);
+		if (fd < 0) {
+			slog(LOG_CRIT, "Unable to create control socket, aborting: %s\n",
+					strerror(errno));
+			exit(1);
+		}
+
+		memset(&ifr, 0, sizeof(ifr));
+		strcpy(ifr.ifr_name, gcfg->tundev);
+		if (ioctl(fd, SIOCIFDESTROY, &ifr) < 0) {
+			slog(LOG_CRIT, "Unable to destroy interface %s, aborting: %s\n",
+					gcfg->tundev, strerror(errno));
+			exit(1);
+		}
+
+		close(fd);
+
+		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
+				gcfg->tundev);
+		return;
+	}
+
+	/* Set multi-AF mode */
+	multi_af = 1;
+	if (ioctl(gcfg->tun_fd, TUNSIFHEAD, &multi_af) < 0) {
+			slog(LOG_CRIT, "Unable to set multi-AF on %s, "
+					"aborting: %s\n", gcfg->tundev,
+					strerror(errno));
+			exit(1);
+	}
+
+	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg->tundev);
+
+	set_nonblock(gcfg->tun_fd);
+
+	fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+
+	if (do_rename) {
+		memset(&ifr, 0, sizeof(ifr));
+		strcpy(ifr.ifr_name, fdevname(gcfg->tun_fd));
+		ifr.ifr_data = gcfg->tundev;
+		if (ioctl(fd, SIOCSIFNAME, &ifr) < 0) {
+			slog(LOG_CRIT, "Unable to rename interface %s to %s, aborting: %s\n",
+					fdevname(gcfg->tun_fd), gcfg->tundev,
+					strerror(errno));
+			exit(1);
+		}
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strcpy(ifr.ifr_name, gcfg->tundev);
+	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
+		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+	close(fd);
+
+	gcfg->mtu = ifr.ifr_mtu;
+
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
+			gcfg->mtu);
+}
+#endif
 
 static void signal_handler(int signal)
 {
@@ -215,7 +323,7 @@ static void read_from_tun(void)
 	memset(p, 0, sizeof(struct pkt));
 	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
-	switch (ntohs(pi->proto)) {
+	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
 		handle_ip4(p);
 		break;

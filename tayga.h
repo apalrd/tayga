@@ -33,10 +33,19 @@
 #include <syslog.h>
 #include <errno.h>
 #include <time.h>
+#if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
-
+#elif defined(__FreeBSD__)
+#include <net/if.h>
+#include <net/if_tun.h>
+#include <netinet/if_ether.h>
+#include <net/ethernet.h>
+#include <sys/uio.h>
+#else
+#error "Could not find headers for platform"
+#endif
 #include "list.h"
 #include "config.h"
 
@@ -47,6 +56,26 @@ static void dummy()
 	temp++;
 }
 
+
+#ifdef __linux__
+#define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->flags = 0; (_pi)->proto = htons(_af); }
+#define	TUN_GET_PROTO(_pi)			ntohs((_pi)->proto)
+#endif
+
+#ifdef __FreeBSD__
+#define s6_addr8  __u6_addr.__u6_addr8
+#define s6_addr16 __u6_addr.__u6_addr16
+#define s6_addr32 __u6_addr.__u6_addr32
+
+struct tun_pi {
+	int	proto;
+};
+
+#define ETH_P_IP AF_INET
+#define	ETH_P_IPV6 AF_INET6
+#define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->proto = htonl(_af); }
+#define	TUN_GET_PROTO(_pi)			ntohl((_pi)->proto)
+#endif
 
 /* Configuration knobs */
 
