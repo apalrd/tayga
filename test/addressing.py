@@ -488,10 +488,7 @@ def sec_5_1():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_log_file = "test/addressing.log"
 test.tayga_bin = "./tayga-cov"
-test.pcap_file = "test/addressing.pcap"
-#test.pcap_test_env = True
 test.setup()
 
 # Call all tests
@@ -501,7 +498,6 @@ sec_3_1_not_strict()
 sec_3_1_rfc8215()
 sec_5_1()
 
-time.sleep(1)
 test.cleanup()
 #Print test report
 test.report()

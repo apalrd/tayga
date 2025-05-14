@@ -571,7 +571,7 @@ def sec_4_2():
     test.section("ICMPv4 -> ICMPv6 (RFC 7915 4.2)")
 
 #############################################
-# ICMPv4 Packets with Extensions (RFC 7915 4.4 + RFC4884)
+# ICMPv4 Packets with Extensions (RFC 7915 4.2 + RFC4884)
 #############################################
 def sec_4_2_rfc4884():
     global test
@@ -1036,9 +1036,7 @@ def sec_5_5():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_log_file = "test/translate.log"
 test.tayga_bin = "./tayga-cov"
-test.pcap_file = "test/translate.pcap"
 #test.pcap_test_env = True
 test.setup()
 

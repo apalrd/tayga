@@ -289,9 +289,9 @@ class test_env:
         self.tayga_ipv4 = ipaddress.ip_address("172.16.0.3")
         self.tayga_ipv6 = ipaddress.ip_address("3fff:6464::172.16.0.3")
         self.tayga_conf_file = "test/tayga.conf"
-        self.pcap_file = None
+        self.pcap_file = test_name + ".pcap"
         self.pcap_test_env = False
-        self.tayga_log_file = None
+        self.tayga_log_file = test_name + ".log"
         self.test_name = test_name
         self.file_path = test_name + ".rpt"
         self.test_results = []
