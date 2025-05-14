@@ -12,10 +12,11 @@ import socket
 
 class route_dest(Enum):
     ROUTE_NORMAL = 0 # route to Tayga
-    ROUTE_BLACKHOLE = 1
-    ROUTE_UNREACHABLE = 2
-    ROUTE_ADMIN_PROHIBIT = 3
-    ROUTE_THROW = 4    
+    ROUTE_TEST = 1 #route to test system
+    ROUTE_BLACKHOLE = 2
+    ROUTE_UNREACHABLE = 3
+    ROUTE_ADMIN_PROHIBIT = 4
+    ROUTE_THROW = 5    
 
 
 class router:
@@ -23,8 +24,14 @@ class router:
         self.dest = dest
         self.route = ipaddress.ip_network(route)
         self.ipr = IPRoute()
+        self.debug = False
+        self.active = False
+
+    def __del__(self):
+        if self.active: self.remove()
 
     def apply(self):
+        self.active = True
         try:
             if self.dest == route_dest.ROUTE_BLACKHOLE:
                 self.ipr.route("add", dst=str(self.route), type="blackhole")
@@ -34,15 +41,23 @@ class router:
                 self.ipr.route("add", dst=str(self.route), type="prohibit")
             elif self.dest == route_dest.ROUTE_THROW:
                 self.ipr.route("add", dst=str(self.route), type="throw")
+            elif self.dest == route_dest.ROUTE_TEST:
+                self.ipr.route("add", dst=str(self.route), oif=self.ipr.link_lookup(ifname="tun0")[0])            
             else:
                 self.ipr.route("add", dst=str(self.route), oif=self.ipr.link_lookup(ifname="nat64")[0])            
         except Exception as e:
             print(f"Failed to add route to {self.route}: {e}")
+            self.active = False
+        if self.debug:
+            print(f"Added route to {self.route}")
     def remove(self):
+        self.active = False
         try:
             self.ipr.route("del", dst=str(self.route))
         except Exception as e:
             print(f"Failed to remove route to {self.route}: {e}")
+        if self.debug:
+            print(f"Removed route to {self.route}")
 
 class test_res(Enum):
     RES_NONE = 0
