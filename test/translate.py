@@ -48,6 +48,7 @@ def icmp4_val(pkt):
     global expect_seq
     global expect_mtu
     global expect_addr
+    global expect_ptr
     res = test_result()
     res.check("Contains IP",pkt.haslayer(IP))
     res.check("Contains ICMP",pkt.haslayer(ICMP))
@@ -65,6 +66,8 @@ def icmp4_val(pkt):
         res.compare("Seq",pkt[ICMP].seq,expect_seq)
     if expect_mtu >= 0:
         res.compare("MTU",pkt[ICMP].nexthopmtu,expect_mtu)
+    if expect_ptr >= 0:
+        res.compare("PTR",pkt[ICMP].ptr,expect_ptr)
     return res
 
 ####
@@ -329,6 +332,7 @@ def sec_4_2():
     send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Small MTU)")
 
     # ICMPv4 Fragmentation Needed (and MTU is higher on Tayga)
+    expect_mtu = 1500
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1600) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Large MTU)")
 
@@ -459,9 +463,13 @@ def sec_4_2():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=19) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 19")
 
+    # Pointer Indicates Error 20 (too large)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=20) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
+    send_and_none(test,send_pkt,"Pointer Indicates Error 20")
+
     # ICMPv4 Missing Required Option
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Missing Required Option")
+    send_and_none(test,send_pkt, "Missing Required Option")
 
     # ICMPv4 Bad Length
     expect_ptr = 0
@@ -532,6 +540,10 @@ def sec_4_2():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=19) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 19")
 
+    # Bad Length 20 (invalid)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=20) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
+    send_and_none(test,send_pkt,"Bad Length 20")
+
     # ICMPv4 Other Param Problem
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=3) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     send_and_none(test,send_pkt,"Other Parameter Problem 3")
@@ -555,13 +567,30 @@ def sec_4_2():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=11,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     send_and_check(test,send_pkt,icmp6_val, "Time Exceeded Fragment Reassembly Time")
 
-    ####
-    # ICMPv4 Packets with Extensions (RFC4884)
-    ####
-
-    test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
 
     test.section("ICMPv4 -> ICMPv6 (RFC 7915 4.2)")
+
+#############################################
+# ICMPv4 Packets with Extensions (RFC 7915 4.4 + RFC4884)
+#############################################
+def sec_4_2_rfc4884():
+    global test
+    test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
+    test.section("ICMPv4 Packets with Extensions (RFC 7915 4.4 + RFC4884)")
+
+#############################################
+# ICMP Inner Translation (RFC 7915 4.3)
+#############################################
+def sec_4_3():
+    # One Nested Header
+    test.tfail("One Nested Header","Not Implemented")
+
+    # Two Nested Headers
+    test.tfail("Two Nested Headers","Not Implemented")
+
+
+    test.section("ICMPv4 Inner Translation (RFC 7915 4.3)")
+
 #############################################
 # ICMPv4 Generation Cases (RFC 7915 4.4)
 #############################################
@@ -698,6 +727,10 @@ def sec_5_2():
     global expect_seq
     global expect_code
     global expect_class
+    global expect_ptr
+
+    #Expected address is same for all tests
+    expect_addr = test.public_ipv6_xlate
 
     ####
     #  ICMPv6 PING TYPES (Type 128 / Type 129)
@@ -823,13 +856,32 @@ def sec_5_2():
 
 
     # Parameter Problem Erroneous Header
-    test.tfail("Parameter Problem Erroneous Header","Not Implemented")
+    expect_type = 12
+    expect_code = 0
+    for i in range(0,41):
+        if i > 39: expect_ptr = -1
+        elif i > 23: expect_ptr = 16
+        elif i > 7: expect_ptr = 12
+        elif i > 6: expect_ptr = 8
+        elif i > 5 : expect_ptr = 9
+        elif i > 3: expect_ptr = 2
+        elif i > 1: expect_ptr = -1
+        elif i > 0: expect_ptr = 1
+        else: expect_ptr = 0
+        send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=0,ptr=i) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+        if expect_ptr >= 0: send_and_check(test,send_pkt,icmp4_val, "Parameter Problem Erroneous Header "+str(i))
+        else: send_and_none(test,send_pkt, "Parameter Problem Erroneous Header "+str(i))
 
-    # Parameter Proboem Unrecognized Next Header
-    test.tfail("Parameter Proboem Unrecognized Next Header","Not Implemented")
+    # Parameter Proboem Unrecognized Next Header    
+    expect_type = 3
+    expect_code = 2
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+    send_and_check(test,send_pkt,icmp4_val, "Parameter Problem Unrecognized Header")
+    
 
     # Other Error Types
-    test.tfail("Other Error Types","Not Implemented")
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=2) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+    send_and_none(test,send_pkt, "Parameter Problem Other")
 
     #############################################
     #  ICMPv6 Errors without a mapping address (RFC 7915 5.2)
@@ -923,7 +975,7 @@ def sec_5_3():
     test.tfail("Two Nested Headers","Not Implemented")
 
 
-    test.section("ICMP Inner Translation (RFC 7915 5.3)")
+    test.section("ICMPv6 Inner Translation (RFC 7915 5.3)")
 #############################################
 # ICMPv6 Generation (RFC 7915 5.4)
 #############################################
@@ -991,15 +1043,17 @@ test.pcap_file = "test/translate.pcap"
 test.setup()
 
 # Call all tests
-sec_4_1()
+#sec_4_1()
 sec_4_2()
-sec_4_4()
-sec_4_4()
-sec_5_1()
+#sec_4_2_rfc4884()
+#sec_4_3()
+#sec_4_4()
+#sec_4_5()
+#sec_5_1()
 sec_5_2()
-sec_5_3()
-sec_5_4()
-sec_5_5()
+#sec_5_3()
+#sec_5_4()
+#sec_5_5()
 
 test.cleanup()
 #Print test report
