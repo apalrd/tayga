@@ -195,7 +195,7 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
 #############################################
 # Public Prefix Limitations Generic Function
 #############################################
-def sec_3_1_generic(pref,strict,expect_drop,expect_icmp):
+def prefix_generic(pref,strict,expect_drop,expect_icmp):
     global expect_sa
     global expect_da
     global expect_len
@@ -217,6 +217,7 @@ def sec_3_1_generic(pref,strict,expect_drop,expect_icmp):
     test_prefix(pref,"198.51.100.10","TEST-NET-2",expect_drop,expect_icmp)
     test_prefix(pref,"203.0.113.69","TEST-NET-3",expect_drop,expect_icmp)
     test_prefix(pref,"198.18.0.20","Benchmarking Space",expect_drop,expect_icmp)
+    # These prefixes should not be prevented from translation
     test_prefix(pref,"192.0.0.2","DSLite Space",False,False)
     test_prefix(pref,"192.88.99.52","6to4 Relay Space",False,False)
 
@@ -225,33 +226,33 @@ def sec_3_1_generic(pref,strict,expect_drop,expect_icmp):
 #############################################
 # Well Known Prefix Restricted (RFC 6042 3.1) w/ WKPF-Strict
 #############################################
-def sec_3_1_strict():
+def wkpf_strict():
     #Use common section 3.1 function
-    sec_3_1_generic("64:ff9b::",True,False,True)
+    prefix_generic("64:ff9b::",True,False,True)
     test.section("Well Known Prefix Restricted (RFC 6042 3.1) w/ WKPF-Strict")
 
 
 #############################################
 # Well Known Prefix Restricted (RFC 6042 3.1) w/o WKPF-Strict
 #############################################
-def sec_3_1_not_strict():
+def wkpf_not_strict():
     #Use common section 3.1 function
-    sec_3_1_generic("64:ff9b::",False,False,False)
+    prefix_generic("64:ff9b::",False,False,False)
     test.section("Well Known Prefix Restricted (RFC 6042 3.1) w/o WKPF-Strict")
 
 
 #############################################
 # Local Use Well Known Prefix (RFC 6052 Sec 3.1 + RFC 8215)
 #############################################
-def sec_3_1_rfc8215():
+def rfc8215_local_use():
     #Use common section 3.1 function
-    sec_3_1_generic("64:ff9b:1::",True,False,False)
+    prefix_generic("64:ff9b:1::",True,False,False)
     test.section("Local-Use Well Known Prefix (RFC 8215)")
 
 #############################################
 # Invalid / Out of Scope Addresses (RFC 6052 5.1)
 #############################################
-def sec_5_1():
+def invalid_ranges():
     # Setup config for this section
     test.tayga_conf.default()
     test.reload()
@@ -299,11 +300,10 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-sec_2_2()
-sec_3_1_strict()
-sec_3_1_not_strict()
-sec_3_1_rfc8215()
-sec_5_1()
+wkpf_strict()
+wkpf_not_strict()
+rfc8215_local_use()
+invalid_ranges()
 
 test.cleanup()
 #Print test report
