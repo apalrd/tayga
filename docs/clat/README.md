@@ -16,9 +16,17 @@ In this example, the following IP addresses are used internally:
 * `192.0.0.0/29` is used as the translation subnet for the local system, as it is reserved for IPv4 to IPv6 transition technologies 
 * `192.168.0.1/29` is used as the IPv4 address of the local system
 * `192.168.0.2/29` is used as the IPv4 address of Tayga itself
+* `2001:db8:feed::6` is used as the IPv6 address of Tayga itself
+* `2001:db8:feed::7` is used as the IPv6 address for translated user traffic
+
+The architecture for all methods is the same:
+![CLAT Architecture](clat1.png)
+
+## Incoming Connections
+The Proxy NDP or Dynamic Routing methods both allow incoming connections to IPv4-only software on the host, however, incoming connections must themselves be from IPv4-translated addresses, as Tayga has no way of translating the source address otherwise. 
 
 # Proxy NDP
-In this approach, a new address on the LAN subnet is generated for use by Tayga. To allow access to the LAN subnet by Tayga, this address is specified for NDP Proxying on the LAN interface, and routed to the Tayga translation interface. This scenario works well if the LAN addresses are assigned via SLAAC, allowing the host to generate an additional address for use by the translator. 
+In this approach, a new address on the LAN subnet is generated for use by Tayga. To allow access to the LAN subnet by Tayga, this address is specified for NDP Proxying on the LAN interface, and routed to the Tayga translation interface. This scenario works well if the LAN addresses are assigned via SLAAC, allowing the host to generate additional address(es) for use by the translator. 
 
 # NAT66
 If the translator is unable to assign an additional address (for example, if the host is forced to use DHCPv6 IA_NA addressing), we can instead use NAT66 to masquerade traffic from the translator to the address already assigned to the host. 
