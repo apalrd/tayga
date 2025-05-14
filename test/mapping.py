@@ -82,7 +82,7 @@ def ip6_val(pkt):
 # Variable Prefix Length (RFC 6052 2.2)
 # Tests RFC6052-style address encapsulation
 #############################################
-def rfc6052_sec_2_2():
+def rfc6052_mapping():
     global expect_sa
     global expect_da
     global expect_len
@@ -276,7 +276,7 @@ def rfc6052_sec_2_2():
 #############################################
 # Explicit Address Mapping (RFC 7757 3.2)
 #############################################
-def rfc7757_sec_3_2():
+def rfc7757_eam():
     test.section("Explicit Address Mapping (RFC 7757 3.2)")
 
 #############################################
@@ -302,8 +302,8 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-rfc6052_sec_2_2()
-rfc7757_sec_3_2()
+rfc6052_mapping()
+rfc7757_eam()
 dynamic_pool()
 no_map_exists()
 
