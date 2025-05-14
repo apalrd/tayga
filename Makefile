@@ -21,7 +21,7 @@ $(TARGET): $(SOURCES)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES)
 
 $(TARGET-COV): $(TARGET)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage
+	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage -DCOVERAGE_TESTING
 
 cov-report:
 	gcov -a -g -f *.gcno

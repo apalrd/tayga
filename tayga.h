@@ -41,11 +41,15 @@
 #include "config.h"
 
 //for coverage testing
-static void dummy()
+#ifdef COVERAGE_TEST
+static void observe()
 {
 	volatile static int temp;
 	temp++;
 }
+#else
+#define observe()
+#endif
 
 
 /* Configuration knobs */
