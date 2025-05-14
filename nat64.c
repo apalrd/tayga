@@ -441,19 +441,19 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		header.icmp.word = 0;
 		switch (p->icmp->code) {
 		case 0: /* Network Unreachable */
-			dummy();
+			observe();
 		case 1: /* Host Unreachable */
-			dummy();
+			observe();
 		case 5: /* Source Route Failed */
-			dummy();
+			observe();
 		case 6:
-			dummy();
+			observe();
 		case 7:
-			dummy();
+			observe();
 		case 8:
-			dummy();
+			observe();
 		case 11:
-			dummy();
+			observe();
 		case 12:
 			header.icmp.code = 0; /* No route to destination */
 			allow_fake_source = 1;
@@ -483,11 +483,11 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			allow_fake_source = 1;
 			break;
 		case 9:
-			dummy();
+			observe();
 		case 10:
-			dummy();
+			observe();
 		case 13:
-			dummy();
+			observe();
 		case 15:
 			header.icmp.code = 1; /* Administratively prohibited */
 			break;
@@ -891,9 +891,9 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		header.icmp.word = 0;
 		switch (p->icmp->code) {
 		case 0: /* No route to destination */
-		dummy();
+		observe();
 		case 2: /* Beyond scope of source address */
-		dummy();
+		observe();
 		case 3: /* Address Unreachable */
 			header.icmp.code = 1; /* Host Unreachable */
 			allow_fake_source = 1;

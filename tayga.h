@@ -41,7 +41,7 @@
 #include "config.h"
 
 //for coverage testing
-static void dummy()
+static void observe()
 {
 	volatile static int temp;
 	temp++;
