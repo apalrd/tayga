@@ -201,11 +201,12 @@ class test_env:
         except subprocess.CalledProcessError as e:
             print(f"Error while bringing up interface: {e}")
         # Set NAT64 interface up
-        ipr.link('set', index=ipr.link_lookup(ifname='nat64')[0], state='up')
+        ifi = ipr.link_lookup(ifname='nat64')[0]
+        ipr.link('set', index=ifi, state='up')
         # Add IPv4 address to NAT64 interface
-        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
+        ipr.addr('add', index=ifi, address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
         # Add IPv6 address to NAT64 interface
-        ipr.addr('add', index=ipr.link_lookup(ifname='nat64')[0], address=str(self.tayga_prefix.network_address), mask=self.tayga_prefix.prefixlen)
+        ipr.route('add', dst=str(self.tayga_prefix), oif=ifi)
 
     def setup_tcpdump(self):
         iface = "nat64"

@@ -23,74 +23,83 @@ extern time_t now;
 
 int validate_ip4_addr(const struct in_addr *a)
 {
+	/* First Octet == 0 */
+	if ((a->s_addr & htonl(0xff000000)) == htonl(0x00000000))
+		return ERROR_DROP;
 	/* First octet == 127 */
 	if ((a->s_addr & htonl(0xff000000)) == htonl(0x7f000000))
-		return -1;
+		return ERROR_DROP;
 
 	/* Link-local block 169.254.0.0/16 */
 	if ((a->s_addr & htonl(0xffff0000)) == htonl(0xa9fe0000))
-		return -1;
+		return ERROR_DROP;
 
-	/* Class D & E */
-	if ((a->s_addr & htonl(0xe0000000)) == htonl(0xe0000000))
-		return -1;
+	/* Class D */
+	if ((a->s_addr & htonl(0xf0000000)) == htonl(0xe0000000))
+		return ERROR_DROP;
 
-	return 0;
+	/* Class E considered valid now */
+
+	/* Local Broadcast not considered valid */
+	if (a->s_addr== 0xffffffff)
+		return ERROR_DROP;
+
+	return ERROR_NONE;
 }
 
 int validate_ip6_addr(const struct in6_addr *a)
 {
 	/* Well-known prefix for NAT64, plus Local-Use Space */
 	if (a->s6_addr32[0] == WKPF)
-		return 0;
+		return ERROR_NONE;
 
 
 	/* Reserved per RFC 2373 */
 	if (!a->s6_addr[0])
-		return -1;
+		return ERROR_DROP;
 
 	/* Multicast addresses */
 	if (a->s6_addr[0] == 0xff)
-		return -1;
+		return ERROR_DROP;
 
 	/* Link-local unicast addresses */
 	if ((a->s6_addr16[0] & htons(0xffc0)) == htons(0xfe80))
-		return -1;
+		return ERROR_DROP;
 
-	return 0;
+	return ERROR_NONE;
 }
 
 int is_private_ip4_addr(const struct in_addr *a)
 {
 	/* 10.0.0.0/8 */
 	if ((a->s_addr & htonl(0xff000000)) == htonl(0x0a000000))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 172.16.0.0/12 */
 	if ((a->s_addr & htonl(0xfff00000)) == htonl(0xac100000))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 192.0.2.0/24 */
 	if ((a->s_addr & htonl(0xffffff00)) == htonl(0xc0000200))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 192.168.0.0/16 */
 	if ((a->s_addr & htonl(0xffff0000)) == htonl(0xc0a80000))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 198.18.0.0/15 */
 	if ((a->s_addr & htonl(0xfffe0000)) == htonl(0xc6120000))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 198.51.100.0/24 */
 	if ((a->s_addr & htonl(0xffffff00)) == htonl(0xc6336400))
-		return -1;
+		return ERROR_ICMP;
 
 	/* 203.0.113.0/24 */
 	if ((a->s_addr & htonl(0xffffff00)) == htonl(0xcb007100))
-		return -1;
+		return ERROR_ICMP;
 
-	return 0;
+	return ERROR_NONE;
 }
 
 int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len)
@@ -98,7 +107,7 @@ int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len)
 	mask->s_addr = htonl(~(0xffffffff >> len));
 	if (len == 32) mask->s_addr = 0xffffffff;
 	if (addr && (addr->s_addr & ~mask->s_addr))
-		return -1;
+		return -1; //todo fix this error code
 	return 0;
 
 }
@@ -135,7 +144,7 @@ int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len)
 			(addr->s6_addr32[1] & ~mask->s6_addr32[1]) ||
 			(addr->s6_addr32[2] & ~mask->s6_addr32[2]) ||
 			(addr->s6_addr32[3] & ~mask->s6_addr32[3]))
-		return -1;
+		return -1; //todo fix this error code
 	return 0;
 }
 
@@ -381,14 +390,14 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 			!prefix->s6_addr32[2] && 
 			gcfg->wkpf_strict &&
 			is_private_ip4_addr(addr4))
-			return -1;
+			return ERROR_ICMP;
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
 		addr6->s6_addr32[1] = prefix->s6_addr32[1];
 		addr6->s6_addr32[2] = prefix->s6_addr32[2];
 		addr6->s6_addr32[3] = addr4->s_addr;
 		return 0;
 	default:
-		return -1;
+		return ERROR_DROP;
 	}
 }
 
@@ -396,6 +405,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		struct cache_entry **c_ptr)
 {
 	uint32_t hash;
+	int ret;
 	struct list_head *entry;
 	struct cache_entry *c;
 	struct map4 *map4;
@@ -434,10 +444,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		break;
 	case MAP_TYPE_RFC6052:
 		s = container_of(map4, struct map_static, map4);
-		if (append_to_prefix(addr6, addr4, &s->map6.addr,
-					s->map6.prefix_len) < 0) {
+		ret = append_to_prefix(addr6, addr4, &s->map6.addr,s->map6.prefix_len);
+		if (ret < 0) {
 			slog(LOG_DEBUG,"Append_to_prefix failed at %s:%d\n",__FUNCTION__,__LINE__);
-			return -1;
+			return ret;
 		}
 		break;
 	case MAP_TYPE_DYNAMIC_POOL:
@@ -450,7 +460,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		break;
 	default:
 		slog(LOG_DEBUG,"Hit default case in %s:%d\n",__FUNCTION__,__LINE__);
-		return -1;
+		return ERROR_DROP;
 	}
 
 	if (gcfg->cache_size) {
@@ -474,13 +484,13 @@ static int extract_from_prefix(struct in_addr *addr4,
 	switch (prefix_len) {
 	case 32:
 		if (addr6->s6_addr32[2] || addr6->s6_addr32[3])
-			return -1;
+			return ERROR_DROP;
 		addr4->s_addr = addr6->s6_addr32[1];
 		break;
 	case 40:
 		if (addr6->s6_addr32[2] & htonl(0xff00ffff) ||
 				addr6->s6_addr32[3])
-			return -1;
+			return ERROR_DROP;
 #if __BYTE_ORDER == __BIG_ENDIAN
 		addr4->s_addr = (addr6->s6_addr32[1] << 8) | addr6->s6_addr[9];
 #else
@@ -493,7 +503,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 	case 48:
 		if (addr6->s6_addr32[2] & htonl(0xff0000ff) ||
 				addr6->s6_addr32[3])
-			return -1;
+			return ERROR_DROP;
 #if __BYTE_ORDER == __BIG_ENDIAN
 		addr4->s_addr = (addr6->s6_addr16[3] << 16) |
 				(addr6->s6_addr32[2] >> 8);
@@ -506,7 +516,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 		break;
 	case 56:
 		if (addr6->s6_addr[8] || addr6->s6_addr32[3])
-			return -1;
+			return ERROR_DROP;
 #if __BYTE_ORDER == __BIG_ENDIAN
 		addr4->s_addr = (addr6->s6_addr[7] << 24) |
 				addr6->s6_addr32[2];
@@ -520,7 +530,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 	case 64:
 		if (addr6->s6_addr[8] ||
 				addr6->s6_addr32[3] & htonl(0x00ffffff))
-			return -1;
+			return ERROR_DROP;
 #if __BYTE_ORDER == __BIG_ENDIAN
 		addr4->s_addr = (addr6->s6_addr32[2] << 8) |
 				addr6->s6_addr[12];
@@ -535,7 +545,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 		addr4->s_addr = addr6->s6_addr32[3];
 		break;
 	default:
-		return -1;
+		return ERROR_DROP;
 	}
 	return validate_ip4_addr(addr4);
 }
@@ -544,6 +554,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		struct cache_entry **c_ptr, int dyn_alloc)
 {
 	uint32_t hash;
+	int ret = 0;
 	struct list_head *entry;
 	struct cache_entry *c;
 	struct map6 *map6;
@@ -586,17 +597,20 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 
 		break;
 	case MAP_TYPE_RFC6052:
-		if (extract_from_prefix(addr4, addr6, map6->prefix_len) < 0)
-			return -1;
+		ret = extract_from_prefix(addr4, addr6, map6->prefix_len);
+		if (ret < 0)
+			return ret;
 		if (map6->addr.s6_addr32[0] == WKPF &&
 			map6->addr.s6_addr32[1] == 0 &&
 			map6->addr.s6_addr32[2] == 0 &&
 			gcfg->wkpf_strict &&
 				is_private_ip4_addr(addr4))
-			return -1;
+			return ERROR_ICMP;
 		s = container_of(map6, struct map_static, map6);
-		if (find_map4(addr4) != &s->map4)
-			return -1;
+		if (find_map4(addr4) != &s->map4){
+			slog(LOG_DEBUG,"Dropping packet due to find_map4 %s:%d",__FUNCTION__,__LINE__);
+			return ERROR_DROP;
+		}
 		break;
 	case MAP_TYPE_DYNAMIC_HOST:
 		d = container_of(map6, struct map_dynamic, map6);
@@ -604,7 +618,8 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		d->last_use = now;
 		break;
 	default:
-		return -1;
+		slog(LOG_DEBUG,"Dropping packet due to default case %s:%d",__FUNCTION__,__LINE__);
+		return ERROR_DROP;
 	}
 
 	if (gcfg->cache_size) {

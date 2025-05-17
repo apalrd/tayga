@@ -218,24 +218,29 @@ static void xlate_4to6_data(struct pkt *p)
 	int no_frag_hdr = 0;
 	uint16_t off = ntohs(p->ip4->flags_offset);
 	int frag_size;
+	int ret;
 
 	frag_size = gcfg->ipv6_offlink_mtu;
 	if (frag_size > gcfg->mtu)
 		frag_size = gcfg->mtu;
 	frag_size -= sizeof(struct ip6);
 
-	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest)) {
+	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest);
+	if (ret == ERROR_ICMP) {
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to kick back ICMP4 for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->dest,temp,64));
 		host_send_icmp4_error(3, 1, 0, p);
 		return;
 	}
+	else if(ret == ERROR_DROP) return;
 
-	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src)) {
+	ret = map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src);
+	if (ret == ERROR_ICMP) {
 		host_send_icmp4_error(3, 10, 0, p);
 		return;
 	}
+	else if(ret == ERROR_DROP) return;
 
 	/* We do not respect the DF flag for IP4 packets that are already
 	   fragmented, because the IP6 fragmentation header takes an extra
@@ -740,15 +745,26 @@ static void xlate_6to4_data(struct pkt *p)
 		struct ip4 ip4;
 	} __attribute__ ((__packed__)) header;
 	struct cache_entry *src = NULL, *dest = NULL;
+	int ret;
 	struct iovec iov[2];
 
-	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0)) {
+	ret = map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0);
+	if (ret == ERROR_ICMP) {
 		host_send_icmp6_error(1, 0, 0, p);
 		return;
 	}
+	else if (ret == ERROR_DROP){
+		/* Drop packet */
+		return;
+	}
 
-	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1)) {
+	ret = map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1);
+	if (ret == ERROR_ICMP) {
 		host_send_icmp6_error(1, 5, 0, p);
+		return;
+	}
+	else if (ret == ERROR_DROP){
+		/* Drop packet */
 		return;
 	}
 

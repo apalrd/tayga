@@ -266,6 +266,11 @@ struct config {
 	int wkpf_strict;
 };
 
+/* Tayga Packet Error Codes */
+#define ERROR_NONE 0
+#define ERROR_ICMP -1
+#define ERROR_DROP -2
+
 
 /* Macros and static functions */
 

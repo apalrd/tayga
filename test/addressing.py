@@ -96,11 +96,8 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     global expect_data
     global test
 
-    test.debug = True
-
     # v6 dest is in net
     rt_us = router(pref+"/96")
-    rt_us.debug = True
     rt_us.apply()
     expect_proto = 16
     expect_sa = test.public_ipv6_xlate
@@ -125,8 +122,6 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     # also flip the whole damn routing table around
     rt_us = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
     rt_ds = router(str(test.public_ipv6))
-    rt_us.debug = True
-    rt_ds.debug = True
     rt_us.apply()
     rt_ds.apply()
     expect_sa = net
@@ -151,8 +146,6 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     # v4 dest is in net
     rt_us = router(net+"/32")
     rt_ds = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
-    rt_us.debug = True
-    rt_ds.debug = True
     rt_us.apply()
     rt_ds.apply()
     expect_sa = test.public_ipv6
@@ -265,6 +258,7 @@ def invalid_ranges():
     # Zero network should be dropped (TBD if this is the best behavior)
     # Zero Addr also does not forward correctly in the test env
     test_prefix(pref,"0.0.0.0","Zero Addr",True,False)
+
     test_prefix(pref,"0.0.0.1","Zero Net Low",True,False)
     test_prefix(pref,"0.0.1.1","Zero Net Mid",True,False)
     test_prefix(pref,"0.1.1.1","Zero Net High",True,False)
@@ -291,7 +285,7 @@ def invalid_ranges():
     
     # Local Broadcast should probably be dropped
     # This one is again hard to test properly
-    test_prefix(pref,"255.255.255.255","Local Broadcast",False,False)
+    test_prefix(pref,"255.255.255.255","Local Broadcast",True,False)
 
     test.section("Invalid / Out of Scope Addresses (RFC 6052 5.1)")
 
