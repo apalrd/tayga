@@ -913,11 +913,7 @@ def sec_5_1():
     # IPv6 Fragment Header
     test.tfail("IPv6 Fragment Header","Not Implemented")
 
-    # Illegal Source Address
-    test.tfail("Illegal Source Address","Not Implemented")
-
-    # Illegal Dest Address
-    test.tfail("Illegal Dest Address","Not Implemented")
+    # Illegal Addresses are covered by addressing test suite
 
     test.section("IPv6 to IPv4 Translation (RFC 7915 5.1)")
 #############################################
