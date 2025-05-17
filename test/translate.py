@@ -831,6 +831,7 @@ def sec_4_4():
     rt_d.remove()
 
     rt.remove()
+
     test.section("ICMPv4 Generation Cases (RFC 7915 4.4)")
 #############################################
 # Transport-Layer Header (RFC 7915 4.5)
@@ -867,6 +868,10 @@ def sec_5_1():
     global expect_da
     expect_sa = test.public_ipv6_xlate
     expect_da = test.public_ipv4
+
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
 
     # Setup config for this section
     test.tayga_conf.default()
@@ -1222,6 +1227,10 @@ def sec_5_4():
     expect_sa = test.public_ipv6_xlate
     expect_da = test.public_ipv6
 
+    
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
     
     # Setup config for this section
     test.tayga_conf.default()
