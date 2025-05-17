@@ -12,6 +12,7 @@ from test_env import (
     send_and_check_two,
     send_and_none,
     test_result,
+    router,
 )
 from random import randbytes
 from scapy.all import IP, ICMP, UDP, IPv6, Raw
@@ -46,15 +47,9 @@ expect_code = 0
 expect_id = -1
 expect_seq = -1
 expect_mtu = -1
-expect_addr = test.public_ipv6_xlate
+expect_sa = ""
+expect_da = ""
 def icmp4_val(pkt):
-    global expect_type
-    global expect_code
-    global expect_id
-    global expect_seq
-    global expect_mtu
-    global expect_addr
-    global expect_ptr
     res = test_result()
     res.check("Contains IP",pkt.haslayer(IP))
     res.check("Contains ICMP",pkt.haslayer(ICMP))
@@ -62,8 +57,8 @@ def icmp4_val(pkt):
     if (not IP in pkt) or (not ICMP in pkt):
         return res
     #Validate packet stuff
-    res.compare("Src IP",pkt[IP].src,str(expect_addr))
-    res.compare("Dst IP",pkt[IP].dst,str(test.public_ipv4))
+    res.compare("Src IP",pkt[IP].src,str(expect_sa))
+    res.compare("Dst IP",pkt[IP].dst,str(expect_da))
     res.compare("Type",pkt[ICMP].type,expect_type)
     res.compare("Code",pkt[ICMP].code,expect_code)
     if expect_id >= 0:
@@ -82,12 +77,6 @@ def icmp4_val(pkt):
 expect_class = None
 expect_ptr = -1
 def icmp6_val(pkt):
-    global expect_code
-    global expect_type
-    global expect_addr
-    global expect_class
-    global expect_ptr
-    global expect_mtu
     res = test_result()
     # layer 0 is LinuxTunInfo
     res.check("Contains IPv6",isinstance(pkt.getlayer(1),IPv6))
@@ -96,8 +85,8 @@ def icmp6_val(pkt):
     if res.has_fail:
         return res
     #Validate packet stuff
-    res.compare("Src IP",pkt[IPv6].src,str(expect_addr))
-    res.compare("Dst IP",pkt[IPv6].dst,str(test.public_ipv6))
+    res.compare("Src IP",pkt[IPv6].src,str(expect_sa))
+    res.compare("Dst IP",pkt[IPv6].dst,str(expect_da))
     res.compare("Type",pkt.getlayer(2).type,expect_type)
     res.compare("Code",pkt.getlayer(2).code,expect_code)
     if expect_mtu >= 0:
@@ -199,7 +188,7 @@ def ip6_val_frag(pkt):
 #  Generic IPv4 Validator
 ####
 expect_ref = None
-expect_addr2 = test.public_ipv6_xlate
+expect_da = test.public_ipv6_xlate
 def ip_val(pkt):
     res = test_result()
     # layer 0 is LinuxTunInfo
@@ -243,8 +232,8 @@ def ip_val(pkt):
         res.compare("Flags",pkt[IP].flags,0)
     res.compare("Frag",pkt[IP].frag,0)
     res.compare("TTL",pkt[IP].ttl,expect_ref[IPv6].hlim-3) #test setup has 3 trips
-    res.compare("Src",pkt[IP].src,str(expect_addr))
-    res.compare("Dest",pkt[IP].dst,str(expect_addr2))
+    res.compare("Src",pkt[IP].src,str(expect_sa))
+    res.compare("Dest",pkt[IP].dst,str(expect_da))
     res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load)
     return res
 
@@ -365,7 +354,7 @@ def sec_4_1():
 def sec_4_2():
     global test
     global expect_class
-    global expect_addr
+    global expect_sa
     global expect_type
     global expect_code
     global expect_id
@@ -381,7 +370,7 @@ def sec_4_2():
 
     # ICMPv4 Echo Request (type 8)
     expect_class = ICMPv6EchoRequest()
-    expect_addr = test.public_ipv4_xlate
+    expect_sa = test.public_ipv4_xlate
     expect_type = 128
     expect_code = 0
     expect_id = 22
@@ -469,7 +458,7 @@ def sec_4_2():
 
     # ICMPv4 Destination Unreachable - Host Unreachable
     expect_class = ICMPv6DestUnreach()
-    expect_addr = test.public_ipv4_xlate
+    expect_sa = test.public_ipv4_xlate
     expect_type = 1
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
@@ -759,7 +748,7 @@ def sec_4_2_rfc4884():
     test.tayga_conf.default()
     test.reload()
     test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
-    test.section("ICMPv4 Packets with Extensions (RFC 7915 4.4 + RFC4884)")
+    test.section("ICMPv4 Packets with Extensions (RFC 7915 4.2 + RFC4884)")
 
 #############################################
 # ICMP Inner Translation (RFC 7915 4.3)
@@ -785,14 +774,17 @@ def sec_4_3():
 #############################################
 def sec_4_4():
     global test
-    global expect_addr
+    global expect_sa
+    global expect_da
     global expect_type
     global expect_code
     # Setup config for this section
     test.tayga_conf.default()
     test.reload()
+
     # Hop Limit Exceeded in Tayga (Data payload)
-    expect_addr = test.tayga_ipv4
+    expect_sa = str(test.tayga_ipv4)
+    expect_da = str(test.public_ipv4)
     expect_type = 11
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
@@ -807,9 +799,38 @@ def sec_4_4():
     send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
 
     
-    # IPv4 Requires Fragmentation - DF Bit Set (should kick back ICMPv4)
-    test.tfail("Frag Required and DF Bit Set","Not Implemented")
+    # IPv4 Requires Fragmentation - DF Bit Set
+    # TODO validate MTU
+    expect_data = randbytes(1480)
+    expect_type = 3
+    expect_code = 4
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),flags="DF",len=1480+20,proto=16) / Raw(expect_data)
+    send_and_check(test,send_pkt,icmp4_val, "Frag Required and DF Bit Set")
 
+    # Host Unrech - within Tayga pool4 but not allocated
+
+    # Proto Unrech - addressed to Tayga itself but not ICMP
+
+    # Invalid Addressing must be done with wkpf-strict
+    test.tayga_conf.default()
+    test.tayga_conf.prefix = "64:ff9b::/96"
+    test.tayga_conf.ipv6_addr = "3fff:6464::1"
+    test.tayga_conf.wkpf_strict = True
+    rt = router(test.tayga_conf.prefix)
+    rt.apply()
+    test.reload()
+
+    # Invalid Source Address (is private)
+    expect_data = randbytes(128)
+    expect_type = 3
+    expect_code = 10
+    rt_d = router("42.69.0.1")
+    rt_d.apply()
+    send_pkt = IP(dst="42.69.0.1",src=str(test.public_ipv4),len=128,proto=16) / Raw(expect_data)
+    send_and_check(test,send_pkt,icmp4_val, "Invalid SA")
+    rt_d.remove()
+
+    rt.remove()
     test.section("ICMPv4 Generation Cases (RFC 7915 4.4)")
 #############################################
 # Transport-Layer Header (RFC 7915 4.5)
@@ -842,10 +863,10 @@ def sec_4_5():
 def sec_5_1():
     global test
     global expect_ref
-    global expect_addr
-    global expect_addr2
-    expect_addr = test.public_ipv6_xlate
-    expect_addr2 = test.public_ipv4
+    global expect_sa
+    global expect_da
+    expect_sa = test.public_ipv6_xlate
+    expect_da = test.public_ipv4
 
     # Setup config for this section
     test.tayga_conf.default()
@@ -921,7 +942,7 @@ def sec_5_1():
 #############################################
 def sec_5_2():
     global test
-    global expect_addr
+    global expect_sa
     global expect_id
     global expect_type
     global expect_seq
@@ -934,7 +955,7 @@ def sec_5_2():
     test.reload()
 
     #Expected address is same for all tests
-    expect_addr = test.public_ipv6_xlate
+    expect_sa = test.public_ipv6_xlate
 
     ####
     #  ICMPv6 PING TYPES (Type 128 / Type 129)
@@ -1094,7 +1115,7 @@ def sec_5_2():
     #############################################
 
     # Expected source address is Tayga's own address
-    expect_addr = test.tayga_ipv4
+    expect_sa = test.tayga_ipv4
 
     # No Route to Destination
     expect_type = 3
@@ -1190,14 +1211,16 @@ def sec_5_3():
 # ICMPv6 Generation (RFC 7915 5.4)
 #############################################
 def sec_5_4():
-    global expect_addr
+    global expect_sa
+    global expect_da
     global expect_id
     global expect_seq
     global expect_type
     global expect_code
     global expect_class
     global test
-    expect_addr = test.public_ipv6_xlate
+    expect_sa = test.public_ipv6_xlate
+    expect_da = test.public_ipv6
 
     
     # Setup config for this section
@@ -1206,7 +1229,7 @@ def sec_5_4():
 
     # Hop Limit Exceeded In Tayga (UDP)
     expect_class = ICMPv6TimeExceeded()
-    expect_addr = test.tayga_ipv6
+    expect_sa = test.tayga_ipv6
     expect_type = 3
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
@@ -1219,6 +1242,46 @@ def sec_5_4():
     # Hop Limit Exceeded In Tayga (ICMP Error)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoReply(id=43,seq=88)
     send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
+    
+    # Packet Too Big (Linux masks this one)
+    #expect_class = ICMPv6PacketTooBig()
+    #send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=1600) / Raw(randbytes(1600))
+    #send_and_check(test,send_pkt,icmp6_val, "Packet Too Big")
+
+    # Protocol addressed to Tayga
+    expect_class = ICMPv6ParamProblem()
+    expect_type = 4
+    expect_code = 1
+    send_pkt = IPv6(dst=str(test.tayga_ipv6),src=str(test.public_ipv6),nh=16,plen=128) / Raw(randbytes(128))
+    send_and_check(test,send_pkt,icmp6_val, "Proto Unreach")
+
+
+    # Invalid Addressing must be done with wkpf-strict
+    test.tayga_conf.default()
+    test.tayga_conf.prefix = "64:ff9b::/96"
+    test.tayga_conf.ipv6_addr = str(test.tayga_ipv6)
+    test.tayga_conf.wkpf_strict = True
+    test.reload()
+
+    # Invalid Dest Address (is private)
+    expect_class = ICMPv6DestUnreach()
+    expect_data = randbytes(128)
+    expect_code = 0
+    expect_type = 1
+    rt = router(test.tayga_conf.prefix)
+    rt.apply()
+    send_pkt = IPv6(dst=test.xlate("192.168.88.1","64:ff9b::"),src=str(test.public_ipv6),nh=16,plen=128) / Raw(expect_data)
+    send_and_check(test,send_pkt,icmp6_val, "Invalid DA")
+    rt.remove()
+
+    
+    # Invalid Src Address (is private)
+    expect_class = ICMPv6DestUnreach()
+    expect_data = randbytes(128)
+    expect_type = 1
+    expect_da = test.xlate("192.168.88.1","64:ff9b::")
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=expect_da,nh=16,plen=128) / Raw(expect_data)
+    send_and_check(test,send_pkt,icmp6_val, "Invalid SA")
 
     # reset expected
     expect_id = -1
