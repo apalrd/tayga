@@ -81,6 +81,7 @@ def ip6_val(pkt):
 
 
 
+
 ####
 #  Generic Prefix Test
 #  Tests src/dest in v4/v6 directions
@@ -192,6 +193,7 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
         send_and_check(test,send_pkt,ip6_val, name+" v4 src") 
 
 
+
 #############################################
 # Public Prefix Limitations Generic Function
 #############################################
@@ -201,6 +203,8 @@ def prefix_generic(pref,strict,expect_drop,expect_icmp):
     global expect_len
     global expect_proto
     global expect_data
+    global test
+
 
     # Setup config for this section
     test.tayga_conf.default()
@@ -233,7 +237,7 @@ def wkpf_strict():
 
 
 #############################################
-# Well Known Prefix Restricted (RFC 6042 3.1) w/o WKPF-Strict
+# Public Prefix Limitations Generic Function
 #############################################
 def wkpf_not_strict():
     #Use common section 3.1 function
@@ -305,6 +309,7 @@ wkpf_not_strict()
 rfc8215_local_use()
 invalid_ranges()
 
+time.sleep(1)
 test.cleanup()
 #Print test report
 test.report()
