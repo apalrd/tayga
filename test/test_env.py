@@ -339,6 +339,10 @@ class test_env:
             prefix = str(self.tayga_prefix.network_address)
         return str(ipaddress.ip_address(prefix + str(ipaddress.ip_address(ipv4))))
 
+    def flush(self):
+        # Use the sniff method for 0.1 seconds
+        self.tun.sniff(timeout=0.1,store=False)
+
 
     def tpass(self, test_name):
         self.test_results.append(f"PASS: {test_name}")
@@ -438,6 +442,82 @@ class send_and_check:
             self.test.tfail(self.test_name,self.test_stat.error())
         else:
             self.test.tpass(self.test_name)
+
+    def failed(self):
+        return not self.test_stat
+    
+#Expect two packets back (i.e. fragments)
+class send_and_check_two:
+    def recv_validate(self,pkt):
+        # Toss link-local packets since we shouldn't see them on our
+        # tun adapter
+        if pkt.haslayer(IPv6):
+            if ipaddress.IPv6Address(pkt[IPv6].src).is_link_local:
+                return False
+            if ipaddress.IPv6Address(pkt[IPv6].dst).is_link_local:
+                return False
+        # Toss IPv4 IGMP
+        if pkt.haslayer(IP):
+            if pkt[IP].proto == 2:
+                return False
+        # Toss LLMNR
+        if pkt.haslayer(IP) and pkt[IP].dst == "224.0.0.252":
+            return False
+        # Check if the received packet matches the expected response
+        try:
+            if self.first_pkt: res = self.response_func(pkt)
+            else: res = self.response_func2(pkt)
+        except Exception as e:
+            print(f"Exception occurred while processing packet in {self.test_name}: {e}")
+            print(pkt.show())
+            return False
+        if res.result() != test_res.RES_NONE:
+            if self.test.debug or res.has_fail:
+                print(f"Received packet matching {self.test_name}")
+                print(pkt.show())
+            if self.first_pkt:
+                self.test_stat = res
+                self.first_pkt = False
+                return False
+            else: 
+                self.test_stat2 = res
+                return True
+        return False
+
+    def __init__(self,test,packet,response_func,response_func2,test_name):
+        self.test = test
+        self.test_name = test_name
+        self.response_func = response_func
+        self.response_func2 = response_func2
+        self.test_stat = test_result()
+        self.test_stat2 = test_result()
+        self.first_pkt = True
+
+        # Send the packet using the test.tun interface
+        if self.test.debug:
+            print(f"Sending packet for {test_name}:")
+            print(packet.show())
+        # Send the packet
+        self.test.tun.send(packet)
+
+        # Use the sniff method to wait for a response
+        self.test.tun.sniff(timeout=self.test.timeout,stop_filter=self.recv_validate,store=False)
+
+        # First Result
+        if self.test_stat.result() == test_res.RES_NONE:
+            self.test.tfail(self.test_name+" Pkt1","No valid response received")
+        elif self.test_stat.result() == test_res.RES_FAIL:
+            self.test.tfail(self.test_name+" Pkt1",self.test_stat.error())
+        else:
+            self.test.tpass(self.test_name+" Pkt1")
+
+        # Second Result
+        if self.test_stat2.result() == test_res.RES_NONE:
+            self.test.tfail(self.test_name+" Pkt2","No valid response received")
+        elif self.test_stat2.result() == test_res.RES_FAIL:
+            self.test.tfail(self.test_name+" Pkt2",self.test_stat2.error())
+        else:
+            self.test.tpass(self.test_name+" Pkt2")
 
     def failed(self):
         return not self.test_stat

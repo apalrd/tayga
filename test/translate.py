@@ -9,6 +9,7 @@
 from test_env import (
     test_env, 
     send_and_check, 
+    send_and_check_two,
     send_and_none,
     test_result,
 )
@@ -26,6 +27,11 @@ from scapy.layers.inet6 import (
     IPv6ExtHdrHopByHop,
     IPv6ExtHdrDestOpt,
     IPv6ExtHdrRouting,
+    IPv6ExtHdrFragment,
+)
+from scapy.layers.inet import (
+    IPOption_Stream_Id,
+    IPOption_SSRR,
 )
 import time
 
@@ -103,6 +109,91 @@ def icmp6_val(pkt):
     if expect_seq >= 0:
         res.compare("SEQ",pkt.getlayer(2).seq,expect_seq)
     return res
+####
+#  Generic IPv6 Validator
+####
+expect_fl = 0
+expect_frag = False
+def ip6_val(pkt):
+    res = test_result()
+    # layer 0 is LinuxTunInfo
+    res.check("Contains IPv6",isinstance(pkt.getlayer(1),IPv6))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Field Comparison
+    res.compare("Src",pkt[IPv6].src,str(expect_sa))
+    res.compare("Dest",pkt[IPv6].dst,str(expect_da))
+    res.compare("Version",pkt[IPv6].version,6)
+    if expect_data is not None:
+        if expect_frag:
+            # Only compare first expect_len bytes
+            res.compare("Payload",pkt[Raw].load,expect_data[0:expect_len])
+        else:
+            res.compare("Payload",pkt[Raw].load,expect_data)
+    if expect_ref is not None:
+        res.compare("TC",pkt[IPv6].tc,expect_ref.tos)
+        res.compare("FL",pkt[IPv6].fl,expect_fl)
+        if expect_frag:
+            #Length is total fragment, not including frag hdr
+            res.compare("Length",pkt[IPv6].plen,expect_len+8)
+        elif expect_len >= 0:
+            res.compare("Length",pkt[IPv6].plen,expect_len)
+        else:
+            res.compare("Length",pkt[IPv6].plen,expect_ref.len - 20)
+        if expect_frag:
+            res.compare("NH",pkt[IPv6].nh,44)
+            res.check("Contains Frag Hdr",isinstance(pkt.getlayer(2),IPv6ExtHdrFragment))
+            #Validate frag header
+            res.compare("[frag]NH",pkt[IPv6ExtHdrFragment].nh,expect_ref.proto)
+            res.compare("[frag]Offset",pkt[IPv6ExtHdrFragment].offset,0)
+            res.compare("[frag]M",pkt[IPv6ExtHdrFragment].m,1)
+            res.compare("[frag]id",pkt[IPv6ExtHdrFragment].id,expect_id)
+        else:
+            res.compare("NH",pkt[IPv6].nh,expect_ref.proto)
+        res.compare("HLIM",pkt[IPv6].hlim,expect_ref.ttl-3)
+    return res
+
+####
+#  IPv6 Second Fragment Validator
+####
+def ip6_val_frag(pkt):
+    res = test_result()
+    # layer 0 is LinuxTunInfo
+    res.check("Contains IPv6",isinstance(pkt.getlayer(1),IPv6))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Field Comparison
+    res.compare("Src",pkt[IPv6].src,str(expect_sa))
+    res.compare("Dest",pkt[IPv6].dst,str(expect_da))
+    res.compare("Version",pkt[IPv6].version,6)
+    if expect_frag:
+        # Only compare after expect_len
+        res.compare("Payload",pkt[Raw].load,expect_data[expect_len:])
+    else:
+        res.compare("Payload",pkt[Raw].load,expect_data)
+    if expect_ref is not None:
+        res.compare("TC",pkt[IPv6].tc,expect_ref.tos)
+        res.compare("FL",pkt[IPv6].fl,expect_fl)
+        if expect_frag:
+            res.compare("Length",pkt[IPv6].plen,expect_ref.len - 20 + 8 - expect_len)
+        elif expect_len >= 0:
+            res.compare("Length",pkt[IPv6].plen,expect_len)
+        else:
+            res.compare("Length",pkt[IPv6].plen,expect_ref.len - 20)
+        if expect_frag:
+            res.compare("NH",pkt[IPv6].nh,44)
+            res.check("Contains Frag Hdr",isinstance(pkt.getlayer(2),IPv6ExtHdrFragment))
+            #Validate frag header
+            res.compare("[frag]NH",pkt[IPv6ExtHdrFragment].nh,expect_ref.proto)
+            res.compare("[frag]Offset",pkt[IPv6ExtHdrFragment].offset,int(expect_len/8))
+            res.compare("[frag]M",pkt[IPv6ExtHdrFragment].m,0)
+            res.compare("[frag]id",pkt[IPv6ExtHdrFragment].id,expect_id)
+        else:
+            res.compare("NH",pkt[IPv6].nh,expect_ref.proto)
+        res.compare("HLIM",pkt[IPv6].hlim,expect_ref.ttl-3)
+    return res
 
 ####
 #  Generic IPv4 Validator
@@ -110,13 +201,6 @@ def icmp6_val(pkt):
 expect_ref = None
 expect_addr2 = test.public_ipv6_xlate
 def ip_val(pkt):
-    global expect_code
-    global expect_type
-    global expect_addr
-    global expect_addr2
-    global expect_class
-    global expect_ptr
-    global expect_mtu
     res = test_result()
     # layer 0 is LinuxTunInfo
     res.check("Contains IPv4",isinstance(pkt.getlayer(1),IP))
@@ -169,17 +253,110 @@ def ip_val(pkt):
 #############################################
 def sec_4_1():
     global test
+    global expect_sa
+    global expect_da
+    global expect_data
+    global expect_ref
+    global expect_len
+    global expect_frag
+    global expect_id
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
+    expect_len = -1
     # Normal Translation Fields
-    test.tfail("Normal Translation Fields","Not Implemented")
+    expect_data = randbytes(64)
+    expect_sa = test.public_ipv4_xlate
+    expect_da = test.public_ipv6
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=64+20) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Basic Translation Small Packet")
+    expect_data = randbytes(1024)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1024+20) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Basic Translation Medium Packet")
+    expect_data = randbytes(1240)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1240+20) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Basic Translation Large Packet")
 
-    # Illegal Source Address
-    test.tfail("Illegal Source Address","Not Implemented")
+    # Traffic Class
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=240) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Traffic Class DS Field")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=2) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Traffic Class ECN Field")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=163) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Traffic Class Both Fields")
 
-    # IPv4 Source Route Option
-    test.tfail("IPv4 Source Route Option","Not Implemented")
+    # Hop Lim variety
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=4) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Hop Lim Low")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=127) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Hop Lim Mid")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=255) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Hop Lim Max")
+    # Hop Limit Exceeded is handled by ICMP Generation test cases
 
-    # IPv4 Requires Fragmentation
-    test.tfail("IPv4 Requires Fragmentation","Not Implemented")
+    # Flow Label 0 is checked by all test cases in this section
+
+    # Payload length is checked by all cases in this section
+
+    # Next Header variety   
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=2,len=128+20,ttl=4) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "NH Low")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=69,len=128+20,ttl=127) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "NH High")
+    expect_data = randbytes(128)
+    # This case is a nh which is not valid for IPv4
+    # However, the translator is not required to check this, so it passes through
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=58,len=128+20,ttl=255) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "NH Overlaps with IPv6")
+
+
+    # IPv4 invalid checksum should be silently dropped
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,chksum=1) / Raw(expect_data)
+    send_and_none(test,expect_ref, "Invalid Checksum")
+
+    # IPv4 Other Options, should be parsed with option discarded
+    expect_data = randbytes(128)
+    expect_len = 128
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20+4,options=IPOption_Stream_Id(security=1)) /Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "Option Stream ID")
+    expect_len = -1
+
+    # IPv4 Source Route Option special handling
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20+4,options=IPOption_SSRR(routers=["1.2.3.4","4.5.6.7"])) /Raw(expect_data)
+    send_and_none(test,expect_ref, "Option Strict Source Route")
+
+    # IPv4 Requires Fragmentation - DF Bit Set is tested in ICMP Generation cases (4.4)
+
+    # IPv4 Requires Frag + DF Bit Clear
+    expect_data = randbytes(1480)
+    expect_frag = True
+    expect_id = 1 #increments each time
+    expect_len = 1240-8 # Length of first fragment, second is calculated from this
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1480+20,ttl=4) / Raw(expect_data)
+    send_and_check_two(test,expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
+
+    # IPv4 Already Fragmented
+    expect_data = randbytes(128)
+    expect_id = 6
+    expect_len = 128
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=4,flags="MF",id=6) / Raw(expect_data)
+    send_and_check(test,expect_ref,ip6_val, "More Fragments")
+
+    #Clear expected
+    expect_id = -1
+    expect_len = -1
+    expect_ref = None
+
 
     test.section("IPv4 -> IPv6 (RFC 7915 4.1)")
 #############################################
@@ -195,6 +372,9 @@ def sec_4_2():
     global expect_seq
     global expect_mtu
     global expect_ptr
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
     ####
     #  ICMP PING TYPES (Type 0 / Type 8)
     ####
@@ -575,6 +755,9 @@ def sec_4_2():
 #############################################
 def sec_4_2_rfc4884():
     global test
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
     test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
     test.section("ICMPv4 Packets with Extensions (RFC 7915 4.4 + RFC4884)")
 
@@ -582,6 +765,12 @@ def sec_4_2_rfc4884():
 # ICMP Inner Translation (RFC 7915 4.3)
 #############################################
 def sec_4_3():
+    global test
+    
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
+
     # One Nested Header
     test.tfail("One Nested Header","Not Implemented")
 
@@ -599,6 +788,9 @@ def sec_4_4():
     global expect_addr
     global expect_type
     global expect_code
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
     # Hop Limit Exceeded in Tayga (Data payload)
     expect_addr = test.tayga_ipv4
     expect_type = 11
@@ -614,12 +806,20 @@ def sec_4_4():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / ICMP(type=3,code=0,id=24,seq=71)
     send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
 
+    
+    # IPv4 Requires Fragmentation - DF Bit Set (should kick back ICMPv4)
+    test.tfail("Frag Required and DF Bit Set","Not Implemented")
+
     test.section("ICMPv4 Generation Cases (RFC 7915 4.4)")
 #############################################
 # Transport-Layer Header (RFC 7915 4.5)
 #############################################
 def sec_4_5():
     global test
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
+
     # TCP Header
     test.tfail("TCP Header","Not Implemented")
 
@@ -646,6 +846,10 @@ def sec_5_1():
     global expect_addr2
     expect_addr = test.public_ipv6_xlate
     expect_addr2 = test.public_ipv4
+
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
 
     # Normal Translation
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=64) / Raw(randbytes(64))
@@ -728,6 +932,10 @@ def sec_5_2():
     global expect_code
     global expect_class
     global expect_ptr
+
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
 
     #Expected address is same for all tests
     expect_addr = test.public_ipv6_xlate
@@ -968,6 +1176,12 @@ def sec_5_2():
 # ICMP Inner Translation (RFC 7915 5.3)
 #############################################
 def sec_5_3():
+    global test
+    
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
+
     # One Nested Header
     test.tfail("One Nested Header","Not Implemented")
 
@@ -986,7 +1200,13 @@ def sec_5_4():
     global expect_type
     global expect_code
     global expect_class
+    global test
     expect_addr = test.public_ipv6_xlate
+
+    
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
 
     # Hop Limit Exceeded In Tayga (UDP)
     expect_class = ICMPv6TimeExceeded()
@@ -1013,6 +1233,11 @@ def sec_5_4():
 # Transport-Layer Header (RFC 7915 5.5)
 #############################################
 def sec_5_5():
+    global test
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.reload()
+
     # TCP Header
     test.tfail("TCP Header","Not Implemented")
 
@@ -1041,17 +1266,19 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-#sec_4_1()
-sec_4_2()
+sec_4_1()
+#sec_4_2()
 #sec_4_2_rfc4884()
 #sec_4_3()
 #sec_4_4()
 #sec_4_5()
 #sec_5_1()
-sec_5_2()
+#sec_5_2()
 #sec_5_3()
 #sec_5_4()
 #sec_5_5()
+
+time.sleep(1)
 
 test.cleanup()
 #Print test report

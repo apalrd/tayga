@@ -56,7 +56,7 @@ def ip_val(pkt):
 
 
 ####
-#  Generic IPv Validator
+#  Generic IPv6 Validator
 ####
 def ip6_val(pkt):
     global expect_sa
