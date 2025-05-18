@@ -6,12 +6,9 @@
 #   ref. RFC 6052, 7757
 #
 from test_env import (
-    test_env, 
-    send_and_check, 
-    send_and_none,
+    test_env,
     test_result,
-    router,
-    route_dest
+    router
 )
 from random import randbytes
 from scapy.all import IP, UDP, IPv6, Raw
@@ -278,7 +275,7 @@ def rfc7757_eam():
     # EAM mappings w/ addr specified from 0 bit to 24 bits
     # bits of -1 also tests without bits specified
     # For equal and unequal suffix length
-    for equal in []: #[True,False]
+    for equal in [True]: #[True,False]
         for bits in [-1,0,1,2,4,8,12,16,20,24]:
             test.flush()
 
@@ -432,6 +429,7 @@ def rfc7757_eam():
             expect_proto = 16
 
     # Fail unequal lengths until #37 is resolved
+    # That is commented out as it Tayga will exit with error
     test.tfail("Unequal Suffix Legnths","See Issue #37")
 
     ####
@@ -538,6 +536,13 @@ def rfc7757_eam():
     test.send_and_check(send_pkt,ip6_val, "overlap src over net2 v4->v6")
 
 
+    ## This section will crash Tayga
+    ## So it has been commented out
+    test.tfail("IPv6 Overlapping Ranges","See Issue #10")
+    test.section("Explicit Address Mapping (RFC 7757 3.2)")
+    return
+
+
     # Generate test config for this one
     test.tayga_conf.default()
     test.tayga_conf.dynamic_pool = None
@@ -575,7 +580,6 @@ def rfc7757_eam():
 
 
 
-    test.section("Explicit Address Mapping (RFC 7757 3.2)")
 
 
 
@@ -583,7 +587,46 @@ def rfc7757_eam():
 # Dynamic Pool Mapping (not specified by RFCs)
 #############################################
 def dynamic_pool():
+    global expect_sa
+    global expect_da
+    global expect_data
+    global expect_len
+    global expect_proto
+    global test
+
+    # Default configuration for this test
+    test.tayga_conf.default()
+    test.reload()
+
+    # Send a v4->v6 without the mapping established (should kick back ICMP)
+    expect_da = test.public_ipv4
+    expect_sa = test.tayga_ipv4
+    expect_data = None
+    expect_len = -1
+    expect_proto = 1
+    send_pkt = IP(dst=str("172.16.0.80"),src=str(test.public_ipv4),proto=16) / Raw(randbytes(128))
+    test.send_and_check(send_pkt,ip_val, "send packet to map range without mapping")
+
+    # Send a packet to establish the mapping
+    expect_sa = "172.16.0.80" #This depends on Tayga's hashing algorithm
+    expect_da = test.public_ipv4
+    expect_data = randbytes(128)
+    expect_len = 128+20
+    expect_proto = 16
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str("2001:db8::69"),nh=16) / Raw(expect_data)
+    test.send_and_check(send_pkt,ip_val, "send packet to establish mapping")
+
+    # Send a v4->v6 with the mapping established
+    expect_da = "2001:db8::69"
+    expect_sa = test.public_ipv4_xlate
+    expect_data = randbytes(128)
+    expect_len = 128
+    send_pkt = IP(dst=str("172.16.0.80"),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
+    test.send_and_check(send_pkt,ip6_val, "send packet to map range with mapping")
+
+    
     test.section("Dynamic Pool Mapping (not specified by RFCs)")
+
 
 
 
@@ -597,8 +640,8 @@ test.setup()
 
 # Call all tests
 #rfc6052_mapping()
-rfc7757_eam()
-#dynamic_pool()
+#rfc7757_eam()
+dynamic_pool()
 
 time.sleep(1)
 test.cleanup()

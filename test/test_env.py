@@ -120,7 +120,7 @@ class confgen:
         self.prefix = "3fff:6464::/96"
         self.wkpf_strict = False
         self.dynamic_pool = "172.16.0.0/24"
-        self.data_dir = "/tmp/tayga"
+        self.data_dir = None
         self.map = []
         self.map.append("172.16.0.1 2001:db8::1")
         self.map.append("172.16.0.2 2001:db8::2")
@@ -292,8 +292,7 @@ class test_env:
         self.tayga_conf_file = "test/tayga.conf"
         self.pcap_file = test_name + ".pcap"
         self.pcap_test_env = False
-        self.tayga_log_file = None
-        #self.tayga_log_file = test_name + ".log"
+        self.tayga_log_file = test_name + ".log"
         self.test_name = test_name
         self.file_path = test_name + ".rpt"
         self.test_results = []
