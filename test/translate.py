@@ -807,6 +807,7 @@ def sec_4_4():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),flags="DF",len=1480+20,proto=16) / Raw(expect_data)
     test.send_and_check(send_pkt,icmp4_val, "Frag Required and DF Bit Set")
 
+
     # Host Unrech - within Tayga pool4 but not allocated
 
     # Proto Unrech - addressed to Tayga itself but not ICMP
@@ -1256,6 +1257,7 @@ def sec_5_4():
     #expect_class = ICMPv6PacketTooBig()
     #send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=1600) / Raw(randbytes(1600))
     #test.send_and_check(send_pkt,icmp6_val, "Packet Too Big")
+
 
     # Protocol addressed to Tayga
     expect_class = ICMPv6ParamProblem()
