@@ -135,8 +135,10 @@ class confgen:
                 conf_file.write("wkpf-strict yes\n")
             else:
                 conf_file.write("wkpf-strict no\n")
-            conf_file.write("dynamic-pool "+self.dynamic_pool+"\n")
-            conf_file.write("data-dir "+self.data_dir+"\n")
+            if self.dynamic_pool is not None:
+                conf_file.write("dynamic-pool "+self.dynamic_pool+"\n")
+            if self.data_dir is not None:
+                conf_file.write("data-dir "+self.data_dir+"\n")
             for entry in self.map:
                 conf_file.write("map "+entry+"\n")
 
