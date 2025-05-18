@@ -7,9 +7,7 @@
 #
 
 from test_env import (
-    test_env, 
-    send_and_check, 
-    send_and_none,
+    test_env,
     test_result,
     router,
     route_dest
@@ -105,7 +103,7 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str(test.xlate(net,pref)),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    if expect_drop: send_and_none(test,send_pkt, name+" v6 dest")
+    if expect_drop: test.send_and_none(send_pkt, name+" v6 dest")
     elif expect_icmp:
         #Expect ICMP instead of current nh
         expect_sa = test.tayga_ipv6
@@ -113,9 +111,9 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
         expect_proto = 58
         expect_data = None
         expect_len = -1
-        send_and_check(test,send_pkt,ip6_val, name+" v6 dest")
+        test.send_and_check(send_pkt,ip6_val, name+" v6 dest")
     else: 
-        send_and_check(test,send_pkt,ip_val, name+" v6 dest")
+        test.send_and_check(send_pkt,ip_val, name+" v6 dest")
     rt_us.remove()
 
     # v6 src is in net, dest must hit a static mapping
@@ -128,8 +126,8 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     expect_da = test.public_ipv6_xlate
     expect_data = randbytes(128)
     expect_len = 128+20
-    send_pkt = IPv6(dst=test.public_ipv6,src=str(test.xlate(net,pref)),nh=16) / Raw(expect_data)
-    if expect_drop: send_and_none(test,send_pkt, name+" v6 src")
+    send_pkt = IPv6(dst=str(test.public_ipv6),src=str(test.xlate(net,pref)),nh=16) / Raw(expect_data)
+    if expect_drop: test.send_and_none(send_pkt, name+" v6 src")
     elif expect_icmp:
         #Expect ICMP instead of current nh
         expect_sa = test.tayga_ipv6
@@ -137,9 +135,9 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
         expect_proto = 58
         expect_data = None
         expect_len = -1
-        send_and_check(test,send_pkt,ip6_val, name+" v6 src")
+        test.send_and_check(send_pkt,ip6_val, name+" v6 src")
     else: 
-        send_and_check(test,send_pkt,ip_val, name+" v6 src") 
+        test.send_and_check(send_pkt,ip_val, name+" v6 src") 
     rt_us.remove()
     rt_ds.remove()
 
@@ -153,7 +151,7 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=net,src=str(test.public_ipv6_xlate),proto=16) / Raw(expect_data)
-    if expect_drop: send_and_none(test,send_pkt, name+" v4 dest")
+    if expect_drop: test.send_and_none(send_pkt, name+" v4 dest")
     elif expect_icmp:
         #Expect ICMP instead of current nh
         expect_sa = test.tayga_ipv4
@@ -161,9 +159,9 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
         expect_proto = 1
         expect_data = None
         expect_len = -1
-        send_and_check(test,send_pkt,ip_val, name+" v4 dest")
+        test.send_and_check(send_pkt,ip_val, name+" v4 dest")
     else: 
-        send_and_check(test,send_pkt,ip6_val, name+" v4 dest") 
+        test.send_and_check(send_pkt,ip6_val, name+" v4 dest") 
     rt_us.remove()
     rt_ds.remove()
 
@@ -173,7 +171,7 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=net,proto=16) / Raw(expect_data)
-    if expect_drop: send_and_none(test,send_pkt, name+" v4 src")
+    if expect_drop: test.send_and_none(send_pkt, name+" v4 src")
     elif expect_icmp:
         #Expect ICMP instead of current nh
         expect_sa = test.tayga_ipv4
@@ -181,9 +179,9 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
         expect_proto = 1
         expect_data = None
         expect_len = -1
-        send_and_check(test,send_pkt,ip_val, name+" v4 src")
+        test.send_and_check(send_pkt,ip_val, name+" v4 src")
     else: 
-        send_and_check(test,send_pkt,ip6_val, name+" v4 src") 
+        test.send_and_check(send_pkt,ip6_val, name+" v4 src") 
 
 
 
@@ -207,15 +205,40 @@ def prefix_generic(pref,strict,expect_drop,expect_icmp):
     test.reload()
 
     # Perform tests using generic test function
-    test_prefix(pref,"10.1.3.4","RFC1918 Class A",expect_drop,expect_icmp)
-    test_prefix(pref,"172.18.6.7","RFC1918 Class B",expect_drop,expect_icmp)
-    test_prefix(pref,"192.168.22.69","RFC1918 Class C",expect_drop,expect_icmp)
-    test_prefix(pref,"192.0.2.6","TEST-NET-1",expect_drop,expect_icmp)
-    test_prefix(pref,"198.51.100.10","TEST-NET-2",expect_drop,expect_icmp)
-    test_prefix(pref,"203.0.113.69","TEST-NET-3",expect_drop,expect_icmp)
-    test_prefix(pref,"198.18.0.20","Benchmarking Space",expect_drop,expect_icmp)
+    test_prefix(pref,"9.255.255.255","RFC1918 Class A under",False,False)
+    test_prefix(pref,"10.1.3.4","RFC1918 Class A within",expect_drop,expect_icmp)
+    test_prefix(pref,"11.0.0.0","RFC1918 Class A over",False,False)
+    test_prefix(pref,"100.63.255.255","RFC6598 Shared Space under",False,False)
+    test_prefix(pref,"100.69.96.2","RFC6598 Shared Space within",expect_drop,expect_icmp)
+    test_prefix(pref,"100.128.0.0","RFC6598 Shared Space over",False,False)
+    test_prefix(pref,"172.15.255.255","RFC1918 Class B under",False,False)
+    test_prefix(pref,"172.18.6.7","RFC1918 Class B within",expect_drop,expect_icmp)
+    test_prefix(pref,"172.32.0.0","RFC1918 Class B over",False,False)
+    test_prefix(pref,"192.167.255.255","RFC1918 Class C under",False,False)
+    test_prefix(pref,"192.168.22.69","RFC1918 Class C within",expect_drop,expect_icmp)
+    test_prefix(pref,"192.169.0.0","RFC1918 Class C over",False,False)
+    test_prefix(pref,"192.0.1.255","TEST-NET-1 under",False,False)
+    test_prefix(pref,"192.0.2.6","TEST-NET-1 within",expect_drop,expect_icmp)
+    test_prefix(pref,"192.0.3.0","TEST-NET-1 over",False,False)
+    test_prefix(pref,"198.51.99.255","TEST-NET-2 under",False,False)
+    test_prefix(pref,"198.51.100.10","TEST-NET-2 within",expect_drop,expect_icmp)
+    test_prefix(pref,"198.51.101.0","TEST-NET-2 over",False,False)
+    test_prefix(pref,"203.0.112.255","TEST-NET-3 under",False,False)
+    test_prefix(pref,"203.0.113.69","TEST-NET-3 within",expect_drop,expect_icmp)
+    test_prefix(pref,"203.0.114.0","TEST-NET-3 over",False,False)
+    test_prefix(pref,"198.17.255.255","Behchmarking Space under",False,False)
+    test_prefix(pref,"198.18.0.0","Benchmarking Space within dn",expect_drop,expect_icmp)
+    test_prefix(pref,"198.19.255.255","Benchmarking Space within up",expect_drop,expect_icmp)
+    test_prefix(pref,"198.20.0.0","Behchmarking Space over",False,False)
     # These prefixes should not be prevented from translation
-    test_prefix(pref,"192.0.0.2","DSLite Space",False,False)
+    test_prefix(pref,"192.0.0.0","DSLite Space 0",False,False)
+    test_prefix(pref,"192.0.0.1","DSLite Space 1",False,False)
+    test_prefix(pref,"192.0.0.2","DSLite Space 2",False,False)
+    test_prefix(pref,"192.0.0.3","DSLite Space 3",False,False)
+    test_prefix(pref,"192.0.0.4","DSLite Space 4",False,False)
+    test_prefix(pref,"192.0.0.5","DSLite Space 5",False,False)
+    test_prefix(pref,"192.0.0.6","DSLite Space 6",False,False)
+    test_prefix(pref,"192.0.0.7","DSLite Space 7",False,False)
     test_prefix(pref,"192.88.99.52","6to4 Relay Space",False,False)
 
     #Finished
@@ -251,11 +274,14 @@ def rfc8215_local_use():
 #############################################
 def invalid_ranges():
     # Setup config for this section
+    # Using non-default prefix to avoid overlap with routes
+    # created by the test setup
     test.tayga_conf.default()
+    test.tayga_conf.prefix = "3fff:4646::/96"
     test.reload()
-    pref = "3fff:6464::"
+    pref = "3fff:4646::"
 
-    # Zero network should be dropped (TBD if this is the best behavior)
+    # Zero network should be dropped
     # Zero Addr also does not forward correctly in the test env
     test_prefix(pref,"0.0.0.0","Zero Addr",True,False)
 
@@ -293,7 +319,7 @@ def invalid_ranges():
 # Setup, call tests, etc.
 
 #test.debug = True
-test.timeout = 0.1
+test.timeout = 0.05
 test.tayga_bin = "./tayga-cov"
 test.setup()
 

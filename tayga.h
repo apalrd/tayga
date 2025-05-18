@@ -268,7 +268,7 @@ struct config {
 
 /* Tayga Packet Error Codes */
 #define ERROR_NONE 0
-#define ERROR_ICMP -1
+#define ERROR_REJECT -1
 #define ERROR_DROP -2
 
 

@@ -95,26 +95,26 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str("3fff:6464:c0a8:102::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/32 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/32 v6->v4")
     #v4->v6 with nonzero suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:c0a8:102::abcd"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/32 v6->v4 w/ nonzero suffix")
+    test.send_and_check(send_pkt,ip_val, "/32 v6->v4 w/ nonzero suffix")
     #v4->v6 with nonzero u
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:c0a8:102:ab00::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/32 v6->v4 w/ nonzero u")
+    test.send_and_check(send_pkt,ip_val, "/32 v6->v4 w/ nonzero u")
     #v4->v6 with nonzero u and suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:c0a8:102:abcd:ef12:5678:1234"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/32 v6->v4 w/ nonzero suffix and u")
+    test.send_and_check(send_pkt,ip_val, "/32 v6->v4 w/ nonzero suffix and u")
     #v4 -> v6
     expect_sa = "3fff:6464:c0a8:102::"
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/32 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/32 v4->v6")
 
 
     # /40
@@ -127,26 +127,26 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str("3fff:6464:00c0:a801:0002::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/40 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/40 v6->v4")
     #v4->v6 with nonzero suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:00c0:a801:0002:abcd:ef12:5678"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/40 v6->v4 w/ nonzero suffix")
+    test.send_and_check(send_pkt,ip_val, "/40 v6->v4 w/ nonzero suffix")
     #v4->v6 with nonzero u
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:00c0:a801:fb02::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/40 v6->v4 w/ nonzero u")
+    test.send_and_check(send_pkt,ip_val, "/40 v6->v4 w/ nonzero u")
     #v4->v6 with nonzero u and suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:00c0:a801:cd02:1234:5678:1245"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/40 v6->v4 w/ nonzero suffix and u")
+    test.send_and_check(send_pkt,ip_val, "/40 v6->v4 w/ nonzero suffix and u")
     #v4 -> v6
     expect_sa = "3fff:6464:c0:a801:2::"
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/40 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/40 v4->v6")
 
 
     # /48
@@ -159,26 +159,26 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str("3fff:6464:0:c0a8:1:0200::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/48 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/48 v6->v4")
     #v4->v6 with nonzero suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0a8:1:0200:ef12:5678"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/48 v6->v4 w/ nonzero suffix")
+    test.send_and_check(send_pkt,ip_val, "/48 v6->v4 w/ nonzero suffix")
     #v4->v6 with nonzero u
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0a8:fa01:0200::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/48 v6->v4 w/ nonzero u")
+    test.send_and_check(send_pkt,ip_val, "/48 v6->v4 w/ nonzero u")
     #v4->v6 with nonzero u and suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0a8:6901:0200:ef12:5678"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/48 v6->v4 w/ nonzero suffix and u")
+    test.send_and_check(send_pkt,ip_val, "/48 v6->v4 w/ nonzero suffix and u")
     #v4 -> v6
     expect_sa = "3fff:6464:0:c0a8:1:200::"
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/48 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/48 v4->v6")
 
     # /56
     # Reconfigure Tayga:
@@ -190,26 +190,26 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str("3fff:6464:0:c0:a8:102::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/56 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/56 v6->v4")
     #v4->v6 with nonzero suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0:a8:102:1234:5678"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/56 v6->v4 w/ nonzero suffix")
+    test.send_and_check(send_pkt,ip_val, "/56 v6->v4 w/ nonzero suffix")
     #v4->v6 with nonzero u
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0:dca8:102::"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/56 v6->v4 w/ nonzero u")
+    test.send_and_check(send_pkt,ip_val, "/56 v6->v4 w/ nonzero u")
     #v4->v6 with nonzero u and suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464:0:c0:eda8:102:4567:9817"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/56 v6->v4 w/ nonzero suffix and u")
+    test.send_and_check(send_pkt,ip_val, "/56 v6->v4 w/ nonzero suffix and u")
     #v4 -> v6
     expect_sa = "3fff:6464:0:c0:a8:102::"
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/56 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/56 v4->v6")
 
     # /64
     # Reconfigure Tayga:
@@ -221,26 +221,26 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str("3fff:6464::c0:a801:200:0"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/64 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/64 v6->v4")
     #v4->v6 with nonzero suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464::c0:a801:200:feed"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/64 v6->v4 w/ nonzero suffix")
+    test.send_and_check(send_pkt,ip_val, "/64 v6->v4 w/ nonzero suffix")
     #v4->v6 with nonzero u
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464::15c0:a801:200:0"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/64 v6->v4 w/ nonzero u")
+    test.send_and_check(send_pkt,ip_val, "/64 v6->v4 w/ nonzero u")
     #v4->v6 with nonzero u and suffix
     expect_data = randbytes(128)
     send_pkt = IPv6(dst=str("3fff:6464::68c0:a801:200:face"),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/64 v6->v4 w/ nonzero suffix and u")
+    test.send_and_check(send_pkt,ip_val, "/64 v6->v4 w/ nonzero suffix and u")
     #v4 -> v6
     expect_sa = "3fff:6464::c0:a801:200:0"
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/64 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/64 v4->v6")
 
     # /96
     #reconfigure tayga
@@ -251,13 +251,13 @@ def rfc6052_mapping():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, "/96 v6->v4")
+    test.send_and_check(send_pkt,ip_val, "/96 v6->v4")
     expect_sa = test.public_ipv4_xlate
     expect_da = test.public_ipv6
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "/96 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "/96 v4->v6")
 
     # Cleanup
     rt.remove()
@@ -323,11 +323,11 @@ def rfc7757_eam():
             expect_len = 128
             rt_v4.apply()
             send_pkt = IP(dst=str(this_net4.network_address),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" dest min v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest min v4->v6")
             expect_da = this_net6.broadcast_address
             expect_data = randbytes(128)
             send_pkt = IP(dst=str(this_net4.broadcast_address),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" dest max v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest max v4->v6")
 
         
             # Send Invalid packets (just out of range
@@ -335,10 +335,10 @@ def rfc7757_eam():
             expect_data = randbytes(128)
             expect_len = 128
             send_pkt = IP(dst=str(this_net4.network_address-1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            send_and_none(test,send_pkt, test_nm+" dest under v4->v6")
+            test.send_and_none(send_pkt, test_nm+" dest under v4->v6")
             expect_data = randbytes(128)
             send_pkt = IP(dst=str(this_net4.broadcast_address+1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            send_and_none(test,send_pkt, test_nm+" dest over v4->v6")
+            test.send_and_none(send_pkt, test_nm+" dest over v4->v6")
             rt_v4.remove()
 
             #v4 -> v6 src
@@ -347,11 +347,11 @@ def rfc7757_eam():
             expect_data = randbytes(128)
             expect_len = 128
             send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(this_net4.network_address),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src min v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src min v4->v6")
             expect_sa = this_net6.broadcast_address
             expect_data = randbytes(128)
             send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(this_net4.broadcast_address),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src max v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src max v4->v6")
 
         
             # Send Invalid packets (just out of range)
@@ -362,11 +362,11 @@ def rfc7757_eam():
             expect_sa = test.xlate(str(this_net4.network_address-1))
             expect_len = 128
             send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(this_net4.network_address-1),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src under v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src under v4->v6")
             expect_sa = test.xlate(str(this_net4.broadcast_address+1))
             expect_data = randbytes(128)
             send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(this_net4.broadcast_address+1),proto=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src over v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src over v4->v6")
 
             # Restart Tayga to catch any caching issues here
             test.reload()
@@ -377,13 +377,13 @@ def rfc7757_eam():
             expect_data = randbytes(128)
             expect_len = 128+20
             send_pkt = IPv6(dst=str(this_net6.network_address),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip_val, test_nm+" dest min v6->v4")
+            test.send_and_check(send_pkt,ip_val, test_nm+" dest min v6->v4")
             expect_sa = test.public_ipv6_xlate
             expect_da = this_net4.broadcast_address
             expect_data = randbytes(128)
             expect_len = 128+20
             send_pkt = IPv6(dst=str(this_net6.broadcast_address),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip_val, test_nm+" dest max v6->v4")
+            test.send_and_check(send_pkt,ip_val, test_nm+" dest max v6->v4")
 
             # For invalid, we expect an ICMPv6 back
             expect_sa = test.tayga_ipv6
@@ -392,9 +392,9 @@ def rfc7757_eam():
             expect_len = -1
             expect_proto = 58
             send_pkt = IPv6(dst=str(this_net6.network_address-1),src=str(test.public_ipv6),nh=16) / Raw(randbytes(128))
-            send_and_check(test,send_pkt,ip6_val, test_nm+" dest under v6->v4")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest under v6->v4")
             send_pkt = IPv6(dst=str(this_net6.broadcast_address+1),src=str(test.public_ipv6),nh=16) / Raw(randbytes(128))
-            send_and_check(test,send_pkt,ip6_val, test_nm+" dest over v6->v4")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest over v6->v4")
 
             
             # Clear some expecteds
@@ -407,13 +407,13 @@ def rfc7757_eam():
             expect_data = randbytes(128)
             expect_len = 128+20
             send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(this_net6.network_address),nh=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip_val, test_nm+" src min v6->v4")
+            test.send_and_check(send_pkt,ip_val, test_nm+" src min v6->v4")
             expect_sa = this_net4.broadcast_address
             expect_da = test.public_ipv4
             expect_data = randbytes(128)
             expect_len = 128+20
             send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(this_net6.broadcast_address),nh=16) / Raw(expect_data)
-            send_and_check(test,send_pkt,ip_val, test_nm+" src max v6->v4")
+            test.send_and_check(send_pkt,ip_val, test_nm+" src max v6->v4")
 
             # For invalid, we expect it to pull from dynamic pool
             expect_sa = test.tayga_ipv6
@@ -422,10 +422,10 @@ def rfc7757_eam():
             expect_len = -1
             expect_proto = 58
             send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(this_net6.network_address-1),nh=16) / Raw(randbytes(128))
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src under v6->v4")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src under v6->v4")
             expect_da = this_net6.broadcast_address+1
             send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(this_net6.broadcast_address+1),nh=16) / Raw(randbytes(128))
-            send_and_check(test,send_pkt,ip6_val, test_nm+" src over v6->v4")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" src over v6->v4")
 
             
             # Clear some expecteds
@@ -478,31 +478,31 @@ def rfc7757_eam():
     expect_len = 128
     rt_v4.apply()
     send_pkt = IP(dst=str(net2_v4.network_address-1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest under net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest under net2 v4->v6")
     expect_da = net2_v6.network_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net2_v4.network_address),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest min net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest min net2 v4->v6")
     expect_da = net2_v6.network_address+5
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net3_v4.network_address-1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest under net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest under net3 v4->v6")
     expect_da = net3_v6.network_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net3_v4.network_address),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest equal net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest equal net3 v4->v6")
     expect_da = net2_v6.network_address+7
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net3_v4.network_address+1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest over net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest over net3 v4->v6")
     expect_da = net2_v6.broadcast_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net2_v4.broadcast_address),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest max net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest max net2 v4->v6")
     expect_da = net1_v6.network_address+512
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(net2_v4.broadcast_address+1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap dest over net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap dest over net2 v4->v6")
     rt_v4.remove()
 
     # v4->v6 src    
@@ -511,31 +511,31 @@ def rfc7757_eam():
     expect_data = randbytes(128)
     expect_len = 128
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net2_v4.network_address-1),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src under net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src under net2 v4->v6")
     expect_sa = net2_v6.network_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net2_v4.network_address),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src min net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src min net2 v4->v6")
     expect_sa = net2_v6.network_address+5
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net3_v4.network_address-1),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src under net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src under net3 v4->v6")
     expect_sa = net3_v6.network_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net3_v4.network_address),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src equal net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src equal net3 v4->v6")
     expect_sa = net2_v6.network_address+7
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net3_v4.network_address+1),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src over net3 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src over net3 v4->v6")
     expect_sa = net2_v6.broadcast_address
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net2_v4.broadcast_address),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src max net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src max net2 v4->v6")
     expect_sa = net1_v6.network_address+512
     expect_data = randbytes(128)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(net2_v4.broadcast_address+1),proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip6_val, "overlap src over net2 v4->v6")
+    test.send_and_check(send_pkt,ip6_val, "overlap src over net2 v4->v6")
 
 
     # Generate test config for this one
@@ -563,13 +563,13 @@ def rfc7757_eam():
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str(net2_v6.network_address-1),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, test_nm+" dest min v6->v4")
+    test.send_and_check(send_pkt,ip_val, test_nm+" dest min v6->v4")
     expect_sa = test.public_ipv6_xlate
     expect_da = this_net4.broadcast_address
     expect_data = randbytes(128)
     expect_len = 128+20
     send_pkt = IPv6(dst=str(this_net6.broadcast_address),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,ip_val, test_nm+" dest max v6->v4")
+    test.send_and_check(send_pkt,ip_val, test_nm+" dest max v6->v4")
 
     # v6->v4 src
 

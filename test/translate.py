@@ -258,35 +258,35 @@ def sec_4_1():
     expect_sa = test.public_ipv4_xlate
     expect_da = test.public_ipv6
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=64+20) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Basic Translation Small Packet")
+    test.send_and_check(expect_ref,ip6_val, "Basic Translation Small Packet")
     expect_data = randbytes(1024)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1024+20) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Basic Translation Medium Packet")
+    test.send_and_check(expect_ref,ip6_val, "Basic Translation Medium Packet")
     expect_data = randbytes(1240)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1240+20) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Basic Translation Large Packet")
+    test.send_and_check(expect_ref,ip6_val, "Basic Translation Large Packet")
 
     # Traffic Class
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=240) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Traffic Class DS Field")
+    test.send_and_check(expect_ref,ip6_val, "Traffic Class DS Field")
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=2) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Traffic Class ECN Field")
+    test.send_and_check(expect_ref,ip6_val, "Traffic Class ECN Field")
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,tos=163) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Traffic Class Both Fields")
+    test.send_and_check(expect_ref,ip6_val, "Traffic Class Both Fields")
 
     # Hop Lim variety
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=4) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Hop Lim Low")
+    test.send_and_check(expect_ref,ip6_val, "Hop Lim Low")
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=127) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Hop Lim Mid")
+    test.send_and_check(expect_ref,ip6_val, "Hop Lim Mid")
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=255) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Hop Lim Max")
+    test.send_and_check(expect_ref,ip6_val, "Hop Lim Max")
     # Hop Limit Exceeded is handled by ICMP Generation test cases
 
     # Flow Label 0 is checked by all test cases in this section
@@ -296,33 +296,33 @@ def sec_4_1():
     # Next Header variety   
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=2,len=128+20,ttl=4) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "NH Low")
+    test.send_and_check(expect_ref,ip6_val, "NH Low")
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=69,len=128+20,ttl=127) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "NH High")
+    test.send_and_check(expect_ref,ip6_val, "NH High")
     expect_data = randbytes(128)
     # This case is a nh which is not valid for IPv4
     # However, the translator is not required to check this, so it passes through
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=58,len=128+20,ttl=255) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "NH Overlaps with IPv6")
+    test.send_and_check(expect_ref,ip6_val, "NH Overlaps with IPv6")
 
 
     # IPv4 invalid checksum should be silently dropped
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,chksum=1) / Raw(expect_data)
-    send_and_none(test,expect_ref, "Invalid Checksum")
+    test.send_and_none(expect_ref, "Invalid Checksum")
 
     # IPv4 Other Options, should be parsed with option discarded
     expect_data = randbytes(128)
     expect_len = 128
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20+4,options=IPOption_Stream_Id(security=1)) /Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "Option Stream ID")
+    test.send_and_check(expect_ref,ip6_val, "Option Stream ID")
     expect_len = -1
 
     # IPv4 Source Route Option special handling
     expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20+4,options=IPOption_SSRR(routers=["1.2.3.4","4.5.6.7"])) /Raw(expect_data)
-    send_and_none(test,expect_ref, "Option Strict Source Route")
+    test.send_and_none(expect_ref, "Option Strict Source Route")
 
     # IPv4 Requires Fragmentation - DF Bit Set is tested in ICMP Generation cases (4.4)
 
@@ -332,14 +332,14 @@ def sec_4_1():
     expect_id = 1 #increments each time
     expect_len = 1240-8 # Length of first fragment, second is calculated from this
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1480+20,ttl=4) / Raw(expect_data)
-    send_and_check_two(test,expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
+    test.send_and_check2(expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
 
     # IPv4 Already Fragmented
     expect_data = randbytes(128)
     expect_id = 6
     expect_len = 128
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=4,flags="MF",id=6) / Raw(expect_data)
-    send_and_check(test,expect_ref,ip6_val, "More Fragments")
+    test.send_and_check(expect_ref,ip6_val, "More Fragments")
 
     #Clear expected
     expect_id = -1
@@ -376,7 +376,7 @@ def sec_4_2():
     expect_id = 22
     expect_seq = 9
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=8,code=0,id=22,seq=9)
-    send_and_check(test,send_pkt,icmp6_val, "Echo Request")
+    test.send_and_check(send_pkt,icmp6_val, "Echo Request")
 
     # ICMPv4 Echo Request (type 8)
     expect_class = ICMPv6EchoReply()
@@ -385,7 +385,7 @@ def sec_4_2():
     expect_id = 221
     expect_seq = 19
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=0,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Echo Reply")
+    test.send_and_check(send_pkt,icmp6_val, "Echo Reply")
 
     #cleanup expects
     expect_id = -1
@@ -398,59 +398,59 @@ def sec_4_2():
 
     # ICMPv4 Source Quench (Type 4)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=4,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Source Quench")
+    test.send_and_none(send_pkt,"Source Quench")
 
     # ICMPv4 Redirect (Type 5)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=5,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Redirect")
+    test.send_and_none(send_pkt,"Redirect")
 
     # ICMPv4 Alternative Host Address (Type 6)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=6,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Alternative Host Address")
+    test.send_and_none(send_pkt,"Alternative Host Address")
 
     # ICMPv4 unassigned type 7
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=7,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Unassigned7")
+    test.send_and_none(send_pkt,"Unassigned7")
 
     # ICMPv4 Router Advertisement (Type 9)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=9,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Router Advertisement")
+    test.send_and_none(send_pkt,"Router Advertisement")
 
     # ICMPv4 Router Solicitation (Type 10)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=10,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Router Solicitation")
+    test.send_and_none(send_pkt,"Router Solicitation")
 
     # ICMPv4 Timestamp (Type 13)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=13,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Timestamp")
+    test.send_and_none(send_pkt,"Timestamp")
 
     # ICMPv4 Timestamp Reply (Type 14)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=14,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Timestamp Reply")
+    test.send_and_none(send_pkt,"Timestamp Reply")
 
     # ICMPv4 Information Request (Type 15)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=15,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Information Request")
+    test.send_and_none(send_pkt,"Information Request")
 
     # ICMPv4 Information Reply (Type 16)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=16,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Information Reply")
+    test.send_and_none(send_pkt,"Information Reply")
 
     # ICMPv4 Addr Mask Request (Type 17)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=17,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Addr Mask Request")
+    test.send_and_none(send_pkt,"Addr Mask Request")
 
     # ICMPv4 Addr Mask Reply (Type 18)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=18,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Addr Mask Reply")
+    test.send_and_none(send_pkt,"Addr Mask Reply")
 
     # ICMPv4 Extended Echo Request (Type 42)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=42,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Extended Echo Request")
+    test.send_and_none(send_pkt,"Extended Echo Request")
 
     # ICMPv4 Ectended Echo Reply (Type 43)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=43,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Extended Echo Reply")
+    test.send_and_none(send_pkt,"Extended Echo Reply")
 
     ####
     # ICMP Error Messages (Type 3)
@@ -462,16 +462,16 @@ def sec_4_2():
     expect_type = 1
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Destination Unreachable Host Unreachable")
+    test.send_and_check(send_pkt,icmp6_val, "Destination Unreachable Host Unreachable")
 
     # ICMPv4 Destination Unreachable - Network Unreachable
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Destination Unreachable Network Unreachable")
+    test.send_and_check(send_pkt,icmp6_val, "Destination Unreachable Network Unreachable")
 
     # ICMPv4 Destination Unreachable - Port Unreachable
     expect_code = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=3) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Destination Unreachable Port Unreachable")
+    test.send_and_check(send_pkt,icmp6_val, "Destination Unreachable Port Unreachable")
 
     # ICMPv4 Destination Unreachable - Protocol Unreachable
     expect_class = ICMPv6ParamProblem()
@@ -479,7 +479,7 @@ def sec_4_2():
     expect_code = 1
     expect_ptr = 6
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=2) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Destination Unreachable Protocol Unreachable")
+    test.send_and_check(send_pkt,icmp6_val, "Destination Unreachable Protocol Unreachable")
 
     # ICMPv4 Fragmentation Needed (and MTU is lower on Tayga)
     expect_class = ICMPv6PacketTooBig()
@@ -488,22 +488,22 @@ def sec_4_2():
     expect_mtu = 1460
     expect_ptr = -1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1440) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Normal MTU)")
+    test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Normal MTU)")
 
     # ICMPv4 Fragmentation Needed (and MTU is lower, but would be higher once +20, like PPPoE)
     expect_mtu = 1500
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1496) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Slightly Large MTU)")
+    test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Slightly Large MTU)")
 
     # ICMPv4 Fragmentation Needed (and MTU is less than 1280)
     expect_mtu = 1280
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1200) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Small MTU)")
+    test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Small MTU)")
 
     # ICMPv4 Fragmentation Needed (and MTU is higher on Tayga)
     expect_mtu = 1500
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1600) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Fragmentation Needed (Large MTU)")
+    test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Large MTU)")
 
     # ICMPv4 Source Route Failed
     expect_class = ICMPv6DestUnreach()
@@ -511,50 +511,50 @@ def sec_4_2():
     expect_code = 0
     expect_mtu = -1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=5) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Source Route Failed")
+    test.send_and_check(send_pkt,icmp6_val, "Source Route Failed")
 
     # ICMPv4 Dest Network Unknown
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Dest Network Unknown")
+    test.send_and_check(send_pkt,icmp6_val, "Dest Network Unknown")
 
     # ICMPv4 Dest Host Unknown
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=7) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Dest Host Unknown")
+    test.send_and_check(send_pkt,icmp6_val, "Dest Host Unknown")
 
     # ICMPv4 Source Host Isolated
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=8) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Source Host Isolated")
+    test.send_and_check(send_pkt,icmp6_val, "Source Host Isolated")
 
     # ICMPv4 Network Administratively Prohibited
     expect_code = 1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=9) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Newtork Admin Prohibited")
+    test.send_and_check(send_pkt,icmp6_val, "Newtork Admin Prohibited")
 
     # ICMPv4 Host Administratively Prohibited
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=10) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Host Admin Prohibited")
+    test.send_and_check(send_pkt,icmp6_val, "Host Admin Prohibited")
 
     # ICMPv4 Network Unreachable For ToS
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=11) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Network Unreachable for ToS")
+    test.send_and_check(send_pkt,icmp6_val, "Network Unreachable for ToS")
 
     # ICMPv4 Host Unreachable For ToS
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=12) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Host Unreachable for ToS")
+    test.send_and_check(send_pkt,icmp6_val, "Host Unreachable for ToS")
 
     # ICMPv4 Communication Administratively Prohibited
     expect_code = 1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=13) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Communication Administratively Prohibited")
+    test.send_and_check(send_pkt,icmp6_val, "Communication Administratively Prohibited")
 
     # ICMPv4 Host Precedence Violation
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=14) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Host Presence Violation")
+    test.send_and_none(send_pkt,"Host Presence Violation")
 
     # ICMPv4 Precedence Cutoff In Effect
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=15) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Precedence Cutoff In Effect")
+    test.send_and_check(send_pkt,icmp6_val, "Precedence Cutoff In Effect")
 
     ####
     # ICMP Parameter Problem (Type 12)
@@ -566,158 +566,158 @@ def sec_4_2():
     expect_code = 0
     expect_ptr = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 0 Version/IHL")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 0 Version/IHL")
 
 
     # ICMPv4 Pointer Indicates Error pointer 1
     expect_ptr = 1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 1 Type Of Service")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 1 Type Of Service")
 
 
     # ICMPv4 Pointer Indicates Error pointer 2
     expect_ptr = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=2) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 2 Total Length")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 2 Total Length")
 
 
     # ICMPv4 Pointer Indicates Error pointer 3
     expect_ptr = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=3) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 3 Total Length")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 3 Total Length")
 
     # ICMPv4 Pointer Indicates Error 4, 5, 6,7 all should not be returned
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=4) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 4")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 4")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=5) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 5")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 5")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 6")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 6")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 7")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 7")
 
     # ICMPv4 Pointer Indicates Error pointer 8, 9
     expect_ptr = 7
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=8) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 8 Time To Live")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 8 Time To Live")
     expect_ptr = 6
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=9) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error 9 Protocol")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error 9 Protocol")
 
     # ICMPv4 Pointer Indicates Error 10,11 should not be returned
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=10) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 10")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 10")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=11) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 11")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 11")
 
     # ICMPv4 Pointer Indicates Error 12-15 are all Source Address
     expect_ptr = 8
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=12) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 12")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 12")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=13) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 13")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 13")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=14) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 14")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 14")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=15) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 15")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 15")
 
     # ICMPv4 Pointer Indicates Error 16-19 are all Dest Address
     expect_ptr = 24
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=16) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 16")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 16")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=17) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 17")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 17")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=18) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 18")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 18")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=19) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Pointer Indicates Error Src Address 19")
+    test.send_and_check(send_pkt,icmp6_val, "Pointer Indicates Error Src Address 19")
 
     # Pointer Indicates Error 20 (too large)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=0,ptr=20) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Pointer Indicates Error 20")
+    test.send_and_none(send_pkt,"Pointer Indicates Error 20")
 
     # ICMPv4 Missing Required Option
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt, "Missing Required Option")
+    test.send_and_none(send_pkt, "Missing Required Option")
 
     # ICMPv4 Bad Length
     expect_ptr = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 0 Version/IHL")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 0 Version/IHL")
 
 
     # ICMPv4 Bad Length pointer 1
     expect_ptr = 1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 1 Type Of Service")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 1 Type Of Service")
 
 
     # ICMPv4 Bad Length pointer 2
     expect_ptr = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=2) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 2 Total Length")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 2 Total Length")
 
 
     # ICMPv4 Bad Length pointer 3
     expect_ptr = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=3) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 3 Total Length")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 3 Total Length")
 
     # ICMPv4 Bad Length 4, 5, 6,7 all should not be returned
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=4) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 4")
+    test.send_and_none(send_pkt,"Bad Length 4")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=5) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 5")
+    test.send_and_none(send_pkt,"Bad Length 5")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 6")
+    test.send_and_none(send_pkt,"Bad Length 6")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 7")
+    test.send_and_none(send_pkt,"Bad Length 7")
 
     # ICMPv4 Bad Length pointer 8, 9
     expect_ptr = 7
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=8) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 8 Time To Live")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 8 Time To Live")
     expect_ptr = 6
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=9) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length 9 Protocol")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length 9 Protocol")
 
     # ICMPv4 Bad Length 10,11 should not be returned
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=10) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 10")
+    test.send_and_none(send_pkt,"Bad Length 10")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=11) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 11")
+    test.send_and_none(send_pkt,"Bad Length 11")
 
     # ICMPv4 Bad Length 12-15 are all Source Address
     expect_ptr = 8
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=12) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 12")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 12")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=13) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 13")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 13")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=14) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 14")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 14")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=15) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 15")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 15")
 
     # ICMPv4 Bad Length 16-19 are all Dest Address
     expect_ptr = 24
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=16) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 16")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 16")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=17) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 17")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 17")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=18) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 18")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 18")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=19) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Bad Length Src Address 19")
+    test.send_and_check(send_pkt,icmp6_val, "Bad Length Src Address 19")
 
     # Bad Length 20 (invalid)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=2,ptr=20) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Bad Length 20")
+    test.send_and_none(send_pkt,"Bad Length 20")
 
     # ICMPv4 Other Param Problem
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=3) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Other Parameter Problem 3")
+    test.send_and_none(send_pkt,"Other Parameter Problem 3")
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=12,code=6) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_none(test,send_pkt,"Other Parameter Problem 4")
+    test.send_and_none(send_pkt,"Other Parameter Problem 4")
 
     ####
     # ICMPv4 Time Exceeded (Type 11)
@@ -729,12 +729,12 @@ def sec_4_2():
     expect_code = 0
     expect_ptr = -1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=11,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Time Exceeded Hop Limit")
+    test.send_and_check(send_pkt,icmp6_val, "Time Exceeded Hop Limit")
 
     # ICMPv4 Time Exceeded - Fragment Reassembly
     expect_code = 1
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=11,code=1) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
-    send_and_check(test,send_pkt,icmp6_val, "Time Exceeded Fragment Reassembly Time")
+    test.send_and_check(send_pkt,icmp6_val, "Time Exceeded Fragment Reassembly Time")
 
 
     test.section("ICMPv4 -> ICMPv6 (RFC 7915 4.2)")
@@ -788,15 +788,15 @@ def sec_4_4():
     expect_type = 11
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
-    send_and_check(test,send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (UDP)")
+    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (UDP)")
 
     # Hop Limit Exceeded in Tayga (ICMP payload)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / ICMP(type=8,code=0,id=24,seq=71)
-    send_and_check(test,send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (ICMP Echo)")
+    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (ICMP Echo)")
 
     # Hop Limit Exceeded in Tayga (ICMP error)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / ICMP(type=3,code=0,id=24,seq=71)
-    send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
+    test.send_and_none(send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
 
     
     # IPv4 Requires Fragmentation - DF Bit Set
@@ -805,7 +805,7 @@ def sec_4_4():
     expect_type = 3
     expect_code = 4
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),flags="DF",len=1480+20,proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,icmp4_val, "Frag Required and DF Bit Set")
+    test.send_and_check(send_pkt,icmp4_val, "Frag Required and DF Bit Set")
 
     # Host Unrech - within Tayga pool4 but not allocated
 
@@ -827,7 +827,7 @@ def sec_4_4():
     rt_d = router("42.69.0.1")
     rt_d.apply()
     send_pkt = IP(dst="42.69.0.1",src=str(test.public_ipv4),len=128,proto=16) / Raw(expect_data)
-    send_and_check(test,send_pkt,icmp4_val, "Invalid SA")
+    test.send_and_check(send_pkt,icmp4_val, "Invalid SA")
     rt_d.remove()
 
     rt.remove()
@@ -879,59 +879,59 @@ def sec_5_1():
 
     # Normal Translation
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=64) / Raw(randbytes(64))
-    send_and_check(test,expect_ref,ip_val, "Basic Translation Small Packet")
+    test.send_and_check(expect_ref,ip_val, "Basic Translation Small Packet")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=512) / Raw(randbytes(512))
-    send_and_check(test,expect_ref,ip_val, "Basic Translation Medium Packet")
+    test.send_and_check(expect_ref,ip_val, "Basic Translation Medium Packet")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "Basic Translation Larger Packet")
+    test.send_and_check(expect_ref,ip_val, "Basic Translation Larger Packet")
 
     # TOS value tests
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=24,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "Type Of Service 1")
+    test.send_and_check(expect_ref,ip_val, "Type Of Service 1")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=48,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "Type Of Service 2")
+    test.send_and_check(expect_ref,ip_val, "Type Of Service 2")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=96,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "Type Of Service 3")
+    test.send_and_check(expect_ref,ip_val, "Type Of Service 3")
 
     # Explicit Congestion Notification
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=1,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "ECN")
+    test.send_and_check(expect_ref,ip_val, "ECN")
 
     # TOS + ECN
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,tc=25,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "TOS+ECN")
+    test.send_and_check(expect_ref,ip_val, "TOS+ECN")
 
     # TTL Varying
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,hlim=172,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "TTL Big")
+    test.send_and_check(expect_ref,ip_val, "TTL Big")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,hlim=5,plen=1420) / Raw(randbytes(1420))
-    send_and_check(test,expect_ref,ip_val, "TTL Small")
+    test.send_and_check(expect_ref,ip_val, "TTL Small")
 
     # ICMP translation (proto 1 / proto 58) is handled section 5.2 tests
 
     # IPv6 Hop By Hop Options
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8) / IPv6ExtHdrHopByHop(nh=16) / Raw(randbytes(72))
-    send_and_check(test,expect_ref,ip_val, "Hop-By-Hop Option")
+    test.send_and_check(expect_ref,ip_val, "Hop-By-Hop Option")
 
     # IPv6 Destination Options
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8) / IPv6ExtHdrDestOpt(nh=16) / Raw(randbytes(72))
-    send_and_check(test,expect_ref,ip_val, "Destination Option")
+    test.send_and_check(expect_ref,ip_val, "Destination Option")
 
     # IPv6 Route w/ segments left
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8) / IPv6ExtHdrRouting(nh=16,segleft=0,type=253) / Raw(randbytes(72))
-    send_and_check(test,expect_ref,ip_val, "Routing w/o segments left")
+    test.send_and_check(expect_ref,ip_val, "Routing w/o segments left")
 
     # IPv6 Route w/o segments left
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8) / IPv6ExtHdrRouting(nh=16,segleft=4,type=253) / Raw(randbytes(72))
-    send_and_none(test,expect_ref, "Routing w/ segments left")
+    test.send_and_none(expect_ref, "Routing w/ segments left")
 
     # Multiple IPv6 Option Headers
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8+8) / IPv6ExtHdrHopByHop() / IPv6ExtHdrDestOpt(nh=16) / Raw(randbytes(72))
-    send_and_check(test,expect_ref,ip_val, "Hop-By-Hop + Dest Option")
+    test.send_and_check(expect_ref,ip_val, "Hop-By-Hop + Dest Option")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8+8+8) / IPv6ExtHdrHopByHop() / IPv6ExtHdrDestOpt() / IPv6ExtHdrRouting(nh=16,segleft=0,type=253) / Raw(randbytes(72))
-    send_and_check(test,expect_ref,ip_val, "Hop-By-Hop + Dest + Routing Option")
+    test.send_and_check(expect_ref,ip_val, "Hop-By-Hop + Dest + Routing Option")
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8+8) / IPv6ExtHdrHopByHop() / IPv6ExtHdrRouting(nh=16,segleft=4,type=253) / Raw(randbytes(72))
-    send_and_none(test,expect_ref, "Hop-By-Hop + Routing Segments Left Option")
+    test.send_and_none(expect_ref, "Hop-By-Hop + Routing Segments Left Option")
 
     # Fragmentation Needed
     test.tfail("Fragmentation Needed","Not Implemented")
@@ -972,7 +972,7 @@ def sec_5_2():
     expect_type = 8
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6EchoRequest(id=expect_id,seq=expect_seq)
-    send_and_check(test,send_pkt,icmp4_val, "Echo Request")
+    test.send_and_check(send_pkt,icmp4_val, "Echo Request")
 
     # ICMPv4 Echo Reply
     expect_id  = 69
@@ -980,7 +980,7 @@ def sec_5_2():
     expect_type = 0
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6EchoReply(id=expect_id,seq=expect_seq)
-    send_and_check(test,send_pkt,icmp4_val, "Echo Reply")
+    test.send_and_check(send_pkt,icmp4_val, "Echo Reply")
 
     # Clear expected
     expect_id = -1
@@ -992,13 +992,13 @@ def sec_5_2():
 
     # MLD Query
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=130,code=0)
-    send_and_none(test,send_pkt,"MLD Query")
+    test.send_and_none(send_pkt,"MLD Query")
     # MLD Report
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=131,code=0)
-    send_and_none(test,send_pkt,"MLD Report")
+    test.send_and_none(send_pkt,"MLD Report")
     # MLD Done
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=132,code=0)
-    send_and_none(test,send_pkt,"MLD Done")
+    test.send_and_none(send_pkt,"MLD Done")
 
     ####
     # ND (Type 135 / Type 136 / Type 137))
@@ -1006,13 +1006,13 @@ def sec_5_2():
 
     # Neighbor Solicitation
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=135,code=0)
-    send_and_none(test,send_pkt,"Neighbor Solicitation")
+    test.send_and_none(send_pkt,"Neighbor Solicitation")
     # Neighbor Advertisement
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=136,code=0)
-    send_and_none(test,send_pkt,"Neighbor Advertisement")
+    test.send_and_none(send_pkt,"Neighbor Advertisement")
     # Redirect Message
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=137,code=0)
-    send_and_none(test,send_pkt,"Redirect")
+    test.send_and_none(send_pkt,"Redirect")
 
     ####
     # Unreachable (Type 1)
@@ -1023,31 +1023,31 @@ def sec_5_2():
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=0) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "No Route to Destination")
+    test.send_and_check(send_pkt,icmp4_val, "No Route to Destination")
 
     # Communication Administratively Prohibited
     expect_type = 3
     expect_code = 10
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Administratively Prohibited")
+    test.send_and_check(send_pkt,icmp4_val, "Administratively Prohibited")
 
     # Beyond Scope of Source Address
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=2) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Beyond Scope of Source Address")
+    test.send_and_check(send_pkt,icmp4_val, "Beyond Scope of Source Address")
 
     # Address Unreachable
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Address Unreachable")
+    test.send_and_check(send_pkt,icmp4_val, "Address Unreachable")
 
     # Port Unreachable
     expect_type = 3
     expect_code = 3
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=4) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Port Unreachable")
+    test.send_and_check(send_pkt,icmp4_val, "Port Unreachable")
 
     # Others should be dropped (TODO?)
     test.tfail("Invalid Error Codes","Not Implemented")
@@ -1061,7 +1061,7 @@ def sec_5_2():
     expect_code = 4
     expect_mtu = 1340
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6PacketTooBig(mtu=expect_mtu+20) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Packet Too Big")
+    test.send_and_check(send_pkt,icmp4_val, "Packet Too Big")
 
 
     # Packet Too Big (w/ MTU above Tayga's MTU)
@@ -1069,20 +1069,20 @@ def sec_5_2():
     expect_code = 4
     expect_mtu = 1480 # clamped from 1500 mtu on Tayga tun adapter
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6PacketTooBig(mtu=1600) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Packet Really Too Big")
+    test.send_and_check(send_pkt,icmp4_val, "Packet Really Too Big")
     expect_mtu = -1
 
     # Time Exceeded In Transit
     expect_type = 11
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6TimeExceeded(code=0) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Time Exceeded In Transit")
+    test.send_and_check(send_pkt,icmp4_val, "Time Exceeded In Transit")
 
     # Time Exceeded / Fragment Reassembly
     expect_type = 11
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6TimeExceeded(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Time Exceeded Fragment Reassembly")
+    test.send_and_check(send_pkt,icmp4_val, "Time Exceeded Fragment Reassembly")
 
 
     # Parameter Problem Erroneous Header
@@ -1099,19 +1099,19 @@ def sec_5_2():
         elif i > 0: expect_ptr = 1
         else: expect_ptr = 0
         send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=0,ptr=i) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-        if expect_ptr >= 0: send_and_check(test,send_pkt,icmp4_val, "Parameter Problem Erroneous Header "+str(i))
-        else: send_and_none(test,send_pkt, "Parameter Problem Erroneous Header "+str(i))
+        if expect_ptr >= 0: test.send_and_check(send_pkt,icmp4_val, "Parameter Problem Erroneous Header "+str(i))
+        else: test.send_and_none(send_pkt, "Parameter Problem Erroneous Header "+str(i))
 
     # Parameter Proboem Unrecognized Next Header    
     expect_type = 3
     expect_code = 2
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Parameter Problem Unrecognized Header")
+    test.send_and_check(send_pkt,icmp4_val, "Parameter Problem Unrecognized Header")
     
 
     # Other Error Types
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=2) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_none(test,send_pkt, "Parameter Problem Other")
+    test.send_and_none(send_pkt, "Parameter Problem Other")
 
     #############################################
     #  ICMPv6 Errors without a mapping address (RFC 7915 5.2)
@@ -1126,25 +1126,25 @@ def sec_5_2():
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=0) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "No Route to Destination")
+    test.send_and_check(send_pkt,icmp4_val, "No Route to Destination")
 
     # Communication Administratively Prohibited
     expect_type = 3
     expect_code = 10
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Administratively Prohibited")
+    test.send_and_check(send_pkt,icmp4_val, "Administratively Prohibited")
 
     # Beyond Scope of Source Address
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=2) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Beyond Scope of Source Address")
+    test.send_and_check(send_pkt,icmp4_val, "Beyond Scope of Source Address")
 
     # Address Unreachable
     expect_type = 3
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=3) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Address Unreachable")
+    test.send_and_check(send_pkt,icmp4_val, "Address Unreachable")
 
     # Port Unreachable
     # Expect nothing, since this particular message can only come
@@ -1152,34 +1152,34 @@ def sec_5_2():
     expect_type = 3
     expect_code = 3
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=4) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Port Unreachable")
+    test.send_and_check(send_pkt,icmp4_val, "Port Unreachable")
 
     # Packet Too Big (w/ MTU in reasonable size)
     expect_type = 3
     expect_code = 4
     expect_mtu = 1340
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6PacketTooBig(mtu=expect_mtu+20) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Packet Too Big")
+    test.send_and_check(send_pkt,icmp4_val, "Packet Too Big")
 
     # Packet Too Big (w/ MTU above Tayga's MTU)
     expect_type = 3
     expect_code = 4
     expect_mtu = 1480 # clamped from 1500 mtu on Tayga tun adapter
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6PacketTooBig(mtu=1600) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Packet Really Too Big")
+    test.send_and_check(send_pkt,icmp4_val, "Packet Really Too Big")
     expect_mtu = -1
 
     # Time Exceeded In Transit
     expect_type = 11
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6TimeExceeded(code=0) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Time Exceeded In Transit")
+    test.send_and_check(send_pkt,icmp4_val, "Time Exceeded In Transit")
 
     # Time Exceeded / Fragment Reassembly
     expect_type = 11
     expect_code = 1
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6TimeExceeded(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
-    send_and_check(test,send_pkt,icmp4_val, "Time Exceeded Fragment Reassembly")
+    test.send_and_check(send_pkt,icmp4_val, "Time Exceeded Fragment Reassembly")
 
 
     # Parameter Problem Erroneous Header
@@ -1242,27 +1242,27 @@ def sec_5_4():
     expect_type = 3
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
-    send_and_check(test,send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (UDP)")
+    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (UDP)")
    
     # Hop Limit Exceeded In Tayga (ICMP)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoRequest(id=42,seq=89)
-    send_and_check(test,send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (ICMP)")
+    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (ICMP)")
    
     # Hop Limit Exceeded In Tayga (ICMP Error)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoReply(id=43,seq=88)
-    send_and_none(test,send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
+    test.send_and_none(send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
     
     # Packet Too Big (Linux masks this one)
     #expect_class = ICMPv6PacketTooBig()
     #send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=1600) / Raw(randbytes(1600))
-    #send_and_check(test,send_pkt,icmp6_val, "Packet Too Big")
+    #test.send_and_check(send_pkt,icmp6_val, "Packet Too Big")
 
     # Protocol addressed to Tayga
     expect_class = ICMPv6ParamProblem()
     expect_type = 4
     expect_code = 1
     send_pkt = IPv6(dst=str(test.tayga_ipv6),src=str(test.public_ipv6),nh=16,plen=128) / Raw(randbytes(128))
-    send_and_check(test,send_pkt,icmp6_val, "Proto Unreach")
+    test.send_and_check(send_pkt,icmp6_val, "Proto Unreach")
 
 
     # Invalid Addressing must be done with wkpf-strict
@@ -1280,7 +1280,7 @@ def sec_5_4():
     rt = router(test.tayga_conf.prefix)
     rt.apply()
     send_pkt = IPv6(dst=test.xlate("192.168.88.1","64:ff9b::"),src=str(test.public_ipv6),nh=16,plen=128) / Raw(expect_data)
-    send_and_check(test,send_pkt,icmp6_val, "Invalid DA")
+    test.send_and_check(send_pkt,icmp6_val, "Invalid DA")
     rt.remove()
 
     
@@ -1290,7 +1290,7 @@ def sec_5_4():
     expect_type = 1
     expect_da = test.xlate("192.168.88.1","64:ff9b::")
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=expect_da,nh=16,plen=128) / Raw(expect_data)
-    send_and_check(test,send_pkt,icmp6_val, "Invalid SA")
+    test.send_and_check(send_pkt,icmp6_val, "Invalid SA")
 
     # reset expected
     expect_id = -1

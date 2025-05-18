@@ -226,7 +226,7 @@ static void xlate_4to6_data(struct pkt *p)
 	frag_size -= sizeof(struct ip6);
 
 	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest);
-	if (ret == ERROR_ICMP) {
+	if (ret == ERROR_REJECT) {
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to kick back ICMP4 for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->dest,temp,64));
@@ -236,7 +236,7 @@ static void xlate_4to6_data(struct pkt *p)
 	else if(ret == ERROR_DROP) return;
 
 	ret = map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src);
-	if (ret == ERROR_ICMP) {
+	if (ret == ERROR_REJECT) {
 		host_send_icmp4_error(3, 10, 0, p);
 		return;
 	}
@@ -749,7 +749,7 @@ static void xlate_6to4_data(struct pkt *p)
 	struct iovec iov[2];
 
 	ret = map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0);
-	if (ret == ERROR_ICMP) {
+	if (ret == ERROR_REJECT) {
 		host_send_icmp6_error(1, 0, 0, p);
 		return;
 	}
@@ -759,7 +759,7 @@ static void xlate_6to4_data(struct pkt *p)
 	}
 
 	ret = map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1);
-	if (ret == ERROR_ICMP) {
+	if (ret == ERROR_REJECT) {
 		host_send_icmp6_error(1, 5, 0, p);
 		return;
 	}

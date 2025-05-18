@@ -18,12 +18,12 @@ class route_dest(Enum):
     ROUTE_ADMIN_PROHIBIT = 4
     ROUTE_THROW = 5    
 
+ipr = IPRoute()
 
 class router:
     def __init__(self, route: str,dest: route_dest = route_dest.ROUTE_NORMAL):
         self.dest = dest
         self.route = ipaddress.ip_network(route)
-        self.ipr = IPRoute()
         self.debug = False
         self.active = False
 
@@ -34,26 +34,27 @@ class router:
         self.active = True
         try:
             if self.dest == route_dest.ROUTE_BLACKHOLE:
-                self.ipr.route("add", dst=str(self.route), type="blackhole")
+                ipr.route("add", dst=str(self.route), type="blackhole")
             elif self.dest == route_dest.ROUTE_UNREACHABLE:
-                self.ipr.route("add", dst=str(self.route), type="unreachable")
+                ipr.route("add", dst=str(self.route), type="unreachable")
             elif self.dest == route_dest.ROUTE_ADMIN_PROHIBIT:
-                self.ipr.route("add", dst=str(self.route), type="prohibit")
+                ipr.route("add", dst=str(self.route), type="prohibit")
             elif self.dest == route_dest.ROUTE_THROW:
-                self.ipr.route("add", dst=str(self.route), type="throw")
+                ipr.route("add", dst=str(self.route), type="throw")
             elif self.dest == route_dest.ROUTE_TEST:
-                self.ipr.route("add", dst=str(self.route), oif=self.ipr.link_lookup(ifname="tun0")[0])            
+                ipr.route("add", dst=str(self.route), oif=ipr.link_lookup(ifname="tun0")[0])            
             else:
-                self.ipr.route("add", dst=str(self.route), oif=self.ipr.link_lookup(ifname="nat64")[0])            
+                ipr.route("add", dst=str(self.route), oif=ipr.link_lookup(ifname="nat64")[0])            
         except Exception as e:
             print(f"Failed to add route to {self.route}: {e}")
             self.active = False
         if self.debug:
             print(f"Added route to {self.route}")
+    
     def remove(self):
         self.active = False
         try:
-            self.ipr.route("del", dst=str(self.route))
+            ipr.route("del", dst=str(self.route))
         except Exception as e:
             print(f"Failed to remove route to {self.route}: {e}")
         if self.debug:
@@ -147,7 +148,6 @@ class confgen:
 class test_env:
     def cleanup(self):
         print("Stopping Tayga")
-        ipr = IPRoute()
         
         # Kill tcpdump process using the subprocess object
         if hasattr(self, 'tcpdump_proc') and self.tcpdump_proc:
@@ -193,7 +193,6 @@ class test_env:
         subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.forwarding=1"], check=True)
 
     def setup_nat64(self):
-        ipr = IPRoute()
         if self.debug:
             print("Bringing up the NAT64 interface")
         # Bring Up Interface
@@ -262,7 +261,6 @@ class test_env:
         print(f"Creating TUN/TAP interface")
         # Create a TUN/TAP interface
         tun = TunTapInterface(iface="tun0", mode_tun=True, strip_packet_info=False)
-        ipr = IPRoute()
         tun_index = ipr.link_lookup(ifname="tun0")[0]
         ipr.link("set", index=tun_index, state="up")
         ipr.link("set", index=tun_index, mtu=1500)
@@ -270,8 +268,8 @@ class test_env:
         ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv6), mask=64)
         ipr.route("add",dst="default",oif=tun_index)
         ipr.route("add",dst="::/0",oif=tun_index,family=socket.AF_INET6)
-
         self.tun = tun
+
 
     def __init__(self,test_name):
         #These are the default values for the test environment
@@ -294,7 +292,8 @@ class test_env:
         self.tayga_conf_file = "test/tayga.conf"
         self.pcap_file = test_name + ".pcap"
         self.pcap_test_env = False
-        self.tayga_log_file = test_name + ".log"
+        self.tayga_log_file = None
+        #self.tayga_log_file = test_name + ".log"
         self.test_name = test_name
         self.file_path = test_name + ".rpt"
         self.test_results = []
@@ -389,10 +388,7 @@ class test_env:
             print(f"Passed: {self.test_passed}")
             print(f"Failed: {self.test_failed}")
 
-    # Send a packet and check for a suitable response
-
-class send_and_check:
-    def recv_validate(self,pkt):
+    def _val_snd_check(self,pkt):
         # Toss link-local packets since we shouldn't see them on our
         # tun adapter
         if pkt.haslayer(IPv6):
@@ -415,43 +411,36 @@ class send_and_check:
             print(pkt.show())
             return False
         if res.result() != test_res.RES_NONE:
-            if self.test.debug or res.has_fail:
+            if self.debug or res.has_fail:
                 print(f"Received packet matching {self.test_name}")
                 print(pkt.show())
             self.test_stat = res
             return True
         return False
 
-    def __init__(self,test,packet,response_func,test_name):
-        self.test = test
+    def send_and_check(self,packet,response_func,test_name):
         self.test_name = test_name
         self.response_func = response_func
         self.test_stat = test_result()
 
         # Send the packet using the test.tun interface
-        if self.test.debug:
+        if self.debug:
             print(f"Sending packet for {test_name}:")
             print(packet.show())
         # Send the packet
-        self.test.tun.send(packet)
+        self.tun.send(packet)
 
         # Use the sniff method to wait for a response
-        self.test.tun.sniff(timeout=self.test.timeout,stop_filter=self.recv_validate,store=False)
-
+        self.tun.sniff(timeout=self.timeout,stop_filter=self._val_snd_check,store=False)
 
         if self.test_stat.result() == test_res.RES_NONE:
-            self.test.tfail(self.test_name,"No valid response received")
+            self.tfail(self.test_name,"No valid response received")
         elif self.test_stat.result() == test_res.RES_FAIL:
-            self.test.tfail(self.test_name,self.test_stat.error())
+            self.tfail(self.test_name,self.test_stat.error())
         else:
-            self.test.tpass(self.test_name)
+            self.tpass(self.test_name)
 
-    def failed(self):
-        return not self.test_stat
-    
-#Expect two packets back (i.e. fragments)
-class send_and_check_two:
-    def recv_validate(self,pkt):
+    def _val_snd_check2(self,pkt):
         # Toss link-local packets since we shouldn't see them on our
         # tun adapter
         if pkt.haslayer(IPv6):
@@ -475,7 +464,7 @@ class send_and_check_two:
             print(pkt.show())
             return False
         if res.result() != test_res.RES_NONE:
-            if self.test.debug or res.has_fail:
+            if self.debug or res.has_fail:
                 print(f"Received packet matching {self.test_name}")
                 print(pkt.show())
             if self.first_pkt:
@@ -487,8 +476,7 @@ class send_and_check_two:
                 return True
         return False
 
-    def __init__(self,test,packet,response_func,response_func2,test_name):
-        self.test = test
+    def send_and_check_two(self,packet,response_func,response_func2,test_name):
         self.test_name = test_name
         self.response_func = response_func
         self.response_func2 = response_func2
@@ -497,37 +485,32 @@ class send_and_check_two:
         self.first_pkt = True
 
         # Send the packet using the test.tun interface
-        if self.test.debug:
+        if self.debug:
             print(f"Sending packet for {test_name}:")
             print(packet.show())
         # Send the packet
-        self.test.tun.send(packet)
+        self.tun.send(packet)
 
         # Use the sniff method to wait for a response
-        self.test.tun.sniff(timeout=self.test.timeout,stop_filter=self.recv_validate,store=False)
+        self.tun.sniff(timeout=self.timeout,stop_filter=self._val_snd_check2,store=False)
 
         # First Result
         if self.test_stat.result() == test_res.RES_NONE:
-            self.test.tfail(self.test_name+" Pkt1","No valid response received")
+            self.tfail(self.test_name+" Pkt1","No valid response received")
         elif self.test_stat.result() == test_res.RES_FAIL:
-            self.test.tfail(self.test_name+" Pkt1",self.test_stat.error())
+            self.tfail(self.test_name+" Pkt1",self.test_stat.error())
         else:
-            self.test.tpass(self.test_name+" Pkt1")
+            self.tpass(self.test_name+" Pkt1")
 
         # Second Result
         if self.test_stat2.result() == test_res.RES_NONE:
-            self.test.tfail(self.test_name+" Pkt2","No valid response received")
+            self.tfail(self.test_name+" Pkt2","No valid response received")
         elif self.test_stat2.result() == test_res.RES_FAIL:
-            self.test.tfail(self.test_name+" Pkt2",self.test_stat2.error())
+            self.tfail(self.test_name+" Pkt2",self.test_stat2.error())
         else:
-            self.test.tpass(self.test_name+" Pkt2")
+            self.tpass(self.test_name+" Pkt2")
 
-    def failed(self):
-        return not self.test_stat
-    
-
-class send_and_none:
-    def recv_validate(self,pkt):
+    def _val_snd_none(self,pkt):
         #If the packet is IPv6 link-local src or dest, toss it
         if pkt.haslayer(IPv6):
             if ipaddress.IPv6Address(pkt[IPv6].src).is_link_local:
@@ -543,32 +526,28 @@ class send_and_none:
             return False
         # Got an unexpected packet
         print(f"Received unexpected packet for {self.test_name}")
-        if self.test.debug:
+        if self.debug:
             print(pkt.show())
         self.test_stat = False
         return True
 
-    def __init__(self,test,packet,test_name):
-        self.test = test
+    def send_and_none(self,packet,test_name):
         self.test_name = test_name
         self.test_stat = True #default pass, unless we get an odd one
         self.test_err = "Unexpected Packet Received"
 
-        # Send the packet using the test.tun interface
-        if self.test.debug:
+        # Send the packet using the tun interface
+        if self.debug:
             print(f"Sending packet for {test_name}:")
             print(packet.show())
         # Send the packet
-        self.test.tun.send(packet)
+        self.tun.send(packet)
 
         # Use the sniff method to wait for a response
-        self.test.tun.sniff(timeout=self.test.timeout,stop_filter=self.recv_validate,store=False)
+        self.tun.sniff(timeout=self.timeout,stop_filter=self._val_snd_none,store=False)
 
         if self.test_stat:
-            self.test.tpass(self.test_name)
+            self.tpass(self.test_name)
         else:
             print("Failing Test "+self.test_name)
-            self.test.tfail(self.test_name, self.test_err)
-
-    def failed(self):
-        return not self.test_stat
+            self.tfail(self.test_name, self.test_err)
