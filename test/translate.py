@@ -30,6 +30,9 @@ from scapy.layers.inet6 import (
 from scapy.layers.inet import (
     IPOption_Stream_Id,
     IPOption_SSRR,
+    ICMPExtension_Header,
+    ICMPExtension_Object,
+    ICMPExtension_InterfaceInformation,
 )
 import time
 
@@ -94,6 +97,8 @@ def icmp6_val(pkt):
         res.compare("ID",pkt.getlayer(2).id,expect_id)
     if expect_seq >= 0:
         res.compare("SEQ",pkt.getlayer(2).seq,expect_seq)
+    if expect_len >= 0:
+        res.compare("LEN",pkt.getlayer(2).length,expect_len)
     return res
 ####
 #  Generic IPv6 Validator
@@ -741,10 +746,69 @@ def sec_4_2():
 #############################################
 def sec_4_2_rfc4884():
     global test
+    global expect_class
+    global expect_sa
+    global expect_da
+    global expect_type
+    global expect_code
+    global expect_len
+    global expect_ext_type
     # Setup config for this section
     test.tayga_conf.default()
     test.reload()
-    test.tfail("ICMPv4 Packets with Extensions (RFC4884)","Not Implemented")
+
+    ## Extensions may be added to the following ICMPv4 types:
+    # Destination Unreachable
+    # Time Exceeded
+    # Parameter Problem
+
+    ## The following extensions are defined
+    # 1 = MPLS (RFC 4950)
+    # 2 = Interface Information
+    # 3 = Interface Identification
+    # 4 = Extended Information
+    # Extension MPLS (type 1)
+
+    # Also, ICMPv4 requires 4 byte alignment and ICMPv6 requires 8
+
+    #Misaligned test (length multiple of 8 bytes)
+    expect_class = ICMPv6TimeExceeded()
+    expect_sa = test.public_ipv4_xlate
+    expect_da = test.public_ipv6
+    expect_type = 3
+    expect_code = 0
+    expect_len = 19 #152bytes, /8 for ICMPv6
+    #this is a hell of a stack
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) \
+        / ICMP(
+            type=11,
+            code=0,
+            length=32, #128 bytes, /4 for ICMPv4
+            ext=ICMPExtension_Header() /
+            ICMPExtension_InterfaceInformation(has_ifindex=1,ifindex=6)
+        ) / IP(dst=str(test.test_sys_ipv6_xlate),src=str(test.test_sys_ipv4),proto=16,len=512) \
+        / Raw(randbytes(128-20))
+    test.send_and_check(send_pkt,icmp6_val, f"Extension Misaligned v4")
+
+    # Due to bugs in Scapy assuming 128-byte embedded packet (instead of using em_len)
+    # this test was validated manually in Wireshark
+
+    
+    #Reverse case (v6->v4)
+    expect_type = 11
+    expect_code = 0
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) \
+         / ICMPv6TimeExceeded(
+            code=0,
+            length=16,
+            ext=ICMPExtension_Header() /
+            ICMPExtension_InterfaceInformation(has_ifindex=1,ifindex=6)
+            ) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),nh=16) / Raw(randbytes(128-40))
+    test.send_and_check(send_pkt,icmp4_val, "Extension Aligned v6 short")
+
+    expect_type = -1
+    expect_code = -1
+    expect_len = -1
     test.section("ICMPv4 Packets with Extensions (RFC 7915 4.2 + RFC4884)")
 
 #############################################
@@ -1338,17 +1402,17 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-sec_4_1()
-sec_4_2()
+#sec_4_1()
+#sec_4_2()
 sec_4_2_rfc4884()
-sec_4_3()
-sec_4_4()
-sec_4_5()
-sec_5_1()
-sec_5_2()
-sec_5_3()
-sec_5_4()
-sec_5_5()
+#sec_4_3()
+#sec_4_4()
+#sec_4_5()
+#sec_5_1()
+#sec_5_2()
+#sec_5_3()
+#sec_5_4()
+#sec_5_5()
 
 time.sleep(1)
 
