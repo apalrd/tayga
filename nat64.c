@@ -397,7 +397,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	int allow_fake_source = 0;
 	struct cache_entry *orig_dest = NULL;
 
 	memset(&p_em, 0, sizeof(p_em));
@@ -460,7 +459,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			dummy();
 		case 12:
 			header.icmp.code = 0; /* No route to destination */
-			allow_fake_source = 1;
 			break;
 		case 2: /* Protocol Unreachable */
 			header.icmp.type = 4;
@@ -484,7 +482,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 				mtu = 1280;
 			}
 			header.icmp.word = htonl(mtu);
-			allow_fake_source = 1;
 			break;
 		case 9:
 			dummy();
@@ -538,10 +535,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to rely on fake source for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->src,temp,64));
-		if (allow_fake_source)
-			header.ip6.src = gcfg->local_addr6;
-		else
-			return;
+		//Fake source IP is our own IP
+		header.ip6.src = gcfg->local_addr6;
 	}
 
 	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, NULL)) {
@@ -872,7 +867,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	int allow_fake_source = 0;
 
 	memset(&p_em, 0, sizeof(p_em));
 	p_em.data = p->data + sizeof(struct icmp);
@@ -908,7 +902,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		dummy();
 		case 3: /* Address Unreachable */
 			header.icmp.code = 1; /* Host Unreachable */
-			allow_fake_source = 1;
 			break;
 		case 1: /* Administratively prohibited */
 			header.icmp.code = 10; /* Administratively prohibited */
@@ -932,7 +925,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 			mtu = gcfg->mtu;
 		mtu -= MTU_ADJ;
 		header.icmp.word = htonl(mtu);
-		allow_fake_source = 1;
 		break;
 	case 3: /* Time Exceeded */
 		header.icmp.type = 11; /* Time Exceeded */
@@ -988,14 +980,14 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	header.ip4_em.cksum =
 		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
 
+	//As this is an ICMP error packet, we will not further 
+	//send errors, so treat return of REJECT = DROP
 	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to rely on fake source for ip6 %s\n",
 			inet_ntop(AF_INET6,&p->ip6->src,temp,64));
-		if (allow_fake_source)
-			header.ip4.src = gcfg->local_addr4;
-		else
-			return;
+		//fake source IP is our own IP
+		header.ip4.src = gcfg->local_addr4;
 	}
 
 	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, NULL, 0))

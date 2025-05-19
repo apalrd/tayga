@@ -7,10 +7,7 @@
 #
 
 from test_env import (
-    test_env, 
-    send_and_check, 
-    send_and_check_two,
-    send_and_none,
+    test_env,
     test_result,
     router,
 )
@@ -332,7 +329,7 @@ def sec_4_1():
     expect_id = 1 #increments each time
     expect_len = 1240-8 # Length of first fragment, second is calculated from this
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1480+20,ttl=4) / Raw(expect_data)
-    test.send_and_check2(expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
+    test.send_and_check_two(expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
 
     # IPv4 Already Fragmented
     expect_data = randbytes(128)
@@ -1015,6 +1012,10 @@ def sec_5_2():
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=137,code=0)
     test.send_and_none(send_pkt,"Redirect")
 
+    # Unknown Informational
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=200,code=0)
+    test.send_and_none(send_pkt,"Unknown Informational")
+
     ####
     # Unreachable (Type 1)
     ####
@@ -1050,8 +1051,9 @@ def sec_5_2():
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=4) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Port Unreachable")
 
-    # Others should be dropped (TODO?)
-    test.tfail("Invalid Error Codes","Not Implemented")
+    # Invalid type 1 code
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=8) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+    test.send_and_none(send_pkt, "Invalid Code")
 
     ####
     # Other Errors (Type 2 / Type 3 / Type 4)
@@ -1113,6 +1115,13 @@ def sec_5_2():
     # Other Error Types
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6ParamProblem(code=2) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_none(send_pkt, "Parameter Problem Other")
+
+    
+    # Unknown Error Type
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6Unknown(type=100,code=0)
+    test.send_and_none(send_pkt,"Unknown Error")
+
+    test.section("ICMPv6 to ICMPv4 Translation (RFC 7915 5.2)")
 
     #############################################
     #  ICMPv6 Errors without a mapping address (RFC 7915 5.2)
@@ -1182,19 +1191,12 @@ def sec_5_2():
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6TimeExceeded(code=1) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Time Exceeded Fragment Reassembly")
 
-
-    # Parameter Problem Erroneous Header
-    test.tfail("Parameter Problem Erroneous Header","Not Implemented")
-
-    # Parameter Proboem Unrecognized Next Header
-    test.tfail("Parameter Proboem Unrecognized Next Header","Not Implemented")
-
     # reset expected
     expect_id = -1
     expect_seq = -1
     expect_mtu = -1
 
-    test.section("ICMPv6 to ICMPv4 Translation (RFC 7915 5.2)")
+    test.section("ICMPv6 to ICMPv4 Translation (RFC 7915 5.2) without mapping address")
 #############################################
 # ICMP Inner Translation (RFC 7915 5.3)
 #############################################
