@@ -17,6 +17,7 @@
  */
 
 #include "tayga.h"
+#include "version.h"
 
 #include <stdarg.h>
 #include <signal.h>
@@ -581,7 +582,7 @@ int main(int argc, char **argv)
 		close(pidfd);
 	}
 
-	slog(LOG_INFO, "starting TAYGA " VERSION "\n");
+	slog(LOG_INFO, "starting TAYGA " TAYGA_VERSION "\n");
 
 	if (gcfg->cache_size) {
 		gcfg->urandom_fd = open("/dev/urandom", O_RDONLY);

@@ -11,3 +11,7 @@ tayga-cov
 *.pcap
 *.pyc
 *.log
+html/*
+latex/*
+version.h
+.vscode/*

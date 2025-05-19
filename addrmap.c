@@ -21,6 +21,15 @@
 extern struct config *gcfg;
 extern time_t now;
 
+/**
+ * @brief Check if an IPv4 address is valid
+ * 
+ * Checks if an address is within the ranges which are reserved
+ * by protocol, such as multicast, link-local, etc.
+ *
+ * @param a struct in_addr address to validate
+ * @returns ERROR_DROP if invalid, else 0
+ */
 int validate_ip4_addr(const struct in_addr *a)
 {
 	/* First Octet == 0 */
@@ -47,6 +56,15 @@ int validate_ip4_addr(const struct in_addr *a)
 	return ERROR_NONE;
 }
 
+/**
+ * @brief Check if an IPv6 address is valid
+ *  
+ * Checks if an address is within the ranges which are reserved
+ * by protocol, such as multicast, link-local, etc.
+ *
+ * @param a struct in6_addr address to validate
+ * @returns ERROR_DROP if invalid, else 0
+ */
 int validate_ip6_addr(const struct in6_addr *a)
 {
 	/* Well-known prefix for NAT64, plus Local-Use Space */
@@ -69,6 +87,16 @@ int validate_ip6_addr(const struct in6_addr *a)
 	return ERROR_NONE;
 }
 
+/**
+ * @brief Check if an IPv4 address is private
+ *  
+ * Checks if an address is within the ranges which are reserved
+ * by IANA, and therefore, must not be translated using the
+ * well-known prefix (64:ff9b::/96)
+ *
+ * @param a struct in_addr address to validate
+ * @returns ERROR_REJECT if invalid, else 0
+ */
 int is_private_ip4_addr(const struct in_addr *a)
 {
 	/* 10.0.0.0/8 RFC1918 */
@@ -106,16 +134,31 @@ int is_private_ip4_addr(const struct in_addr *a)
 	return ERROR_NONE;
 }
 
+/**
+ * @brief Calculate the mask of an IPv4 address
+ *
+ * @param mask Pointer to return mask
+ * @param addr Pointer to address
+ * @param len length in bits of IPv4 mask
+ * @returns -1 if address has host bits of mask set
+ */
 int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len)
 {
 	mask->s_addr = htonl(~(0xffffffff >> len));
 	if (len == 32) mask->s_addr = 0xffffffff;
 	if (addr && (addr->s_addr & ~mask->s_addr))
-		return -1; //todo fix this error code
+		return -1;
 	return 0;
-
 }
 
+/**
+ * @brief Calculate the mask of an IPv6 address
+ *
+ * @param mask Pointer to return mask
+ * @param addr Pointer to address
+ * @param len length in bits of IPv6 mask
+ * @returns -1 if address has host bits of mask set
+ */
 int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len)
 {
 	if (len > 32) {
@@ -148,7 +191,7 @@ int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len)
 			(addr->s6_addr32[1] & ~mask->s6_addr32[1]) ||
 			(addr->s6_addr32[2] & ~mask->s6_addr32[2]) ||
 			(addr->s6_addr32[3] & ~mask->s6_addr32[3]))
-		return -1; //todo fix this error code
+		return -1;
 	return 0;
 }
 
@@ -180,6 +223,12 @@ static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
 	list_add(&c->hash6, &gcfg->hash_table6[hash6]);
 }
 
+/**
+ * @brief Initialize address translation cache
+ *  
+ * TODO Document how the cache works better
+ *
+ */
 void create_cache(void)
 {
 	int i, hash_size = 1 << gcfg->hash_bits;
@@ -243,7 +292,12 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 	add_to_hash_table(c, hash4, hash6);
 	return c;
 }
-
+/**
+ * @brief Check if an IPv4 address is in the cache
+ *  
+ * @param addr4 IPv4 address to check
+ * @returns Cache entry, or NULL if none found
+ */
 struct map4 *find_map4(const struct in_addr *addr4)
 {
 	struct list_head *entry;
@@ -256,7 +310,12 @@ struct map4 *find_map4(const struct in_addr *addr4)
 	}
 	return NULL;
 }
-
+/**
+ * @brief Check if an IPv6 address is in the cache
+ *  
+ * @param addr6 IPv6 address to check
+ * @returns Cache entry, or NULL if none found
+ */
 struct map6 *find_map6(const struct in6_addr *addr6)
 {
 	struct list_head *entry;
@@ -269,7 +328,13 @@ struct map6 *find_map6(const struct in6_addr *addr6)
 	}
 	return NULL;
 }
-
+/**
+ * @brief Insert an IPv4 entry into the cache
+ *  
+ * @param map4 Cache entry to add
+ * @param conflict Pointer to return conflicting object
+ * @returns -1 on conflict
+ */
 int insert_map4(struct map4 *m, struct map4 **conflict)
 {
 	struct list_head *entry;
@@ -291,7 +356,13 @@ conflict:
 		*conflict = s;
 	return -1;
 }
-
+/**
+ * @brief Insert an IPv6 entry into the cache
+ *  
+ * @param map6 Cache entry to add
+ * @param conflict Pointer to return conflicting object
+ * @returns -1 on conflict
+ */
 int insert_map6(struct map6 *m, struct map6 **conflict)
 {
 	struct list_head *entry, *insert_pos = NULL;
@@ -317,7 +388,15 @@ conflict:
 		*conflict = s;
 	return -1;
 }
-
+/**
+ * @brief Append an IPv4 address to an IPv6 translation prefix
+ *  
+ * @param[out] addr6 Return IPv6 address
+ * @param[in] addr4 IPv4 address
+ * @param[in] prefix IPv6 Prefix
+ * @param[in] prefix_len IPv6 prefix length (must be defined by RFC6052)
+ * @returns ERROR_DROP on invalid prefix
+ */
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len)
 {
@@ -405,6 +484,14 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 	}
 }
 
+/**
+ * @brief Map IPv4 to IPv6
+ *  
+ * @param[out] addr6 Return IPv6 address
+ * @param[in] addr4 IPv4 address
+ * @param[out] c_ptr Cache entry
+ * @returns ERROR_REJECT or ERROR_DROP on error
+ */
 int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		struct cache_entry **c_ptr)
 {
@@ -553,7 +640,15 @@ static int extract_from_prefix(struct in_addr *addr4,
 	}
 	return validate_ip4_addr(addr4);
 }
-
+/**
+ * @brief Map IPv6 to IPv4
+ *  
+ * @param[out] addr4 Return IPv6 address
+ * @param[in] addr6 IPv4 address
+ * @param[out] c_ptr Cache entry
+ * @param[in] dyn_allow Allow dynamic allocation for this mapping
+ * @returns ERROR_REJECT or ERROR_DROP on error
+ */
 int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		struct cache_entry **c_ptr, int dyn_alloc)
 {
@@ -586,7 +681,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		if (dyn_alloc)
 			map6 = assign_dynamic(addr6);
 		if (!map6)
-			return -1;
+			return ERROR_REJECT; //TODO what's the right behavior here
 	}
 
 	switch (map6->type) {
@@ -654,6 +749,10 @@ static void report_ageout(struct cache_entry *c)
 	d->cache_entry = NULL;
 }
 
+/**
+ * @brief Perform periodic address cache maintenance
+ *  
+ */
 void addrmap_maint(void)
 {
 	struct list_head *entry, *next;

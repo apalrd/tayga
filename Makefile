@@ -10,12 +10,18 @@ TARGET-COV := $(TARGET)-cov
 all: $(TARGET)
 cov: $(TARGET-COV)
 
-# Dependency generation
-DEPS := $(SOURCES:.c=.d)
-%.d: %.c
-	@$(CC) $(CFLAGS) -MM -MT $(@:.d=.o) $< > $@
+# Version generation
+version.h: .git/*
+	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --abbrev=0)\"" > $@
+	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> $@
 
--include $(DEPS)
+# Dependency generation
+tayga.d: $(SOURCES) version.h
+	$(CC) $(CFLAGS) -MM $(SOURCES) -MT tayga $< > $@
+
+-include tayga.d
+
+
 
 $(TARGET): $(SOURCES)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES)
@@ -27,7 +33,7 @@ cov-report:
 	gcov -a -g -f *.gcno
 
 clean:
-	rm -f $(TARGET) $(DEPS) $(TARGET-COV) *.gcda *.gcno
+	rm -f $(TARGET) tayga.d version.h $(TARGET-COV) *.gcda *.gcno
 
 install: $(TARGET)
 	# TODO

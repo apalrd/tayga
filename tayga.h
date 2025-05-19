@@ -47,8 +47,6 @@
 #error "Could not find headers for platform"
 #endif
 #include "list.h"
-#include "config.h"
-
 //for coverage testing
 static void dummy()
 {
@@ -90,6 +88,9 @@ struct tun_pi {
 
 /* Valid token delimiters in config file and dynamic map file */
 #define DELIM		" \t\r\n"
+
+/// Default configuration path
+#define TAYGA_CONF_PATH "/etc/tayga.conf"
 
 
 /* Protocol structures */
@@ -149,6 +150,7 @@ struct icmp {
 
 /* TAYGA data definitions */
 
+/// Packet structure
 struct pkt {
 	struct ip4 *ip4;
 	struct ip6 *ip6;
@@ -160,6 +162,7 @@ struct pkt {
 	uint32_t header_len; /* inc IP hdr for v4 but excl IP hdr for v6 */
 };
 
+/// Type of mapping in mapping list
 enum {
 	MAP_TYPE_STATIC,
 	MAP_TYPE_RFC6052,
@@ -167,6 +170,7 @@ enum {
 	MAP_TYPE_DYNAMIC_HOST,
 };
 
+/// Mapping entry (IPv4)
 struct map4 {
 	struct in_addr addr;
 	struct in_addr mask;
@@ -175,6 +179,7 @@ struct map4 {
 	struct list_head list;
 };
 
+/// Mapping entry (IPv6)
 struct map6 {
 	struct in6_addr addr;
 	struct in6_addr mask;
@@ -183,6 +188,7 @@ struct map6 {
 	struct list_head list;
 };
 
+/// Mapping entry (Static Maps)
 struct map_static {
 	struct map4 map4;
 	struct map6 map6;
@@ -195,6 +201,7 @@ struct free_addr {
 	struct list_head list;
 };
 
+/// Mapping entry (Dynamic Map)
 struct map_dynamic {
 	struct map4 map4;
 	struct map6 map6;
@@ -204,6 +211,7 @@ struct map_dynamic {
 	struct free_addr free;
 };
 
+/// Mapping entry (Dynamic Pool)
 struct dynamic_pool {
 	struct map4 map4;
 	struct list_head mapped_list;
@@ -212,6 +220,7 @@ struct dynamic_pool {
 	struct free_addr free_head;
 };
 
+/// IP Cache entry
 struct cache_entry {
 	struct in6_addr addr6;
 	struct in_addr addr4;
@@ -223,11 +232,15 @@ struct cache_entry {
 	struct list_head hash6;
 };
 
-#define CACHE_F_SEEN_4TO6	(1<<0)
-#define CACHE_F_SEEN_6TO4	(1<<1)
-#define CACHE_F_GEN_IDENT	(1<<2)
-#define CACHE_F_REP_AGEOUT	(1<<3)
+/// Cache flag bits
+enum {
+	CACHE_F_SEEN_4TO6	= (1<<0),
+	CACHE_F_SEEN_6TO4	= (1<<1),
+	CACHE_F_GEN_IDENT	= (1<<2),
+	CACHE_F_REP_AGEOUT	= (1<<3),
+};
 
+/// Configuration structure
 struct config {
 	char tundev[IFNAMSIZ];
 	char data_dir[512];
@@ -266,10 +279,12 @@ struct config {
 	int wkpf_strict;
 };
 
-/* Tayga Packet Error Codes */
-#define ERROR_NONE 0
-#define ERROR_REJECT -1
-#define ERROR_DROP -2
+/// Packet error codes
+enum {
+	ERROR_NONE = 0,
+	ERROR_REJECT = -1,
+	ERROR_DROP = -2,
+};
 
 
 /* Macros and static functions */
