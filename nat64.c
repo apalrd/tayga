@@ -403,14 +403,14 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	p_em.data = p->data + sizeof(struct icmp);
 	p_em.data_len = p->data_len - sizeof(struct icmp);
 
-	/* embedded length may be specified by ICMPv4 for extensions */
 	if (p->icmp->type == 3 || p->icmp->type == 11 || p->icmp->type == 12) {
-		em_len = ((ntohl(p->icmp->word) & 0xff0000) >> 14);
+		em_len = (ntohl(p->icmp->word) >> 14) & 0x3fc;
 		if (em_len) {
 			if (p_em.data_len < em_len) {
 				slog(LOG_DEBUG,"em packet length error %s:%d\n",__FUNCTION__,__LINE__);
 				return;
 			}
+			p_em.data_len = em_len;
 		}
 	}
 
@@ -420,7 +420,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	}
 
 	if (p_em.data_proto == 1 && p_em.icmp->type != 8) {
-		slog(LOG_DEBUG,"Dropping packet since embedded packet is ICMP and not Ping %s:%d\n",__FUNCTION__,__LINE__);
+		slog(LOG_DEBUG,"Dropping packet since it's ICMP and not Ping %s:%d\n",__FUNCTION__,__LINE__);
 		return;
 	}
 
@@ -529,38 +529,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	if (xlate_payload_4to6(&p_em, &header.ip6_em) < 0) {
 		slog(LOG_DEBUG,"xlate_payload_4to6 failed at %s:%d\n",__FUNCTION__,__LINE__);
 		return;
-	}
-
-	/* If we had an extension length, write it back into the new header */
-	if(em_len) {
-		/* length increased by 20 bytes due to em header translation */
-		em_len += 20;		
-		/* If em_len not divisible by 8, need to add padding
-		* ICMPv4 required 4-byte alignment, ICMPv6 requires 8
-		*/
-		slog(LOG_DEBUG,"em_len is %d\n",em_len);
-		if(em_len & 0x4)
-		{
-			/* Extension len = data len - em_len, without ip header length */
-			uint16_t cpy_len = p_em.data_len - (em_len - 40);
-			if(cpy_len > 512) {
-				slog(LOG_DEBUG,"Need to align ICMPV4 extension but copy length is"
-					" unreasonable, data_len=%d,em_len=%d\n",p_em.data_len,em_len);
-			}
-			else {
-				/* em_len is off by 40, since it includes IP header */
-				memmove(p_em.data+(em_len-40)+4,p_em.data+(em_len-40),cpy_len);
-				/* Add 4 bytes of padding */
-				memset(p_em.data+(em_len-40),0,4);
-			}
-			/* Increase lengths by 4 to account for new padding */
-			em_len += 4;
-			p_em.data_len += 4;
-
-		}
-		/* Extension length field is in 64-bit words for ICMPv6 */
-		header.icmp.word |= htonl((em_len << 21) & 0xff000000);
-		slog(LOG_DEBUG,"Got ICMP Ext Len %d, new word %x, p len %d\n",em_len,header.icmp.word,p_em.data_len);
 	}
 
 	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, NULL)) {
@@ -899,21 +867,17 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	uint16_t em_ext_len = 0;
 
 	memset(&p_em, 0, sizeof(p_em));
 	p_em.data = p->data + sizeof(struct icmp);
 	p_em.data_len = p->data_len - sizeof(struct icmp);
 
-	/* read em_len if it exists */
 	if (p->icmp->type == 1 || p->icmp->type == 3) {
 		em_len = (ntohl(p->icmp->word) >> 21) & 0x7f8;
 		if (em_len) {
-			if (p_em.data_len < em_len) {
-				slog(LOG_DEBUG,"em packet length error %s:%d\n",__FUNCTION__,__LINE__);
+			if (p_em.data_len < em_len)
 				return;
-			}
-			em_ext_len = p_em.data_len - em_len;
+			p_em.data_len = em_len;
 		}
 	}
 
@@ -1002,29 +966,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		return;
 	default:
 		return;
-	}
-
-	
-	/* If we had an extension length, write it back into the new header */
-	if(em_len >= 20) {
-		/* length decreased by 20 bytes due to em header translation */
-		em_len -= 20;	
-		/* Extensions must start at 128 bytes or more from ICMP header */
-		if(em_len < 128) {
-			/* Move extensions up to start at 128 */
-			if(em_ext_len > 512) {
-				slog(LOG_DEBUG,"Unreasonable extension length and copy required"
-					",%s:%d\n",__FUNCTION__,__LINE__);
-			}
-			else {
-				/* Copy up to start at 128 (off by ip hdr len) */
-				memmove(p_em.data+108,p_em.data+p_em.data_len,em_ext_len);
-			}
-			em_len = 128;
-			p_em.data_len = 108+em_ext_len;
-		}
-		/* Extension length field is in 32-bit words for ICMPv4 */
-		header.icmp.word |= htonl((em_len << 14) & 0xff0000);
 	}
 
 	if (map_ip6_to_ip4(&header.ip4_em.src, &p_em.ip6->src, NULL, 0) ||
