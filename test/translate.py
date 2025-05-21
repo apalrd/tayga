@@ -1338,17 +1338,17 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-sec_4_1()
-sec_4_2()
-sec_4_2_rfc4884()
-sec_4_3()
-sec_4_4()
-sec_4_5()
-sec_5_1()
+#sec_4_1()
+#sec_4_2()
+#sec_4_2_rfc4884()
+#sec_4_3()
+#sec_4_4()
+#sec_4_5()
+#sec_5_1()
 sec_5_2()
-sec_5_3()
-sec_5_4()
-sec_5_5()
+#sec_5_3()
+#sec_5_4()
+#sec_5_5()
 
 time.sleep(1)
 

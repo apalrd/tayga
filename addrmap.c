@@ -416,37 +416,45 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
 
+	/* Lookup entry in cache */
 	if (gcfg->cache_size) {
 		hash = hash_ip4(addr4);
 
 		list_for_each(entry, &gcfg->hash_table4[hash]) {
 			c = list_entry(entry, struct cache_entry, hash4);
 			if (addr4->s_addr == c->addr4.s_addr) {
+				/* Found cache entry, return cached item */
 				*addr6 = c->addr6;
 				c->last_use = now;
 				if (c_ptr)
 					*c_ptr = c;
-				return 0;
+				return ERROR_NONE;
 			}
 		}
 	}
 
+	/* Find map which this address belongs to */
 	map4 = find_map4(addr4);
 
+	/* No mapping found, kick back return */
 	if (!map4) {
 		slog(LOG_DEBUG,"Invalid map4 at %s:%d\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	}
 
+	/* Translate according to map type */
 	switch (map4->type) {
 	case MAP_TYPE_STATIC:
+		/* Address is an explicit address map (EAM) */
 		s = container_of(map4, struct map_static, map4);
 		*addr6 = s->map6.addr;
+		/* Map is EAM-map with prefix length */
 		if (map4->prefix_len < 32) {
 			addr6->s6_addr32[3] = s->map6.addr.s6_addr32[3] | (addr4->s_addr & ~map4->mask.s_addr);
 		}
 		break;
 	case MAP_TYPE_RFC6052:
+		/* Address is IPv6-translated per RFC6052 */
 		s = container_of(map4, struct map_static, map4);
 		ret = append_to_prefix(addr6, addr4, &s->map6.addr,s->map6.prefix_len);
 		if (ret < 0) {
@@ -455,9 +463,11 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		}
 		break;
 	case MAP_TYPE_DYNAMIC_POOL:
+		/* Address fits into dynamic pool but no host is using it */
 		slog(LOG_DEBUG,"Address map is dynamic pool at %s:%d\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	case MAP_TYPE_DYNAMIC_HOST:
+		/* Address is an allocated dynamic host */
 		d = container_of(map4, struct map_dynamic, map4);
 		*addr6 = d->map6.addr;
 		d->last_use = now;
@@ -467,9 +477,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		return ERROR_DROP;
 	}
 
+	/* Add entry to cache*/
 	if (gcfg->cache_size) {
 		c = cache_insert(addr4, addr6, hash, hash_ip6(addr6));
-
+		c->flags |= (map4->type & CACHE_F_TYPE);
 		if (c_ptr)
 			*c_ptr = c;
 		if (d) {
@@ -565,12 +576,14 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
 
+	/* Search for addr6 in cache */
 	if (gcfg->cache_size) {
 		hash = hash_ip6(addr6);
 
 		list_for_each(entry, &gcfg->hash_table6[hash]) {
 			c = list_entry(entry, struct cache_entry, hash6);
 			if (IN6_ARE_ADDR_EQUAL(addr6, &c->addr6)) {
+				/* Found in cache, return */
 				*addr4 = c->addr4;
 				c->last_use = now;
 				if (c_ptr)
@@ -579,20 +592,24 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 			}
 		}
 	}
-
+	/* Not found in cache, lookup map which contains this addr */
 	map6 = find_map6(addr6);
 
+	/* Not found */
 	if (!map6) {
+		/* Try dyanmic assignment if allowed */
 		if (dyn_alloc)
 			map6 = assign_dynamic(addr6);
+		/* Not allowed to assign, or assignment failed */
 		if (!map6)
-			return -1;
+			return ERROR_REJECT;
 	}
 
+	/* Mapping based on map type */
 	switch (map6->type) {
 	case MAP_TYPE_STATIC:
 		s = container_of(map6, struct map_static, map6);
-		
+		/* EAM mapping prefix */
 		if (map6->prefix_len < 128) {
 			addr4->s_addr = s->map4.addr.s_addr | (addr6->s6_addr32[3] & ~map6->mask.s6_addr32[3]);
 		} else {
@@ -601,9 +618,11 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 
 		break;
 	case MAP_TYPE_RFC6052:
+		/* Pull v4 out of v6 with prefix */
 		ret = extract_from_prefix(addr4, addr6, map6->prefix_len);
-		if (ret < 0)
+		if (ret < ERROR_NONE)
 			return ret;
+		/* Reject if using well-known prefix for private addresses */
 		if (map6->addr.s6_addr32[0] == WKPF &&
 			map6->addr.s6_addr32[1] == 0 &&
 			map6->addr.s6_addr32[2] == 0 &&
@@ -625,12 +644,16 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		slog(LOG_DEBUG,"Dropping packet due to default case %s:%d",__FUNCTION__,__LINE__);
 		return ERROR_DROP;
 	}
-
+	/* Write new cache entry for this map */
 	if (gcfg->cache_size) {
+		/* Insert into hash table */
 		c = cache_insert(addr4, addr6, hash_ip4(addr4), hash);
-
+		/* Update cache entry type */
+		c->flags |= (map6->type & CACHE_F_TYPE);
+		/* Return pointer */
 		if (c_ptr)
 			*c_ptr = c;
+		/* Dynamic map update cache entry */
 		if (d) {
 			d->cache_entry = c;
 			if (c)

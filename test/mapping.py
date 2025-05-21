@@ -639,8 +639,8 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-#rfc6052_mapping()
-#rfc7757_eam()
+rfc6052_mapping()
+rfc7757_eam()
 dynamic_pool()
 
 time.sleep(1)

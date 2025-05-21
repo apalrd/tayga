@@ -73,7 +73,7 @@ struct tun_pi {
 
 #define ETH_P_IP AF_INET
 #define	ETH_P_IPV6 AF_INET6
-#define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->proto = htonl(_af); }
+#define	TUN_SET_PROTO(_pi, _af)			{ (_pi).proto = htonl(_af); }
 #define	TUN_GET_PROTO(_pi)			ntohl((_pi)->proto)
 #endif
 
@@ -158,7 +158,17 @@ struct pkt {
 	uint8_t *data;
 	uint32_t data_len;
 	uint32_t header_len; /* inc IP hdr for v4 but excl IP hdr for v6 */
+	struct cache_entry *src;
+	struct cache_entry *dest;
 };
+
+
+struct new4 {
+	struct tun_pi pi;
+	struct ip4 ip4;
+	struct icmp icmp;
+	struct ip4 ip4_em;
+} __attribute__ ((__packed__));
 
 enum {
 	MAP_TYPE_STATIC,
@@ -223,10 +233,11 @@ struct cache_entry {
 	struct list_head hash6;
 };
 
-#define CACHE_F_SEEN_4TO6	(1<<0)
-#define CACHE_F_SEEN_6TO4	(1<<1)
-#define CACHE_F_GEN_IDENT	(1<<2)
-#define CACHE_F_REP_AGEOUT	(1<<3)
+#define CACHE_F_TYPE		(0x7)
+#define CACHE_F_SEEN_4TO6	(1<<3)
+#define CACHE_F_SEEN_6TO4	(1<<4)
+#define CACHE_F_GEN_IDENT	(1<<5)
+#define CACHE_F_REP_AGEOUT	(1<<6)
 
 struct config {
 	char tundev[IFNAMSIZ];
