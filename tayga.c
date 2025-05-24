@@ -357,6 +357,7 @@ static void read_from_signalfd(void)
 		if (gcfg.dynamic_pool)
 			dynamic_maint(gcfg.dynamic_pool, 1);
 		slog(LOG_NOTICE, "exiting on signal %d\n", sig);
+		tayga_bpf_detach();
 		exit(0);
 	}
 }
@@ -685,6 +686,9 @@ int main(int argc, char **argv)
 	pollfds[0].events = POLLIN;
 	pollfds[1].fd = gcfg.tun_fd;
 	pollfds[1].events = POLLIN;
+
+	/* Setup BPF */
+	tayga_bpf_attach();
 
 	for (;;) {
 		ret = poll(pollfds, 2, POOL_CHECK_INTERVAL * 1000);

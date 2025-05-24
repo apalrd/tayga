@@ -12,3 +12,5 @@ tayga-cov
 *.pyc
 *.log
 callgrind*
+vmlinux.h
+*.skel.h

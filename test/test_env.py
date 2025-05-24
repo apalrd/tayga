@@ -203,6 +203,7 @@ class test_env:
             print(f"Error while bringing up interface: {e}")
         # Set NAT64 interface up
         ifi = ipr.link_lookup(ifname='nat64')[0]
+        print("NAT64 is index",ifi)
         ipr.link('set', index=ifi, state='up')
         # Add IPv4 address to NAT64 interface
         ipr.addr('add', index=ifi, address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
@@ -240,11 +241,12 @@ class test_env:
         try:
             new_args = ["-c",self.tayga_conf_file,"-d"]
             total_args = []
-            if isinstance(self.tayga_bin,list):
-                #Append args
-                total_args.extend(self.tayga_bin)
-            else:
-                total_args.append(self.tayga_bin)
+            if self.use_valgrind:
+                #Append valgrind command
+                total_args.extend(self.valgrind_opts)
+            # Append Tayga command
+            total_args.append(self.tayga_bin)
+            # Append args to Tayga
             total_args.extend(new_args)
             self.tayga_proc = subprocess.Popen(
             total_args,
@@ -308,6 +310,10 @@ class test_env:
         self.test_failed = 0
         self.timeout = 1 # seconds
         self.tayga_conf = confgen()
+        # Valgrind
+        self.use_valgrind = False
+        self.valgrind_opts = ["valgrind", "--tool=callgrind","--dump-instr=yes","--simulate-cache=yes","--collect-jumps=yes"]
+
         # write report header
         with open(self.file_path, 'w') as report_file:
             report_file.write("Test Report "+self.test_name+"\n")

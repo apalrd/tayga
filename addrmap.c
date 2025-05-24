@@ -638,9 +638,9 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 			/* Packet had another map, but we used rfc6052 anyway 
 			 * Reverse lookup the cache entry from our v4
 			 */
-			if (gcfg->cache_size) {
+			if (gcfg.cache_size) {
 				hash = hash_ip4(addr4);
-				list_for_each(entry, &gcfg->hash_table4[hash]) {
+				list_for_each(entry, &gcfg.hash_table4[hash]) {
 					c = list_entry(entry, struct cache_entry, hash4);
 					if (addr4->s_addr == c->addr4.s_addr) {
 						/* Found cache entry, return cached item */

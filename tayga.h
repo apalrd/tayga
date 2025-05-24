@@ -339,3 +339,7 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
+
+/* tc.c */
+void tayga_bpf_attach();
+void tayga_bpf_detach();

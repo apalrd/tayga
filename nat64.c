@@ -689,7 +689,7 @@ static void host_handle_icmp6(struct pkt *p)
 static int xlate_6to4_header(struct pkt *p, int em)
 {
 	int ret;
-	slog(LOG_DEBUG,"about to map src\n");
+	//slog(LOG_DEBUG,"about to map src\n");
 
 	/* Perform v6 to v4 address mapping for source
 	 * No dynamic allow if we are em
@@ -712,7 +712,7 @@ static int xlate_6to4_header(struct pkt *p, int em)
 			__FUNCTION__,__LINE__,
 			inet_ntop(AF_INET6,&p->ip6->src,temp,64));
 		/* Our own IP4 */
-		p->ip4->src = gcfg->local_addr4;
+		p->ip4->src = gcfg.local_addr4;
 	} else if (ret == ERROR_DROP) {
 		return ERROR_DROP;
 	} else if (ret == ERROR_REJECT) {
@@ -720,7 +720,7 @@ static int xlate_6to4_header(struct pkt *p, int em)
 		return ERROR_DROP;
 	}
 
-	slog(LOG_DEBUG,"about to map dst\n");
+	//slog(LOG_DEBUG,"about to map dst\n");
 	/* Perform v6 to v4 address mapping for destination, no dynamic alloc */
 	ret = map_ip6_to_ip4(&p->ip4->dest, &p->ip6->dest, &p->dest, 0);
 	/* Same error handling as above, without fake source */
@@ -732,7 +732,7 @@ static int xlate_6to4_header(struct pkt *p, int em)
 		host_send_icmp6_error(1, 0, 0, p);
 		return ERROR_DROP;
 	}
-	slog(LOG_DEBUG,"about to xlate header\n");
+	//slog(LOG_DEBUG,"about to xlate header\n");
 
 	/* Translate v6 header to v4 header */
 	p->ip4->ver_ihl = 0x45;
@@ -823,17 +823,17 @@ static int xlate_6to4_hairpin(struct pkt *p)
 	/* Check if destination has a cache, and that cache was RFC6052, not hairpin */
 	if(p->dest && (p->dest->flags & CACHE_F_TYPE == MAP_TYPE_RFC6052)) return ERROR_NONE;
 	
-	slog(LOG_DEBUG,"First stage hairpin check\n");
+	//slog(LOG_DEBUG,"First stage hairpin check\n");
 
 	/* Attempt to map ip4 back into ip6 (fail if not possible) */
 	struct cache_entry *xlate_dest;
 	if(map_ip4_to_ip6(&new_hdr.ip6.dest, &p->ip4->dest, &xlate_dest)) return ERROR_NONE;
-
+#if 0
 	slog(LOG_DEBUG,"Dest Type6 is %d, Type4 is %d, ip4 is %x\n",
 		 p->dest->flags & CACHE_F_TYPE,
 		 xlate_dest->flags & CACHE_F_TYPE,
 		ntohl(p->ip4->dest.s_addr));
-    
+#endif   
 	/* To hairpin, must be either static or dynamic EAM hosts */
 	if(((xlate_dest->flags & CACHE_F_TYPE) == MAP_TYPE_STATIC) ||
 	   ((xlate_dest->flags & CACHE_F_TYPE) == MAP_TYPE_DYNAMIC_HOST)) {
@@ -877,7 +877,7 @@ static int xlate_6to4_hairpin(struct pkt *p)
 		iov[iov_idx].iov_base = p->data;
 		iov[iov_idx++].iov_len = p->data_len;
 
-		if (writev(gcfg->tun_fd, iov, iov_idx) < 0)
+		if (writev(gcfg.tun_fd, iov, iov_idx) < 0)
 			slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 					strerror(errno));
 
@@ -894,8 +894,8 @@ static void xlate_6to4_data(struct pkt *p,struct new4 *new4)
 	struct iovec iov[2];
 
 	/* Packet came in too large */
-	if (sizeof(struct ip6) + p->header_len + p->data_len > gcfg->mtu) {
-		host_send_icmp6_error(2, 0, gcfg->mtu, p);
+	if (sizeof(struct ip6) + p->header_len + p->data_len > gcfg.mtu) {
+		host_send_icmp6_error(2, 0, gcfg.mtu, p);
 		return;
 	}
 
@@ -1188,31 +1188,6 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 
 	/* Calculate IP checksum of outer header */
 	new4->ip4.cksum = ip_checksum(&new4->ip4, sizeof(struct ip4));
-
-	xlate_header_6to4(&p_em, &header.ip4_em,
-		ntohs(p_em.ip6->payload_length) - p_em.header_len, NULL);
-
-	header.ip4_em.cksum =
-		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
-
-	//As this is an ICMP error packet, we will not further 
-	//send errors, so treat return of REJECT = DROP
-	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
-		char temp[64];
-		slog(LOG_DEBUG,"Needed to rely on fake source for ip6 %s\n",
-			inet_ntop(AF_INET6,&p->ip6->src,temp,64));
-		//fake source IP is our own IP
-		header.ip4.src = gcfg.local_addr4;
-	}
-
-	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, NULL, 0))
-		return;
-
-	xlate_header_6to4(p, &header.ip4, sizeof(header.icmp) +
-				sizeof(header.ip4_em) + p_em.data_len, NULL);
-	--header.ip4.ttl;
-
-	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
 
 	/* Calculate updated ICMP checksum */
 	new4->icmp.cksum = 0;
