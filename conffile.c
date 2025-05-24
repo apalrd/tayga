@@ -18,7 +18,7 @@
 
 #include "tayga.h"
 
-struct config *gcfg;
+struct config gcfg;
 
 static int parse_prefix(int af, const char *src, void *prefix, int *prefix_len)
 {
@@ -114,17 +114,17 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 
 static void config_ipv4_addr(int ln, int arg_count, char **args)
 {
-	if (gcfg->local_addr4.s_addr) {
+	if (gcfg.local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: duplicate ipv4-addr directive on "
 				"line %d\n", ln);
 		exit(1);
 	}
-	if (!inet_pton(AF_INET, args[0], &gcfg->local_addr4)) {
+	if (!inet_pton(AF_INET, args[0], &gcfg.local_addr4)) {
 		slog(LOG_CRIT, "Expected an IPv4 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
 		exit(1);
 	}
-	if (validate_ip4_addr(&gcfg->local_addr4) < 0) {
+	if (validate_ip4_addr(&gcfg.local_addr4) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv4-addr "
 				"directive, aborting...\n", args[0]);
 		exit(1);
@@ -133,17 +133,17 @@ static void config_ipv4_addr(int ln, int arg_count, char **args)
 
 static void config_ipv6_addr(int ln, int arg_count, char **args)
 {
-	if (gcfg->local_addr6.s6_addr[0]) {
+	if (gcfg.local_addr6.s6_addr[0]) {
 		slog(LOG_CRIT, "Error: duplicate ipv6-addr directive on line "
 				"%d\n", ln);
 		exit(1);
 	}
-	if (!inet_pton(AF_INET6, args[0], &gcfg->local_addr6)) {
+	if (!inet_pton(AF_INET6, args[0], &gcfg.local_addr6)) {
 		slog(LOG_CRIT, "Expected an IPv6 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
 		exit(1);
 	}
-	if (validate_ip6_addr(&gcfg->local_addr6) < 0) {
+	if (validate_ip6_addr(&gcfg.local_addr6) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv6-addr "
 				"directive, aborting...\n", args[0]);
 		exit(1);
@@ -191,22 +191,22 @@ static void config_prefix(int ln, int arg_count, char **args)
 
 static void config_wkpf_strict(int ln, int arg_count, char **args)
 {
-	gcfg->wkpf_strict = strcmp("no",args[0]) ? 1 : 0;
+	gcfg.wkpf_strict = strcmp("no",args[0]) ? 1 : 0;
 }
 
 static void config_tun_device(int ln, int arg_count, char **args)
 {
-	if (gcfg->tundev[0]) {
+	if (gcfg.tundev[0]) {
 		slog(LOG_CRIT, "Error: duplicate tun-device directive on line "
 				"%d\n", ln);
 		exit(1);
 	}
-	if (strlen(args[0]) + 1 > sizeof(gcfg->tundev)) {
+	if (strlen(args[0]) + 1 > sizeof(gcfg.tundev)) {
 		slog(LOG_CRIT, "Device name \"%s\" is invalid on line %d\n",
 				args[0], ln);
 		exit(1);
 	}
-	strcpy(gcfg->tundev, args[0]);
+	strcpy(gcfg.tundev, args[0]);
 }
 
 static void config_map(int ln, int arg_count, char **args)
@@ -267,7 +267,7 @@ static void config_map(int ln, int arg_count, char **args)
 	if (m->map6.addr.s6_addr32[0] == WKPF &&
 	    m->map6.addr.s6_addr32[1] == 0 &&
 	    m->map6.addr.s6_addr32[2] == 0) {
-		if(gcfg->wkpf_strict)
+		if(gcfg.wkpf_strict)
 		{
 			slog(LOG_CRIT, "Cannot create single-host maps inside "
 					"64:ff9b::/96, aborting...\n");
@@ -293,7 +293,7 @@ static void config_dynamic_pool(int ln, int arg_count, char **args)
 	struct dynamic_pool *pool;
 	struct map4 *m4;
 
-	if (gcfg->dynamic_pool) {
+	if (gcfg.dynamic_pool) {
 		slog(LOG_CRIT, "Error: duplicate dynamic-pool directive on "
 				"line %d\n", ln);
 		exit(1);
@@ -338,12 +338,12 @@ static void config_dynamic_pool(int ln, int arg_count, char **args)
 	INIT_LIST_HEAD(&pool->free_head.list);
 	list_add(&pool->free_head.list, &pool->free_list);
 
-	gcfg->dynamic_pool = pool;
+	gcfg.dynamic_pool = pool;
 }
 
 static void config_data_dir(int ln, int arg_count, char **args)
 {
-	if (gcfg->data_dir[0]) {
+	if (gcfg.data_dir[0]) {
 		slog(LOG_CRIT, "Error: duplicate data-dir directive on line "
 				"%d\n", ln);
 		exit(1);
@@ -352,18 +352,18 @@ static void config_data_dir(int ln, int arg_count, char **args)
 		slog(LOG_CRIT, "Error: data-dir must be an absolute path\n");
 		exit(1);
 	}
-	strcpy(gcfg->data_dir, args[0]);
+	strcpy(gcfg.data_dir, args[0]);
 }
 
 static void config_strict_fh(int ln, int arg_count, char **args)
 {
 	if (!strcasecmp(args[0], "true") || !strcasecmp(args[0], "on") ||
 			!strcasecmp(args[0], "1")) {
-		gcfg->lazy_frag_hdr = 0;
+		gcfg.lazy_frag_hdr = 0;
 	} else if (!strcasecmp(args[0], "false") ||
 			!strcasecmp(args[0], "off") ||
 			!strcasecmp(args[0], "0")) {
-		gcfg->lazy_frag_hdr = 1;
+		gcfg.lazy_frag_hdr = 1;
 	} else {
 		slog(LOG_CRIT, "Error: invalid value for strict-frag-hdr\n");
 		exit(1);
@@ -402,24 +402,21 @@ void read_config(char *conffile)
 	struct map4 *m4;
 	struct map6 *m6;
 
-	gcfg = (struct config *)malloc(sizeof(struct config));
-	if (!gcfg)
-		goto malloc_fail;
-	memset(gcfg, 0, sizeof(struct config));
-	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi);
-	INIT_LIST_HEAD(&gcfg->map4_list);
-	INIT_LIST_HEAD(&gcfg->map6_list);
-	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
-	gcfg->dyn_max_lease = 14 * 86400;
-	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
-	gcfg->hash_bits = 7;
-	gcfg->cache_size = 8192;
-	gcfg->allow_ident_gen = 1;
-	gcfg->ipv6_offlink_mtu = 1280;
-	gcfg->lazy_frag_hdr = 1;
-	INIT_LIST_HEAD(&gcfg->cache_pool);
-	INIT_LIST_HEAD(&gcfg->cache_active);
-	gcfg->wkpf_strict = 1;
+	memset(&gcfg, 0, sizeof(struct config));
+	gcfg.recv_buf_size = 65536 + sizeof(struct tun_pi);
+	INIT_LIST_HEAD(&gcfg.map4_list);
+	INIT_LIST_HEAD(&gcfg.map6_list);
+	gcfg.dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
+	gcfg.dyn_max_lease = 14 * 86400;
+	gcfg.max_commit_delay = gcfg.dyn_max_lease / 4;
+	gcfg.hash_bits = 7;
+	gcfg.cache_size = 8192;
+	gcfg.allow_ident_gen = 1;
+	gcfg.ipv6_offlink_mtu = 1280;
+	gcfg.lazy_frag_hdr = 1;
+	INIT_LIST_HEAD(&gcfg.cache_pool);
+	INIT_LIST_HEAD(&gcfg.cache_active);
+	gcfg.wkpf_strict = 1;
 
 	in = fopen(conffile, "r");
 	if (!in) {
@@ -468,31 +465,31 @@ void read_config(char *conffile)
 	}
 	fclose(in);
 
-	if (list_empty(&gcfg->map6_list)) {
+	if (list_empty(&gcfg.map6_list)) {
 		slog(LOG_CRIT, "Error: no translation maps or NAT64 prefix "
 				"configured\n");
 		exit(1);
 	}
 
-	m4 = list_entry(gcfg->map4_list.next, struct map4, list);
-	m6 = list_entry(gcfg->map6_list.next, struct map6, list);
+	m4 = list_entry(gcfg.map4_list.next, struct map4, list);
+	m6 = list_entry(gcfg.map6_list.next, struct map6, list);
 
 	if (m4->type == MAP_TYPE_RFC6052 && m6->type == MAP_TYPE_RFC6052 &&
-			!gcfg->allow_ident_gen)
-		gcfg->cache_size = 0;
+			!gcfg.allow_ident_gen)
+		gcfg.cache_size = 0;
 
-	if (!gcfg->local_addr4.s_addr) {
+	if (!gcfg.local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: no ipv4-addr directive found\n");
 		exit(1);
 	}
 
 	m = alloc_map_static(0);
-	m->map4.addr = gcfg->local_addr4;
+	m->map4.addr = gcfg.local_addr4;
 	if (insert_map4(&m->map4, &m4) < 0)
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
 
-	if (gcfg->local_addr6.s6_addr32[0]) {
-		m->map6.addr = gcfg->local_addr6;
+	if (gcfg.local_addr6.s6_addr32[0]) {
+		m->map6.addr = gcfg.local_addr6;
 		if (insert_map6(&m->map6, &m6) < 0) {
 			if (m6->type == MAP_TYPE_RFC6052) {
 				inet_ntop(AF_INET6, &m6->addr,
@@ -507,16 +504,16 @@ void read_config(char *conffile)
 			}
 		}
 	} else {
-		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+		m6 = list_entry(gcfg.map6_list.prev, struct map6, list);
 		if (m6->type != MAP_TYPE_RFC6052) {
 			slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 					"specified if no NAT64 prefix is "
 					"configured\n");
 			exit(1);
 		}
-		if (append_to_prefix(&gcfg->local_addr6, &gcfg->local_addr4,
+		if (append_to_prefix(&gcfg.local_addr6, &gcfg.local_addr4,
 					&m6->addr, m6->prefix_len)) {
-			if(gcfg->wkpf_strict)
+			if(gcfg.wkpf_strict)
 			{
 				slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 						"specified if prefix is 64:ff9b::/96 "
@@ -525,13 +522,13 @@ void read_config(char *conffile)
 				exit(1);
 			}
 		}
-		m->map6.addr = gcfg->local_addr6;
+		m->map6.addr = gcfg.local_addr6;
 	}
 	
-	if (gcfg->local_addr6.s6_addr32[0] == WKPF &&
-		gcfg->local_addr6.s6_addr32[1] == 0 &&
-		gcfg->local_addr6.s6_addr32[2] == 0 &&
-		gcfg->wkpf_strict)
+	if (gcfg.local_addr6.s6_addr32[0] == WKPF &&
+		gcfg.local_addr6.s6_addr32[1] == 0 &&
+		gcfg.local_addr6.s6_addr32[2] == 0 &&
+		gcfg.wkpf_strict)
 	{
 		slog(LOG_CRIT, "Error: ipv6-addr directive cannot contain an "
 				"address in the Well-Known Prefix "
@@ -539,10 +536,6 @@ void read_config(char *conffile)
 		exit(1);
 	}
 	return;
-
-malloc_fail:
-	slog(LOG_CRIT, "Unable to allocate config memory\n");
-	exit(1);
 }
 
 /*

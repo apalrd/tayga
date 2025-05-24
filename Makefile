@@ -1,7 +1,7 @@
 # Simple Makefile generated based on makefile.am
 
 CC := gcc
-CFLAGS := -Wall -O2 -Isrc
+CFLAGS := -Wall -O4 -Isrc
 LDFLAGS := 
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga
@@ -18,10 +18,10 @@ DEPS := $(SOURCES:.c=.d)
 -include $(DEPS)
 
 $(TARGET): $(SOURCES)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES)
+	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -g
 
 $(TARGET-COV): $(TARGET)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage
+	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage -pg
 
 cov-report:
 	gcov -a -g -f *.gcno

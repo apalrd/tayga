@@ -11,3 +11,4 @@ tayga-cov
 *.pcap
 *.pyc
 *.log
+callgrind*

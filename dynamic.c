@@ -21,7 +21,7 @@
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
 
-extern struct config *gcfg;
+extern struct config gcfg;
 extern time_t now;
 
 static struct map_dynamic *alloc_map_dynamic(const struct in6_addr *addr6,
@@ -113,7 +113,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 	struct map4 *m4;
 	struct map_dynamic *d;
 
-	pool = gcfg->dynamic_pool;
+	pool = gcfg.dynamic_pool;
 	if (!pool)
 		return NULL;
 
@@ -154,7 +154,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 			if (!d)
 				return NULL;
 			print_dyn_change("assigned new", d);
-			gcfg->map_write_pending = 1;
+			gcfg.map_write_pending = 1;
 			goto activate;
 		}
 	}
@@ -165,7 +165,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 	d = list_entry(pool->dormant_list.prev, struct map_dynamic, list);
 	d->map6.addr = *addr6;
 	print_dyn_change("reassigned dormant", d);
-	gcfg->map_write_pending = 1;
+	gcfg.map_write_pending = 1;
 
 activate:
 	move_to_mapped(d, pool);
@@ -188,7 +188,7 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 		inet_ntop(AF_INET, addr4, addrbuf4, sizeof(addrbuf4));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s that lies "
 				"outside dynamic pool prefix\n", addrbuf4,
-				gcfg->data_dir, MAP_FILE);
+				gcfg.data_dir, MAP_FILE);
 		return;
 	}
 	m4 = find_map4(addr4,MAP_TYPE_ANY);
@@ -196,7 +196,7 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 		inet_ntop(AF_INET, addr4, addrbuf4, sizeof(addrbuf4));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s that "
 				"conflicts with statically-configured map\n",
-				addrbuf4, gcfg->data_dir, MAP_FILE);
+				addrbuf4, gcfg.data_dir, MAP_FILE);
 		return;
 	}
 	if (validate_ip6_addr(addr6) < 0) {
@@ -204,14 +204,14 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 		inet_ntop(AF_INET6, addr6, addrbuf6, sizeof(addrbuf6));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s with "
 				"invalid IPv6 address %s\n", addrbuf4,
-				gcfg->data_dir, MAP_FILE, addrbuf6);
+				gcfg.data_dir, MAP_FILE, addrbuf6);
 		return;
 	}
 	if (find_map6(addr6,MAP_TYPE_ANY)) {
 		inet_ntop(AF_INET6, addr6, addrbuf6, sizeof(addrbuf6));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s that "
 				"conflicts with statically-configured map\n",
-				addrbuf6, gcfg->data_dir, MAP_FILE);
+				addrbuf6, gcfg.data_dir, MAP_FILE);
 		return;
 	}
 	addr = ntohl(addr4->s_addr);
@@ -223,7 +223,7 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 	if (entry == &pool->free_list || f->addr >= addr) {
 		inet_ntop(AF_INET, addr4, addrbuf4, sizeof(addrbuf4));
 		slog(LOG_NOTICE, "Ignoring duplicate map for %s from %s/%s\n",
-				addrbuf4, gcfg->data_dir, MAP_FILE);
+				addrbuf4, gcfg.data_dir, MAP_FILE);
 		return;
 	}
 	d = alloc_map_dynamic(addr6, addr4, f);
@@ -249,14 +249,14 @@ void load_dynamic(struct dynamic_pool *pool)
 	if (!in) {
 		if (errno != ENOENT)
 			slog(LOG_ERR, "Unable to open %s/%s, ignoring: %s\n",
-					gcfg->data_dir, MAP_FILE,
+					gcfg.data_dir, MAP_FILE,
 					strerror(errno));
 		return;
 	}
 	while (fgets(line, sizeof(line), in)) {
 		if (strlen(line) + 1 == sizeof(line)) {
 			slog(LOG_ERR, "Ignoring oversized line in %s/%s\n",
-					gcfg->data_dir, MAP_FILE);
+					gcfg.data_dir, MAP_FILE);
 			continue;
 		}
 		s4 = strtok_r(line, DELIM, &tokptr);
@@ -281,7 +281,7 @@ void load_dynamic(struct dynamic_pool *pool)
 		continue;
 malformed:
 		slog(LOG_ERR, "Ignoring malformed line in %s/%s\n",
-				gcfg->data_dir, MAP_FILE);
+				gcfg.data_dir, MAP_FILE);
 	}
 	fclose(in);
 
@@ -295,19 +295,19 @@ malformed:
 	}
 	slog(LOG_INFO, "Loaded %d dynamic %s from %s/%s\n", count,
 			count == 1 ? "map" : "maps",
-			gcfg->data_dir, MAP_FILE);
+			gcfg.data_dir, MAP_FILE);
 	if (last_use > now) {
 		slog(LOG_DEBUG, "Note: maps in %s/%s are dated in the future\n",
-				gcfg->data_dir, MAP_FILE);
+				gcfg.data_dir, MAP_FILE);
 		list_for_each(entry, &pool->dormant_list) {
 			d = list_entry(entry, struct map_dynamic, list);
-			d->last_use = now - gcfg->dyn_min_lease;
+			d->last_use = now - gcfg.dyn_min_lease;
 		}
 	} else {
 		while (!list_empty(&pool->dormant_list)) {
 			d = list_entry(pool->dormant_list.next,
 					struct map_dynamic, list);
-			if (d->last_use + gcfg->dyn_min_lease < now)
+			if (d->last_use + gcfg.dyn_min_lease < now)
 				break;
 			move_to_mapped(d, pool);
 		}
@@ -325,7 +325,7 @@ static void write_to_file(struct dynamic_pool *pool)
 	out = fopen(TMP_MAP_FILE, "w");
 	if (!out) {
 		slog(LOG_ERR, "Unable to open %s/%s for writing: %s\n",
-				gcfg->data_dir, TMP_MAP_FILE,
+				gcfg.data_dir, TMP_MAP_FILE,
 				strerror(errno));
 		return;
 	}
@@ -351,8 +351,8 @@ static void write_to_file(struct dynamic_pool *pool)
 	fclose(out);
 	if (rename(TMP_MAP_FILE, MAP_FILE) < 0) {
 		slog(LOG_ERR, "Unable to rename %s/%s to %s/%s: %s\n",
-				gcfg->data_dir, TMP_MAP_FILE,
-				gcfg->data_dir, MAP_FILE,
+				gcfg.data_dir, TMP_MAP_FILE,
+				gcfg.data_dir, MAP_FILE,
 				strerror(errno));
 		unlink(TMP_MAP_FILE);
 	}
@@ -368,7 +368,7 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 		d = list_entry(entry, struct map_dynamic, list);
 		if (d->cache_entry)
 			continue;
-		if (d->last_use + gcfg->dyn_min_lease < now) {
+		if (d->last_use + gcfg.dyn_min_lease < now) {
 			print_dyn_change("unmapped dormant", d);
 			move_to_dormant(d, pool);
 		}
@@ -376,7 +376,7 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 	while (!list_empty(&pool->dormant_list)) {
 		d = list_entry(pool->dormant_list.prev,
 				struct map_dynamic, list);
-		if (d->last_use + gcfg->dyn_max_lease >= now)
+		if (d->last_use + gcfg.dyn_max_lease >= now)
 			break;
 		f = list_entry(d->free.list.prev, struct free_addr, list);
 		f->count += d->free.count + 1;
@@ -384,14 +384,14 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 		list_del(&d->list);
 		free(d);
 	}
-	if (gcfg->data_dir[0]) {
-		if (shutdown || gcfg->map_write_pending ||
-				gcfg->last_map_write +
-					gcfg->max_commit_delay < now ||
-				gcfg->last_map_write > now) {
+	if (gcfg.data_dir[0]) {
+		if (shutdown || gcfg.map_write_pending ||
+				gcfg.last_map_write +
+					gcfg.max_commit_delay < now ||
+				gcfg.last_map_write > now) {
 			write_to_file(pool);
-			gcfg->last_map_write = now;
-			gcfg->map_write_pending = 0;
+			gcfg.last_map_write = now;
+			gcfg.map_write_pending = 0;
 		}
 	}
 }

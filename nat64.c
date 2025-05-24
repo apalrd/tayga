@@ -18,7 +18,7 @@
 
 #include "tayga.h"
 
-extern struct config *gcfg;
+extern struct config gcfg;
 
 static uint16_t ip_checksum(void *d, int c)
 {
@@ -67,9 +67,30 @@ static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
 static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 {
 	uint32_t sum = 0;
+
+	/* 32-bit adds */
+	uint64_t temp = ~ip4->src.s_addr;
+	temp += ~ip4->dest.s_addr;
+	temp += ip6->src.s6_addr32[0];
+	temp += ip6->src.s6_addr32[1];
+	temp += ip6->src.s6_addr32[2];
+	temp += ip6->src.s6_addr32[3];
+	temp += ip6->dest.s6_addr32[0];
+	temp += ip6->dest.s6_addr32[1];
+	temp += ip6->dest.s6_addr32[2];
+	temp += ip6->dest.s6_addr32[3];
+
+	/* End-around carries */
+	if (temp > 0xffffffff) temp = (temp & 0xffffffff) + (temp >> 32);
+	if (temp > 0xffffffff) temp = (temp & 0xffffffff) + (temp >> 32);
+	if(temp > 0xffff) temp = (temp & 0xffff) + (temp >> 16);
+	if(temp > 0xffff) temp = (temp & 0xffff) + (temp >> 16);
+
+	return (temp & 0xffff);
+
+	/* Un-optimized code path*/
 	uint16_t *p;
 	int i;
-
 	sum += ~ip4->src.s_addr >> 16;
 	sum += ~ip4->src.s_addr & 0xffff;
 	sum += ~ip4->dest.s_addr >> 16;
@@ -80,7 +101,6 @@ static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 
 	while (sum > 0xffff)
 		sum = (sum & 0xffff) + (sum >> 16);
-
 	return sum;
 }
 
@@ -116,7 +136,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 				strerror(errno));
 }
@@ -138,7 +158,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
-	host_send_icmp4(0, &gcfg->local_addr4, &orig->ip4->src, &icmp,
+	host_send_icmp4(0, &gcfg.local_addr4, &orig->ip4->src, &icmp,
 			(uint8_t *)orig->ip4, orig_len);
 }
 
@@ -220,9 +240,9 @@ static void xlate_4to6_data(struct pkt *p)
 	int frag_size;
 	int ret;
 
-	frag_size = gcfg->ipv6_offlink_mtu;
-	if (frag_size > gcfg->mtu)
-		frag_size = gcfg->mtu;
+	frag_size = gcfg.ipv6_offlink_mtu;
+	if (frag_size > gcfg.mtu)
+		frag_size = gcfg.mtu;
 	frag_size -= sizeof(struct ip6);
 
 	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest);
@@ -253,13 +273,13 @@ static void xlate_4to6_data(struct pkt *p)
 	   1456 bytes of payload == 1504 bytes.) */
 	if ((off & (IP4_F_MASK | IP4_F_MF)) == 0) {
 		if (off & IP4_F_DF) {
-			if (gcfg->mtu - MTU_ADJ < p->header_len + p->data_len) {
+			if (gcfg.mtu - MTU_ADJ < p->header_len + p->data_len) {
 				host_send_icmp4_error(3, 4,
-						gcfg->mtu - MTU_ADJ, p);
+						gcfg.mtu - MTU_ADJ, p);
 				return;
 			}
 			no_frag_hdr = 1;
-		} else if (gcfg->lazy_frag_hdr && p->data_len <= frag_size) {
+		} else if (gcfg.lazy_frag_hdr && p->data_len <= frag_size) {
 			no_frag_hdr = 1;
 		}
 	}
@@ -283,7 +303,7 @@ static void xlate_4to6_data(struct pkt *p)
 		iov[1].iov_base = p->data;
 		iov[1].iov_len = p->data_len;
 
-		if (writev(gcfg->tun_fd, iov, 2) < 0)
+		if (writev(gcfg.tun_fd, iov, 2) < 0)
 			slog(LOG_WARNING, "error writing packet to tun "
 					"device: %s\n", strerror(errno));
 	} else {
@@ -318,7 +338,7 @@ static void xlate_4to6_data(struct pkt *p)
 							htons(IP4_F_MF)))
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
 
-			if (writev(gcfg->tun_fd, iov, 2) < 0) {
+			if (writev(gcfg.tun_fd, iov, 2) < 0) {
 				slog(LOG_WARNING, "error writing packet to "
 						"tun device: %s\n",
 						strerror(errno));
@@ -475,9 +495,9 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			if (mtu < 68)
 				mtu = est_mtu(ntohs(p_em.ip4->length));
 			mtu += MTU_ADJ;
-			if (mtu > gcfg->mtu)
-				mtu = gcfg->mtu;
-			if (mtu < 1280 && gcfg->allow_ident_gen && orig_dest) {
+			if (mtu > gcfg.mtu)
+				mtu = gcfg.mtu;
+			if (mtu < 1280 && gcfg.allow_ident_gen && orig_dest) {
 				orig_dest->flags |= CACHE_F_GEN_IDENT;
 				mtu = 1280;
 			}
@@ -536,7 +556,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		slog(LOG_DEBUG,"Needed to rely on fake source for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->src,temp,64));
 		//Fake source IP is our own IP
-		header.ip6.src = gcfg->local_addr6;
+		header.ip6.src = gcfg.local_addr6;
 	}
 
 	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, NULL)) {
@@ -563,7 +583,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 				strerror(errno));
 }
@@ -578,7 +598,7 @@ void handle_ip4(struct pkt *p)
 	if (p->icmp && ip_checksum(p->data, p->data_len))
 		return;
 
-	if (p->ip4->dest.s_addr == gcfg->local_addr4.s_addr) {
+	if (p->ip4->dest.s_addr == gcfg.local_addr4.s_addr) {
 		if (p->data_proto == 1)
 			host_handle_icmp4(p);
 		else
@@ -625,7 +645,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 				strerror(errno));
 }
@@ -647,7 +667,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
-	host_send_icmp6(0, &gcfg->local_addr6, &orig->ip6->src, &icmp,
+	host_send_icmp6(0, &gcfg.local_addr6, &orig->ip6->src, &icmp,
 			(uint8_t *)orig->ip6, orig_len);
 }
 
@@ -909,7 +929,7 @@ static void xlate_6to4_data(struct pkt *p,struct new4 *new4)
 	iov[1].iov_base = p->data;
 	iov[1].iov_len = p->data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 				strerror(errno));
 }
@@ -928,10 +948,8 @@ static int parse_ip6(struct pkt *p)
 	 * Either src or dest IP is not valid
 	 */
 	if (p->data_len < sizeof(struct ip6) ||
-			(ntohl(p->ip6->ver_tc_fl) >> 28) != 6 ||
-			validate_ip6_addr(&p->ip6->src) ||
-			validate_ip6_addr(&p->ip6->dest))
-		return ERROR_DROP;
+			(ntohl(p->ip6->ver_tc_fl) >> 28) != 6)
+		return -1;
 
 	/* Pointers to data field */
 	p->data_proto = p->ip6->next_header;
@@ -1075,8 +1093,8 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 			 	 __FUNCTION__,__LINE__);
 			return;
 		}
-		if (mtu > gcfg->mtu)
-			mtu = gcfg->mtu;
+		if (mtu > gcfg.mtu)
+			mtu = gcfg.mtu;
 		mtu -= MTU_ADJ;
 		new4->icmp.word = htonl(mtu);
 		break;
@@ -1171,6 +1189,31 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 	/* Calculate IP checksum of outer header */
 	new4->ip4.cksum = ip_checksum(&new4->ip4, sizeof(struct ip4));
 
+	xlate_header_6to4(&p_em, &header.ip4_em,
+		ntohs(p_em.ip6->payload_length) - p_em.header_len, NULL);
+
+	header.ip4_em.cksum =
+		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
+
+	//As this is an ICMP error packet, we will not further 
+	//send errors, so treat return of REJECT = DROP
+	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
+		char temp[64];
+		slog(LOG_DEBUG,"Needed to rely on fake source for ip6 %s\n",
+			inet_ntop(AF_INET6,&p->ip6->src,temp,64));
+		//fake source IP is our own IP
+		header.ip4.src = gcfg.local_addr4;
+	}
+
+	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, NULL, 0))
+		return;
+
+	xlate_header_6to4(p, &header.ip4, sizeof(header.icmp) +
+				sizeof(header.ip4_em) + p_em.data_len, NULL);
+	--header.ip4.ttl;
+
+	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
+
 	/* Calculate updated ICMP checksum */
 	new4->icmp.cksum = 0;
 	new4->icmp.cksum = ones_add(ip_checksum(&new4->icmp,
@@ -1184,7 +1227,7 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 				strerror(errno));
 }
@@ -1203,7 +1246,7 @@ void handle_ip6(struct pkt *p)
 		return; /* Packet falls on the ground */
 
 	/* If packet destination is our own IPv6, handle it */
-	if (IN6_ARE_ADDR_EQUAL(&p->ip6->dest, &gcfg->local_addr6)) {
+	if (IN6_ARE_ADDR_EQUAL(&p->ip6->dest, &gcfg.local_addr6)) {
 		/* Handle ICMPv6 to ourselves */
 		if (p->data_proto == 58)
 			host_handle_icmp6(p);

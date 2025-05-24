@@ -198,7 +198,7 @@ class test_env:
         # Bring Up Interface
         try:
             self.tayga_conf.generate()
-            subprocess.run([self.tayga_bin, "-c", self.tayga_conf_file, "-d", "--mktun"], check=True)
+            subprocess.run(["./tayga", "-c", self.tayga_conf_file, "-d", "--mktun"], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error while bringing up interface: {e}")
         # Set NAT64 interface up
@@ -238,8 +238,16 @@ class test_env:
             self.tayga_log = None
 
         try:
+            new_args = ["-c",self.tayga_conf_file,"-d"]
+            total_args = []
+            if isinstance(self.tayga_bin,list):
+                #Append args
+                total_args.extend(self.tayga_bin)
+            else:
+                total_args.append(self.tayga_bin)
+            total_args.extend(new_args)
             self.tayga_proc = subprocess.Popen(
-            [self.tayga_bin, "-c", self.tayga_conf_file,"-d"],
+            total_args,
             stdout=self.tayga_log if self.tayga_log else subprocess.DEVNULL,
             stderr=subprocess.STDOUT
             )
