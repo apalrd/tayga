@@ -171,6 +171,7 @@ struct new4 {
 } __attribute__ ((__packed__));
 
 enum {
+	MAP_TYPE_ANY,
 	MAP_TYPE_STATIC,
 	MAP_TYPE_RFC6052,
 	MAP_TYPE_DYNAMIC_POOL,
@@ -313,8 +314,8 @@ int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len);
 void create_cache(void);
 int insert_map4(struct map4 *m, struct map4 **conflict);
 int insert_map6(struct map6 *m, struct map6 **conflict);
-struct map4 *find_map4(const struct in_addr *addr4);
-struct map6 *find_map6(const struct in6_addr *addr6);
+struct map4 *find_map4(const struct in_addr *addr4, int type);
+struct map6 *find_map6(const struct in6_addr *addr6, int type);
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len);
 int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,

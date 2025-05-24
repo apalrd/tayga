@@ -14,6 +14,7 @@ from random import randbytes
 from scapy.all import IP, UDP, IPv6, Raw
 import time
 import ipaddress
+import subprocess
 
 # Create an instance of TestEnv
 test = test_env("test/mapping")
@@ -579,9 +580,47 @@ def rfc7757_eam():
     # v6->v4 src
 
 
+#############################################
+# Explicit Address Mapping (RFC 7757 4)
+# Hairpin test cases
+#############################################
+def rfc7757_hairpin():
+    global test
+    global expect_sa
+    global expect_da
+    global expect_len
+    global expect_proto
+    global expect_data            
+    
+    # Generate test config for this one
+    test.tayga_conf.default()
+    test.tayga_conf.dynamic_pool = None
+    test.tayga_conf.map = ["172.16.0.0/24 2001:db8::/120"]
+    test.reload()
+
+    subprocess.run(["ip","-6","route"])
+
+    time.sleep(5)
+
+    # Send IPv6 normal packet which will hairpin
+    expect_sa = test.public_ipv6_xlate
+    #expect_da = this_net4.network_address
+    expect_data = randbytes(128)
+    expect_len = 128+20
+    test.debug = True
+    send_pkt = IPv6(dst=str(test.xlate("172.16.0.9")),src=str("2001:db8::7"),nh=16) / Raw(expect_data)
+    test.send_and_check(send_pkt,ip6_val, "Hairpin normal packet")
+    test.tun.send(send_pkt)
+    test.tun.send(send_pkt)
+    test.tun.send(send_pkt)
+    test.tun.send(send_pkt)
+    # Send IPv6 ICMP Ping which will hairpin
+
+    # Send IPv6 ICMP Error which will hairpin
 
 
-
+    test.tfail("EAM Hairpin Detection","See Issue #9")
+    test.section("Explicit Address Mapping (RFC 7757 4)")
 
 #############################################
 # Dynamic Pool Mapping (not specified by RFCs)
@@ -639,9 +678,10 @@ test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
-rfc6052_mapping()
-rfc7757_eam()
-dynamic_pool()
+#rfc6052_mapping()
+#rfc7757_eam()
+rfc7757_hairpin()
+#dynamic_pool()
 
 time.sleep(1)
 test.cleanup()

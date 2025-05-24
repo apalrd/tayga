@@ -53,7 +53,6 @@ int validate_ip6_addr(const struct in6_addr *a)
 	if (a->s6_addr32[0] == WKPF)
 		return ERROR_NONE;
 
-
 	/* Reserved per RFC 2373 */
 	if (!a->s6_addr[0])
 		return ERROR_DROP;
@@ -244,27 +243,29 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 	return c;
 }
 
-struct map4 *find_map4(const struct in_addr *addr4)
+struct map4 *find_map4(const struct in_addr *addr4, int type)
 {
 	struct list_head *entry;
 	struct map4 *m;
 
 	list_for_each(entry, &gcfg->map4_list) {
 		m = list_entry(entry, struct map4, list);
-		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr))
+		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr) &&
+		   (type == MAP_TYPE_ANY || m->type == type))
 			return m;
 	}
 	return NULL;
 }
 
-struct map6 *find_map6(const struct in6_addr *addr6)
+struct map6 *find_map6(const struct in6_addr *addr6, int type)
 {
 	struct list_head *entry;
 	struct map6 *m;
 
 	list_for_each(entry, &gcfg->map6_list) {
 		m = list_entry(entry, struct map6, list);
-		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask))
+		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask) &&
+		   (type == MAP_TYPE_ANY || m->type == type))
 			return m;
 	}
 	return NULL;
@@ -434,7 +435,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	}
 
 	/* Find map which this address belongs to */
-	map4 = find_map4(addr4);
+	map4 = find_map4(addr4,MAP_TYPE_ANY);
 
 	/* No mapping found, kick back return */
 	if (!map4) {
@@ -573,6 +574,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	struct list_head *entry;
 	struct cache_entry *c;
 	struct map6 *map6;
+	struct map4 *map4;
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
 
@@ -593,7 +595,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		}
 	}
 	/* Not found in cache, lookup map which contains this addr */
-	map6 = find_map6(addr6);
+	map6 = find_map6(addr6,MAP_TYPE_ANY);
 
 	/* Not found */
 	if (!map6) {
@@ -629,11 +631,30 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 			gcfg->wkpf_strict &&
 				is_private_ip4_addr(addr4))
 			return ERROR_REJECT;
-		s = container_of(map6, struct map_static, map6);
-		if (find_map4(addr4) != &s->map4){
-			slog(LOG_DEBUG,"Dropping packet due to find_map4 %s:%d",__FUNCTION__,__LINE__);
-			return ERROR_DROP;
-		}
+		map4 = find_map4(addr4,MAP_TYPE_ANY);
+		slog(LOG_DEBUG,"6to4 map4 type is %d\n",map4->type);
+		if (map4->type != MAP_TYPE_RFC6052){
+			slog(LOG_DEBUG,"%s:%s:Did 6to4 but map4 does not match\n",
+				 __FUNCTION__,__LINE__);
+			/* Packet had another map, but we used rfc6052 anyway 
+			 * Reverse lookup the cache entry from our v4
+			 */
+			if (gcfg->cache_size) {
+				hash = hash_ip4(addr4);
+				list_for_each(entry, &gcfg->hash_table4[hash]) {
+					c = list_entry(entry, struct cache_entry, hash4);
+					if (addr4->s_addr == c->addr4.s_addr) {
+						/* Found cache entry, return cached item */
+						c->last_use = now;
+						if (c_ptr)
+							*c_ptr = c;
+						return ERROR_NONE;
+					}
+				}
+			}	
+			/* Exit here to avoid allocating a new cache entry incorrectly */
+			return ERROR_NONE;
+		}			
 		break;
 	case MAP_TYPE_DYNAMIC_HOST:
 		d = container_of(map6, struct map_dynamic, map6);
@@ -669,7 +690,7 @@ static void report_ageout(struct cache_entry *c)
 	struct map4 *m4;
 	struct map_dynamic *d;
 
-	m4 = find_map4(&c->addr4);
+	m4 = find_map4(&c->addr4,MAP_TYPE_ANY);
 	if (!m4 || m4->type != MAP_TYPE_DYNAMIC_HOST)
 		return;
 	d = container_of(m4, struct map_dynamic, map4);

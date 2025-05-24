@@ -669,6 +669,7 @@ static void host_handle_icmp6(struct pkt *p)
 static int xlate_6to4_header(struct pkt *p, int em)
 {
 	int ret;
+	slog(LOG_DEBUG,"about to map src\n");
 
 	/* Perform v6 to v4 address mapping for source
 	 * No dynamic allow if we are em
@@ -699,6 +700,7 @@ static int xlate_6to4_header(struct pkt *p, int em)
 		return ERROR_DROP;
 	}
 
+	slog(LOG_DEBUG,"about to map dst\n");
 	/* Perform v6 to v4 address mapping for destination, no dynamic alloc */
 	ret = map_ip6_to_ip4(&p->ip4->dest, &p->ip6->dest, &p->dest, 0);
 	/* Same error handling as above, without fake source */
@@ -710,11 +712,13 @@ static int xlate_6to4_header(struct pkt *p, int em)
 		host_send_icmp6_error(1, 0, 0, p);
 		return ERROR_DROP;
 	}
+	slog(LOG_DEBUG,"about to xlate header\n");
 
 	/* Translate v6 header to v4 header */
 	p->ip4->ver_ihl = 0x45;
 	p->ip4->tos = (ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff;
-	p->ip4->length = htons(sizeof(struct ip4) + p->data_len);
+	uint16_t temp_len = sizeof(struct ip4) + p->data_len;
+	p->ip4->length = htons(temp_len);
 	/* IPv6 header is a fragment */
 	if (p->ip6_frag) {
 		p->ip4->ident = htons(ntohl(p->ip6_frag->ident) & 0xffff);
@@ -732,7 +736,8 @@ static int xlate_6to4_header(struct pkt *p, int em)
 	/* Not a fragment and not generating IDs*/
 	} else {
 		p->ip4->ident = 0;
-		p->ip4->flags_offset = htons(IP4_F_DF);
+		/* Set DF for packets which were >1280 bytes as IPv6 */
+		p->ip4->flags_offset = (temp_len > 1260) ? htons(IP4_F_DF) : 0;
 	}
 	p->ip4->ttl = p->ip6->hop_limit;
 	p->ip4->proto = p->data_proto == 58 ? 1 : p->data_proto;
@@ -795,16 +800,26 @@ static int xlate_6to4_hairpin(struct pkt *p)
 	} new_hdr;
 	int ret;
 	uint16_t cksum;
-	/* Check if destination was (not) translated via RFC6052 */
-	if((p->dest->flags & CACHE_F_TYPE != MAP_TYPE_RFC6052)) return ERROR_NONE;
+	/* Check if destination has a cache, and that cache was RFC6052, not hairpin */
+	if(p->dest && (p->dest->flags & CACHE_F_TYPE == MAP_TYPE_RFC6052)) return ERROR_NONE;
+	
+	slog(LOG_DEBUG,"First stage hairpin check\n");
 
 	/* Attempt to map ip4 back into ip6 (fail if not possible) */
 	struct cache_entry *xlate_dest;
 	if(map_ip4_to_ip6(&new_hdr.ip6.dest, &p->ip4->dest, &xlate_dest)) return ERROR_NONE;
 
+	slog(LOG_DEBUG,"Dest Type6 is %d, Type4 is %d, ip4 is %x\n",
+		 p->dest->flags & CACHE_F_TYPE,
+		 xlate_dest->flags & CACHE_F_TYPE,
+		ntohl(p->ip4->dest.s_addr));
+    
 	/* To hairpin, must be either static or dynamic EAM hosts */
 	if(((xlate_dest->flags & CACHE_F_TYPE) == MAP_TYPE_STATIC) ||
 	   ((xlate_dest->flags & CACHE_F_TYPE) == MAP_TYPE_DYNAMIC_HOST)) {
+
+		slog(LOG_DEBUG,"%s:%d:Got a packet which should hairpin\n",
+			 __FUNCTION__,__LINE__);
 
 		/* Initialize new ip6 to old ip6 header fields */
 		new_hdr.ip6.ver_tc_fl = p->ip6->ver_tc_fl;
@@ -902,6 +917,8 @@ static void xlate_6to4_data(struct pkt *p,struct new4 *new4)
 static int parse_ip6(struct pkt *p)
 {
 	int hdr_len;
+	uint8_t seg_left = 0;
+	uint16_t seg_ptr = sizeof(struct ip6);
 
 	p->ip6 = (struct ip6 *)(p->data);
 
@@ -930,11 +947,14 @@ static int parse_ip6(struct pkt *p)
 		   p->data_proto == 43 ||  /* Routing */
 		   p->data_proto == 60) {  /* Dest Options */
 		/* Validate packet length against header */
-		if (p->data_len < 2)
-			return ERROR_DROP;
+		if (p->data_len < 2) return ERROR_DROP;
 		hdr_len = (p->data[1] + 1) * 8;
-		if (p->data_len < hdr_len)
-			return ERROR_DROP;
+		if (p->data_len < hdr_len) return ERROR_DROP;
+		/* If it's a routing header, extract segments left 
+		 * We will drop the packet, but need to finish parsing it first
+		 */
+		if(p->data_proto == 43) seg_left = p->data[3];
+		if(!seg_left) seg_ptr += hdr_len;
 		/* Extract next header from extension header */
 		p->data_proto = p->data[0];
 		p->data += hdr_len;
@@ -975,6 +995,16 @@ static int parse_ip6(struct pkt *p)
 		p->icmp = (struct icmp *)(p->data);
 	}
 
+	/* IF we got a routing header with segments left
+	 * kick back a Parameter Problem pointing to the seg field
+	 */
+	if(seg_left) {
+		seg_ptr += 4;
+		slog(LOG_DEBUG,"%s:%d:IPv6 Routing Header w/ Segments Left ptr=%d\n", 
+			 __FUNCTION__,__LINE__,seg_ptr);
+		host_send_icmp6_error(4, 0, seg_ptr, p);
+		return ERROR_DROP;
+	}
 	return ERROR_NONE;
 }
 
@@ -1099,17 +1129,17 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 
 	/* Translate embedded source, dest, and l4 headers */
 	if (map_ip6_to_ip4(&new4->ip4_em.src, &p_em.ip6->src, NULL, 0)) {		
-		slog(LOG_INFO, "%s:%d:Failed to translate em src\n",
+		slog(LOG_DEBUG, "%s:%d:Failed to translate em src\n",
 			__FUNCTION__,__LINE__);
 		return;
 	} 
 	if (map_ip6_to_ip4(&new4->ip4_em.dest, &p_em.ip6->dest, NULL, 0)) {		
-		slog(LOG_INFO, "%s:%d:Failed to translate em dest\n",
+		slog(LOG_DEBUG, "%s:%d:Failed to translate em dest\n",
 			__FUNCTION__,__LINE__);
 		return;
 	}
 	if (xlate_6to4_payload(&p_em, convert_cksum(p_em.ip6,&new4->ip4_em))) {		
-		slog(LOG_INFO, "%s:%d:Failed to translate em l4\n",
+		slog(LOG_DEBUG, "%s:%d:Failed to translate em l4\n",
 			__FUNCTION__,__LINE__);
 		return;
 	}

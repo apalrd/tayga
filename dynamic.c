@@ -148,7 +148,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 		if (f->addr >= addr)
 			continue;
 		addr4.s_addr = htonl(addr);
-		m4 = find_map4(&addr4);
+		m4 = find_map4(&addr4,MAP_TYPE_ANY);
 		if (m4 == &pool->map4) {
 			d = alloc_map_dynamic(addr6, &addr4, f);
 			if (!d)
@@ -191,7 +191,7 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 				gcfg->data_dir, MAP_FILE);
 		return;
 	}
-	m4 = find_map4(addr4);
+	m4 = find_map4(addr4,MAP_TYPE_ANY);
 	if (m4 != &pool->map4) {
 		inet_ntop(AF_INET, addr4, addrbuf4, sizeof(addrbuf4));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s that "
@@ -207,7 +207,7 @@ static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
 				gcfg->data_dir, MAP_FILE, addrbuf6);
 		return;
 	}
-	if (find_map6(addr6)) {
+	if (find_map6(addr6,MAP_TYPE_ANY)) {
 		inet_ntop(AF_INET6, addr6, addrbuf6, sizeof(addrbuf6));
 		slog(LOG_NOTICE, "Ignoring map for %s from %s/%s that "
 				"conflicts with statically-configured map\n",
