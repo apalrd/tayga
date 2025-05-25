@@ -300,6 +300,10 @@ class test_env:
         self.test_failed = 0
         self.timeout = 1 # seconds
         self.tayga_conf = confgen()
+        # Valgrind
+        self.use_valgrind = False
+        self.valgrind_opts = ["valgrind", "--tool=callgrind","--dump-instr=yes","--simulate-cache=yes","--collect-jumps=yes"]
+
         # write report header
         with open(self.file_path, 'w') as report_file:
             report_file.write("Test Report "+self.test_name+"\n")
