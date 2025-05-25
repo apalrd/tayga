@@ -151,6 +151,11 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
+
+#ifdef DEBUG_WRITE
+	slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+		 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 	
 	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
@@ -305,10 +310,13 @@ static void xlate_4to6_data(struct pkt *p)
 	   40 bytes of IP6 header + 8 bytes of fragmentation header +
 	   1456 bytes of payload == 1504 bytes.) */
 	if ((off & (IP4_F_MASK | IP4_F_MF)) == 0) {
+		/* Packet was sent with DF bit set and is not a fragment */
 		if (off & IP4_F_DF) {
 #ifdef CONFIG_GSO
-				if(( p->vnet && (gcfg.mtu < (p->vnet->hdr_len + p->vnet->gso_size))) ||
-				   (!p->vnet && (gcfg.mtu < (p->header_len + p->data_len + MTU_ADJ)))) {
+				/* If we have a vnet header + we are doing gso + mtu is not big enough (using vnet math) */
+				if( ( p->vnet &&  p->vnet->gso_type  && (gcfg.mtu < (p->vnet->hdr_len + p->vnet->gso_size))) ||
+				/* (no vnet header OR not doing gso) AND mtu is not big enough (using regular math) */
+				   ((!p->vnet || !p->vnet->gso_type) && (gcfg.mtu < (p->header_len + p->data_len + MTU_ADJ)))) {
 #else
 				if (gcfg.mtu < (p->header_len + p->data_len + MTU_ADJ)) {
 #endif
@@ -317,6 +325,7 @@ static void xlate_4to6_data(struct pkt *p)
 				return;
 			}
 			no_frag_hdr = 1;
+		/* Packet has clear DF bit and is not a fragment */
 		} else if (gcfg.lazy_frag_hdr && p->data_len <= frag_size) {
 			slog(LOG_DEBUG,"packet hit a bad place %d\n",__LINE__);
 			no_frag_hdr = 1;
@@ -340,7 +349,6 @@ static void xlate_4to6_data(struct pkt *p)
 
 	/* Check if we need to update checksum offloads */
 	if(header.vnet.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-		header.vnet.csum_offset = 16; /* for tcp */
 		header.vnet.csum_start += (40 - p->header_len);
 	}
 
@@ -372,7 +380,10 @@ static void xlate_4to6_data(struct pkt *p)
 #endif
 		iov[1].iov_base = p->data;
 		iov[1].iov_len = p->data_len;
-
+#ifdef DEBUG_WRITE
+		slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+			 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 		if (writev(gcfg.tun_fd, iov, 2) < 0)
 			slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
 				__FUNCTION__,__LINE__,errno,strerror(errno));
@@ -390,6 +401,8 @@ static void xlate_4to6_data(struct pkt *p)
 		frag_size = (frag_size - sizeof(header.ip6_frag)) & ~7;
 
 		while (p->data_len > 0) {
+			slog(LOG_DEBUG,"%s:%d:About to send a fragment, total len is %d, frag_size is %d\n",
+			__FUNCTION__,__LINE__,p->data_len,frag_size);
 			if (p->data_len < frag_size)
 				frag_size = p->data_len;
 
@@ -407,7 +420,12 @@ static void xlate_4to6_data(struct pkt *p)
 			if (p->data_len || (p->ip4->flags_offset &
 							htons(IP4_F_MF)))
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
-			slog(LOG_DEBUG,"Got to a point where I haven't updated\n");
+			slog(LOG_DEBUG,"%s:%d:Got to a point where I haven't updated\n",
+			__FUNCTION__,__LINE__);
+#ifdef DEBUG_WRITE
+			slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+				 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 			if (writev(gcfg.tun_fd, iov, 2) < 0) {
 				slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
 					__FUNCTION__,__LINE__,errno,strerror(errno));
@@ -669,6 +687,11 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
+#ifdef DEBUG_WRITE
+	slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+		 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
+
 	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
 			__FUNCTION__,__LINE__,errno,strerror(errno));
@@ -744,6 +767,11 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
+
+#ifdef DEBUG_WRITE
+	slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+		 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 	
 	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
@@ -916,10 +944,12 @@ static int xlate_6to4_payload(struct pkt *p)
 	 */
 #ifdef CONFIG_GSO
 	if(p->vnet && p->vnet->gso_type) {
+		slog(LOG_DEBUG,"%s:%d:in gso checksum path\n",__FUNCTION__,__LINE__);
 		*tck = ip4_checksum(p->ip4);
 	} else 
 #endif
 	{
+		slog(LOG_DEBUG,"%s:%d:in normal checksum path\n",__FUNCTION__,__LINE__);
 		*tck = ones_add(*tck, convert_cksum(p->ip6,p->ip4));
 	}
 	return ERROR_NONE;
@@ -1000,7 +1030,10 @@ static int xlate_6to4_hairpin(struct pkt *p)
 		}
 		iov[iov_idx].iov_base = p->data;
 		iov[iov_idx++].iov_len = p->data_len;
-
+#ifdef DEBUG_WRITE
+		slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+			 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 		if (writev(gcfg.tun_fd, iov, iov_idx) < 0)
 			slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
 				__FUNCTION__,__LINE__,errno,strerror(errno));
@@ -1061,7 +1094,8 @@ static void xlate_6to4_data(struct pkt *p,struct new4 *new4)
 #ifdef CONFIG_GSO
 	/* Check if we need to update csum offloading */
 	if(new4->vnet.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-		new4->vnet.csum_offset = 16; /* for tcp */
+		slog(LOG_DEBUG,"%s:%d:gso csum adjust was %d is %d (offset %d)\n",__FUNCTION__,__LINE__,
+		p->vnet->csum_start,new4->vnet.csum_start,new4->vnet.csum_offset);
 		new4->vnet.csum_start -= (p->header_len + 20);
 	}
 
@@ -1101,12 +1135,27 @@ static void xlate_6to4_data(struct pkt *p,struct new4 *new4)
 		slog(LOG_DEBUG,"About to write GSO packet type=%d hdr_len=%d data_len=%d seg_size=%d\n",
 		 new4->vnet.gso_type,new4->vnet.hdr_len,p->data_len,new4->vnet.gso_size);
 	}
+	if(new4->vnet.flags) {
+		slog(LOG_DEBUG,"About to write FLAGS packet %x\n",new4->vnet.flags);
+	}
+#endif
+
+#ifdef DEBUG_WRITE
+	slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+			 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
 #endif
 
 	ret = writev(gcfg.tun_fd, iov, 2);
-	if (ret < 0)
+	if (ret < 0) {
 		slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",
 				__FUNCTION__,__LINE__,errno,strerror(errno));
+#ifdef CONFIG_GSO
+		slog(LOG_DEBUG,"packet data at the error:\n");
+		slog(LOG_DEBUG,"incoming gso_type=%d flags=%d\n",p->vnet->gso_type,p->vnet->flags);
+		slog(LOG_DEBUG,"outgoing gso_type=%d flags=%d\n",new4->vnet.gso_type,new4->vnet.flags);
+
+#endif
+	}
 }
 
 static int parse_ip6(struct pkt *p)
@@ -1391,6 +1440,11 @@ static void xlate_6to4_icmp_error(struct pkt *p,struct new4 *new4)
 	iov[0].iov_len = sizeof(struct new4);
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
+
+#ifdef DEBUG_WRITE
+	slog(LOG_DEBUG,"%s:%d:Writing to tun device hdr_len=%d data_len=%d\n",
+		 __FUNCTION__,__LINE__,iov[0].iov_len,iov[1].iov_len);
+#endif
 
 	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "%s:%d:error writing packet to tun device: %d (%s)\n",

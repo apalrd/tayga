@@ -28,7 +28,7 @@ int tc_ingress(struct __sk_buff *ctx)
         l3 = (struct iphdr *)(l2 + 1);
         if ((void *)(l3 + 1) > data_end)
             return TC_ACT_OK;          
-        if(ctx->gso_segs) bpf_printk("Got IP4 packet: gso_segs %d gso_size %d", ctx->gso_segs,ctx->gso_size);
+        bpf_printk("Got IP4 packet: gso_segs %d gso_size %d", ctx->gso_segs,ctx->gso_size);
     }
     else if(ctx->protocol == bpf_htons(ETH_P_IP6))
     {
@@ -37,7 +37,7 @@ int tc_ingress(struct __sk_buff *ctx)
         l3 = (struct ipv6hdr *)(l2 + 1);
         if ((void *)(l3 + 1) > data_end)
             return TC_ACT_OK;
-            if(ctx->gso_segs) bpf_printk("Got IP6 packet: gso_segs %d gso_size %d", ctx->gso_segs,ctx->gso_size);        return TC_ACT_OK;
+        bpf_printk("Got IP6 packet: gso_segs %d gso_size %d", ctx->gso_segs,ctx->gso_size);
     }
 	return TC_ACT_OK;
 

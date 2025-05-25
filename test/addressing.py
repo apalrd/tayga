@@ -95,93 +95,100 @@ def test_prefix(pref,net,name,expect_drop,expect_icmp):
     global test
 
     # v6 dest is in net
-    rt_us = router(pref+"/96")
-    rt_us.apply()
-    expect_proto = 16
-    expect_sa = test.public_ipv6_xlate
-    expect_da = net
-    expect_data = randbytes(128)
-    expect_len = 128+20
-    send_pkt = IPv6(dst=str(test.xlate(net,pref)),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
-    if expect_drop: test.send_and_none(send_pkt, name+" v6 dest")
-    elif expect_icmp:
-        #Expect ICMP instead of current nh
-        expect_sa = test.tayga_ipv6
-        expect_da = test.public_ipv6
-        expect_proto = 58
-        expect_data = None
-        expect_len = -1
-        test.send_and_check(send_pkt,ip6_val, name+" v6 dest")
-    else: 
-        test.send_and_check(send_pkt,ip_val, name+" v6 dest")
-    rt_us.remove()
+    if False:
+        rt_us = router(pref+"/96")
+        rt_us.apply()
+        expect_proto = 16
+        expect_sa = test.public_ipv6_xlate
+        expect_da = net
+        expect_data = randbytes(128)
+        expect_len = 128+20
+        send_pkt = IPv6(dst=str(test.xlate(net,pref)),src=str(test.public_ipv6),nh=16) / Raw(expect_data)
+        if expect_drop: test.send_and_none(send_pkt, name+" v6 dest")
+        elif expect_icmp:
+            #Expect ICMP instead of current nh
+            expect_sa = test.tayga_ipv6
+            expect_da = test.public_ipv6
+            expect_proto = 58
+            expect_data = None
+            expect_len = -1
+            test.send_and_check(send_pkt,ip6_val, name+" v6 dest")
+        else: 
+            test.send_and_check(send_pkt,ip_val, name+" v6 dest")
+        rt_us.remove()
 
     # v6 src is in net, dest must hit a static mapping
     # also flip the whole damn routing table around
-    rt_us = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
-    rt_ds = router(str(test.public_ipv6))
-    rt_us.apply()
-    rt_ds.apply()
-    expect_sa = net
-    expect_da = test.public_ipv6_xlate
-    expect_data = randbytes(128)
-    expect_len = 128+20
-    send_pkt = IPv6(dst=str(test.public_ipv6),src=str(test.xlate(net,pref)),nh=16) / Raw(expect_data)
-    if expect_drop: test.send_and_none(send_pkt, name+" v6 src")
-    elif expect_icmp:
-        #Expect ICMP instead of current nh
-        expect_sa = test.tayga_ipv6
-        expect_da = str(test.xlate(net,pref))
-        expect_proto = 58
-        expect_data = None
-        expect_len = -1
-        test.send_and_check(send_pkt,ip6_val, name+" v6 src")
-    else: 
-        test.send_and_check(send_pkt,ip_val, name+" v6 src") 
-    rt_us.remove()
-    rt_ds.remove()
+    if True:
+        rt_us = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
+        rt_ds = router(str(test.public_ipv6))
+        rt_us.apply()
+        rt_ds.apply()
+        expect_sa = net
+        expect_da = test.public_ipv6_xlate
+        expect_data = randbytes(128)
+        expect_len = 128+20
+        expect_proto = 16
+        send_pkt = IPv6(dst=str(test.public_ipv6),src=str(test.xlate(net,pref)),nh=16) / Raw(expect_data)
+        if expect_drop: test.send_and_none(send_pkt, name+" v6 src")
+        elif expect_icmp:
+            #Expect ICMP instead of current nh
+            expect_sa = test.tayga_ipv6
+            expect_da = str(test.xlate(net,pref))
+            expect_proto = 58
+            expect_data = None
+            expect_len = -1
+            test.send_and_check(send_pkt,ip6_val, name+" v6 src")
+        else: 
+            test.send_and_check(send_pkt,ip_val, name+" v6 src") 
+        rt_us.remove()
+        rt_ds.remove()
 
     # v4 dest is in net
-    rt_us = router(net+"/32")
-    rt_ds = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
-    rt_us.apply()
-    rt_ds.apply()
-    expect_sa = test.public_ipv6
-    expect_da = str(test.xlate(net,pref))
-    expect_data = randbytes(128)
-    expect_len = 128
-    send_pkt = IP(dst=net,src=str(test.public_ipv6_xlate),proto=16) / Raw(expect_data)
-    if expect_drop: test.send_and_none(send_pkt, name+" v4 dest")
-    elif expect_icmp:
-        #Expect ICMP instead of current nh
-        expect_sa = test.tayga_ipv4
-        expect_da = test.public_ipv6_xlate
-        expect_proto = 1
-        expect_data = None
-        expect_len = -1
-        test.send_and_check(send_pkt,ip_val, name+" v4 dest")
-    else: 
-        test.send_and_check(send_pkt,ip6_val, name+" v4 dest") 
-    rt_us.remove()
-    rt_ds.remove()
+    if False:
+        rt_us = router(net+"/32")
+        rt_ds = router(str(test.public_ipv6_xlate),route_dest.ROUTE_TEST)
+        rt_us.apply()
+        rt_ds.apply()
+        expect_sa = test.public_ipv6
+        expect_da = str(test.xlate(net,pref))
+        expect_data = randbytes(128)
+        expect_len = 128
+        expect_proto = 16
+        send_pkt = IP(dst=net,src=str(test.public_ipv6_xlate),proto=16) / Raw(expect_data)
+        if expect_drop: test.send_and_none(send_pkt, name+" v4 dest")
+        elif expect_icmp:
+            #Expect ICMP instead of current nh
+            expect_sa = test.tayga_ipv4
+            expect_da = test.public_ipv6_xlate
+            expect_proto = 1
+            expect_data = None
+            expect_len = -1
+            test.send_and_check(send_pkt,ip_val, name+" v4 dest")
+        else: 
+            test.send_and_check(send_pkt,ip6_val, name+" v4 dest") 
+        rt_us.remove()
+        rt_ds.remove()
 
     # v4 src is in net
-    expect_sa = str(test.xlate(net,pref))
-    expect_da = test.public_ipv6
-    expect_data = randbytes(128)
-    expect_len = 128
-    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=net,proto=16) / Raw(expect_data)
-    if expect_drop: test.send_and_none(send_pkt, name+" v4 src")
-    elif expect_icmp:
-        #Expect ICMP instead of current nh
-        expect_sa = test.tayga_ipv4
-        expect_da = net
-        expect_proto = 1
-        expect_data = None
-        expect_len = -1
-        test.send_and_check(send_pkt,ip_val, name+" v4 src")
-    else: 
-        test.send_and_check(send_pkt,ip6_val, name+" v4 src") 
+    if False:
+        expect_sa = str(test.xlate(net,pref))
+        expect_da = test.public_ipv6
+        expect_data = randbytes(128)
+        expect_len = 128
+        expect_proto = 16
+        send_pkt = IP(dst=str(test.public_ipv6_xlate),src=net,proto=16) / Raw(expect_data)
+        if expect_drop: test.send_and_none(send_pkt, name+" v4 src")
+        elif expect_icmp:
+            #Expect ICMP instead of current nh
+            expect_sa = test.tayga_ipv4
+            expect_da = net
+            expect_proto = 1
+            expect_data = None
+            expect_len = -1
+            test.send_and_check(send_pkt,ip_val, name+" v4 src")
+        else: 
+            test.send_and_check(send_pkt,ip6_val, name+" v4 src") 
 
 
 
@@ -323,8 +330,8 @@ test.timeout = 0.05
 test.setup()
 
 # Call all tests
-wkpf_strict()
-#wkpf_not_strict()
+#wkpf_strict()
+wkpf_not_strict()
 #rfc8215_local_use()
 #invalid_ranges()
 

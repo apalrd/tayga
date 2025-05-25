@@ -18,7 +18,13 @@
 
 /* Config flags */
 //#define CONFIG_BPF
-#define CONFIG_GSO
+//#define CONFIG_GSO
+
+/* Debug definitions */
+//#define DEBUG_MAPPING
+//#define DEBUG_XLATE
+#define DEBUG_GSO
+#define DEBUG_WRITE
 
 #include <stdio.h>
 #include <sys/types.h>

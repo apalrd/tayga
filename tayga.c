@@ -156,6 +156,8 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	/* Try to set all offloads we know of */
 	gcfg.tun_offload |= TUN_F_CSUM;
 	gcfg.tun_offload |= TUN_F_TSO4;
+
+	//The rest of these are currently broken
 	//gcfg.tun_offload |= TUN_F_TSO6;
 	//gcfg.tun_offload |= TUN_F_TSO_ECN;
 	//gcfg.tun_offload |= TUN_F_UFO;

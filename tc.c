@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include "tc.skel.h"
 
-#define LO_IFINDEX 10
+#define LO_IFINDEX 20
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
@@ -25,7 +25,7 @@ void tayga_bpf_attach()
     memset(&tc_hook,0,sizeof(struct bpf_tc_hook));
     tc_hook.sz = sizeof(struct bpf_tc_hook);
 	tc_hook.ifindex = LO_IFINDEX;
-    tc_hook.attach_point = BPF_TC_INGRESS;
+    tc_hook.attach_point = BPF_TC_EGRESS; /* Better? */
 
     /* Initialize opts struct */
     memset(&tc_opts,0,sizeof(struct bpf_tc_opts));

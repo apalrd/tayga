@@ -121,6 +121,7 @@ class confgen:
         self.wkpf_strict = False
         self.dynamic_pool = "172.16.0.0/24"
         self.data_dir = None
+        self.default_routes = True
         self.map = []
         self.map.append("172.16.0.1 2001:db8::1")
         self.map.append("172.16.0.2 2001:db8::2")
@@ -206,7 +207,7 @@ class test_env:
         print("NAT64 is index",ifi)
         ipr.link('set', index=ifi, state='up')
         # Add IPv4 address to NAT64 interface
-        ipr.addr('add', index=ifi, address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
+        ipr.route('add', dst=str(self.tayga_pool4), oif=ifi)
         # Add IPv6 address to NAT64 interface
         ipr.route('add', dst=str(self.tayga_prefix), oif=ifi)
 
@@ -225,7 +226,7 @@ class test_env:
             time.sleep(2)
 
     def setup_tayga(self):
-        # Generate configl
+        # Generate config
         self.tayga_conf.generate()
         print("Starting Tayga")
         # Start Tayga asynchronously and capture output to a file if specified
@@ -279,6 +280,14 @@ class test_env:
         ipr.route("add",dst="default",oif=tun_index)
         ipr.route("add",dst="::/0",oif=tun_index,family=socket.AF_INET6)
         self.tun = tun
+
+    def dump_routes(self):
+        subprocess.run(["ip","route"])
+        subprocess.run(["ip","-6","route"])
+
+    
+    def dump_route(self,dest):
+        return ipr.route("get", dst=str(dest))
 
 
     def __init__(self,test_name):

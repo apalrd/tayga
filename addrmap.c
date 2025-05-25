@@ -423,7 +423,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 				c->last_use = now;
 				if (c_ptr)
 					*c_ptr = c;
-#if 0
+#ifdef DEBUG_MAPPING
 				slog(LOG_DEBUG,"(Cached) lookup for %s got %s\n",
 					inet_ntop(AF_INET,addr4,temp,64),
 					inet_ntop(AF_INET6,&c->addr6,temp2,64));
@@ -441,7 +441,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		slog(LOG_DEBUG,"Invalid map4 at %s:%d\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	}
-#if 0
+#ifdef DEBUG_MAPPING
 	slog(LOG_DEBUG,"Mapping lookup for %s type %d\n",
 		inet_ntop(AF_INET,addr4,temp,64),map4->type);
 #endif
@@ -594,7 +594,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 				c->last_use = now;
 				if (c_ptr)
 					*c_ptr = c;
-#if 0
+#ifdef DEBUG_MAPPING
 				slog(LOG_DEBUG,"(Cached) lookup6 for %s got %s\n",
 					inet_ntop(AF_INET6,addr6,temp,64),
 					inet_ntop(AF_INET,&c->addr4,temp2,64));
@@ -615,8 +615,9 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		if (!map6)
 			return ERROR_REJECT;
 	}
-	//slog(LOG_DEBUG,"Mapping lookup6 for %s got %d\n", inet_ntop(AF_INET6,addr6,temp,64),map6->type);
-
+#ifdef DEBUG_MAPPING
+	slog(LOG_DEBUG,"Mapping lookup6 for %s got %d\n", inet_ntop(AF_INET6,addr6,temp,64),map6->type);
+#endif
 	/* Mapping based on map type */
 	switch (map6->type) {
 	case MAP_TYPE_STATIC:

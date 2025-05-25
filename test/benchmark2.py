@@ -29,13 +29,18 @@ def run_iperf3_tcp_test(server, port=5201, duration=10):
     :param duration: Duration of the test in seconds (default: 10)
     :return: Parsed results as a dictionary
     """
+    tcp = False
     client = iperf3.Client()
     client.server_hostname = server
     client.port = port
     client.duration = duration
-    client.protocol = 'tcp'
-    #client.bandwidth = 10000000
-    #client.reverse = True
+    if tcp: 
+        client.protocol = 'tcp'
+    if not tcp: 
+        client.protocol = 'udp'
+        client.blksize = 64800#1420
+    client.bandwidth = 1000*1000000 # Mbps
+    client.reverse = True
 
     print(f"Running iperf3 TCP test to {server}:{port} for {duration} seconds...")
     result = client.run()
@@ -44,11 +49,19 @@ def run_iperf3_tcp_test(server, port=5201, duration=10):
         print(f"Error: {result.error}")
         return None
 
-    parsed_results = {
-        'sent_bitrate': result.sent_Mbps,  # Mbps
-        'received_bitrate': result.received_Mbps,  # Mbps
-        'retransmits': result.retransmits
-    }
+    if tcp:
+        parsed_results = {
+            'sent_bitrate': result.sent_Mbps,  # Mbps
+            'received_bitrate': result.received_Mbps,  # Mbps
+            'retransmits': result.retransmits
+        }
+    else:
+        parsed_results = {
+            'bitrate': result.Mbps,  # Mbps
+            'packets': result.packets,  # Mbps
+            'loss': result.lost_percent
+        }
+
 
     return parsed_results
 
@@ -71,9 +84,11 @@ stderr=subprocess.STDOUT
 )
 
 time.sleep(1)
+subprocess.run(["ip","route"])
+subprocess.run(["ip","-6","route"])
 
 # Wait for iperf3 client to finish
-res = run_iperf3_tcp_test(str(test.test_sys_ipv4_xlate),6464,10)
+res = run_iperf3_tcp_test(str(test.test_sys_ipv4_xlate),6464,3)
 print("Test Results:")
 print(res)
 
