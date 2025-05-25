@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /* Copyright (c) 2022 Hengqi Chen */
+#include "tayga.h"
 #include <signal.h>
 #include <unistd.h>
 #include "tc.skel.h"
@@ -19,6 +20,7 @@ static struct bpf_tc_opts tc_opts;
 void tayga_bpf_cleanup();
 void tayga_bpf_attach()
 {
+#ifdef CONFIG_BPF
     /* Initialize hook struct */
     memset(&tc_hook,0,sizeof(struct bpf_tc_hook));
     tc_hook.sz = sizeof(struct bpf_tc_hook);
@@ -63,11 +65,13 @@ void tayga_bpf_attach()
 	}
 
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
-	       "to see output of the BPF program.\n");
-    }
+		"to see output of the BPF program.\n");
+#endif
+}
 
 void tayga_bpf_detach()
 {
+#ifdef CONFIG_BPF
 	if(hook_created) {
 		tc_opts.flags = tc_opts.prog_fd = tc_opts.prog_id = 0;
 		err = bpf_tc_detach(&tc_hook, &tc_opts);
@@ -76,10 +80,13 @@ void tayga_bpf_detach()
 			tayga_bpf_cleanup();
 		}
 	}
+#endif
 }
 
 void tayga_bpf_cleanup() {
+#ifdef CONFIG_BPF
 	if (hook_created)
 		bpf_tc_hook_destroy(&tc_hook);
 	tc_bpf__destroy(skel);
+#endif
 }

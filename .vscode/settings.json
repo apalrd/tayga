@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "virtio_net.h": "c"
+    }
+}

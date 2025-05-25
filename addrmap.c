@@ -409,6 +409,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	struct map4 *map4;
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
+	char temp[64],temp2[64];
 
 	/* Lookup entry in cache */
 	if (gcfg.cache_size) {
@@ -422,16 +423,15 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 				c->last_use = now;
 				if (c_ptr)
 					*c_ptr = c;
+#if 0
+				slog(LOG_DEBUG,"(Cached) lookup for %s got %s\n",
+					inet_ntop(AF_INET,addr4,temp,64),
+					inet_ntop(AF_INET6,&c->addr6,temp2,64));
+#endif
 				return ERROR_NONE;
 			}
 		}
 	}
-
-	/* Validate addr6 at this point, after cache check */
-	if(validate_ip6_addr(addr6)) return ERROR_DROP;
-
-	/* Validate addr6 at this point, after cache check */
-	if(validate_ip6_addr(addr6)) return ERROR_DROP;
 
 	/* Find map which this address belongs to */
 	map4 = find_map4(addr4,MAP_TYPE_ANY);
@@ -441,6 +441,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		slog(LOG_DEBUG,"Invalid map4 at %s:%d\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	}
+#if 0
+	slog(LOG_DEBUG,"Mapping lookup for %s type %d\n",
+		inet_ntop(AF_INET,addr4,temp,64),map4->type);
+#endif
 
 	/* Translate according to map type */
 	switch (map4->type) {
@@ -458,7 +462,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		s = container_of(map4, struct map_static, map4);
 		ret = append_to_prefix(addr6, addr4, &s->map6.addr,s->map6.prefix_len);
 		if (ret < 0) {
-			slog(LOG_DEBUG,"Append_to_prefix failed at %s:%d\n",__FUNCTION__,__LINE__);
+			slog(LOG_DEBUG,"Append_to_prefix failed (%d) at %s:%d\n",ret,__FUNCTION__,__LINE__);
 			return ret;
 		}
 		break;
@@ -576,6 +580,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	struct map4 *map4;
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
+	char temp[64],temp2[64];
 
 	/* Search for addr6 in cache */
 	if (gcfg.cache_size) {
@@ -589,6 +594,11 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 				c->last_use = now;
 				if (c_ptr)
 					*c_ptr = c;
+#if 0
+				slog(LOG_DEBUG,"(Cached) lookup6 for %s got %s\n",
+					inet_ntop(AF_INET6,addr6,temp,64),
+					inet_ntop(AF_INET,&c->addr4,temp2,64));
+#endif
 				return 0;
 			}
 		}
@@ -605,6 +615,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		if (!map6)
 			return ERROR_REJECT;
 	}
+	//slog(LOG_DEBUG,"Mapping lookup6 for %s got %d\n", inet_ntop(AF_INET6,addr6,temp,64),map6->type);
 
 	/* Mapping based on map type */
 	switch (map6->type) {
@@ -631,7 +642,6 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 				is_private_ip4_addr(addr4))
 			return ERROR_REJECT;
 		map4 = find_map4(addr4,MAP_TYPE_ANY);
-		slog(LOG_DEBUG,"6to4 map4 type is %d\n",map4->type);
 		if (map4->type != MAP_TYPE_RFC6052){
 			slog(LOG_DEBUG,"%s:%s:Did 6to4 but map4 does not match\n",
 				 __FUNCTION__,__LINE__);

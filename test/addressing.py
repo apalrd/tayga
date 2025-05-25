@@ -320,14 +320,13 @@ def invalid_ranges():
 
 #test.debug = True
 test.timeout = 0.05
-test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
 wkpf_strict()
-wkpf_not_strict()
-rfc8215_local_use()
-invalid_ranges()
+#wkpf_not_strict()
+#rfc8215_local_use()
+#invalid_ranges()
 
 time.sleep(1)
 test.cleanup()

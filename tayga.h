@@ -16,6 +16,10 @@
  *  GNU General Public License for more details.
  */
 
+/* Config flags */
+//#define CONFIG_BPF
+#define CONFIG_GSO
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,12 +41,18 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
+#ifdef CONFIG_GSO
+#include <linux/virtio_net.h>
+#endif
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <sys/uio.h>
+#ifdef CONFIG_GSO
+#error "GSO is not supported on FreeBSD"
+#endif
 #else
 #error "Could not find headers for platform"
 #endif
@@ -50,11 +60,15 @@
 #include "config.h"
 
 //for coverage testing
+#ifdef COVERAGE_TESTING
 static void dummy()
 {
 	volatile static int temp;
 	temp++;
 }
+#else
+#define dummy()
+#endif
 
 
 #ifdef __linux__
@@ -154,6 +168,9 @@ struct pkt {
 	struct ip6 *ip6;
 	struct ip6_frag *ip6_frag;
 	struct icmp *icmp;
+#ifdef CONFIG_GSO
+	struct virtio_net_hdr_v1 *vnet;
+#endif
 	uint8_t data_proto;
 	uint8_t *data;
 	uint32_t data_len;
@@ -165,6 +182,9 @@ struct pkt {
 
 struct new4 {
 	struct tun_pi pi;
+#ifdef CONFIG_GSO
+	struct virtio_net_hdr_v1 vnet;
+#endif
 	struct ip4 ip4;
 	struct icmp icmp;
 	struct ip4 ip4_em;
@@ -260,6 +280,8 @@ struct config {
 
 	int urandom_fd;
 	int tun_fd;
+	/* Offloads enabled on the tun device */
+	int tun_offload;
 
 	uint16_t mtu;
 	uint8_t *recv_buf;

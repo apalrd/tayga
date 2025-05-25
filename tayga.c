@@ -100,6 +100,9 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN;
+#ifdef CONFIG_GSO
+	ifr.ifr_flags |= IFF_VNET_HDR;
+#endif
 	strcpy(ifr.ifr_name, gcfg.tundev);
 	if (ioctl(gcfg.tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
@@ -140,6 +143,60 @@ static void tun_setup(int do_mktun, int do_rmtun)
 				gcfg.tundev);
 		return;
 	}
+	gcfg.tun_offload = 0;
+#ifdef CONFIG_GSO
+	/* Setup tun vnet header size */
+	int len = sizeof(struct virtio_net_hdr_v1);
+	if(ioctl(gcfg.tun_fd, TUNSETVNETHDRSZ, &(int){len}))
+	{
+		slog(LOG_ERR,"ioctl TUNSETVNETHDRSZ failed %d\n",errno);
+		exit(1);
+	}
+
+	/* Try to set all offloads we know of */
+	gcfg.tun_offload |= TUN_F_CSUM;
+	gcfg.tun_offload |= TUN_F_TSO4;
+	//gcfg.tun_offload |= TUN_F_TSO6;
+	//gcfg.tun_offload |= TUN_F_TSO_ECN;
+	//gcfg.tun_offload |= TUN_F_UFO;
+	//gcfg.tun_offload |= TUN_F_USO4;
+	//gcfg.tun_offload |= TUN_F_USO6;
+	int ret = ioctl(gcfg.tun_fd, TUNSETOFFLOAD, gcfg.tun_offload );
+	if(ret == EINVAL)
+	{
+		slog(LOG_INFO,"Tun device does not support all offloads, trying fewer offloads\n");
+		gcfg.tun_offload = TUN_F_CSUM | TUN_F_TSO4 | TUN_F_TSO6;
+		int ret = ioctl(gcfg.tun_fd, TUNSETOFFLOAD, gcfg.tun_offload );
+		if(ret == EINVAL)
+		{
+			slog(LOG_INFO,"Tun device still doesn't support offloads, trying csum only\n");
+			gcfg.tun_offload = TUN_F_CSUM;
+			int ret = ioctl(gcfg.tun_fd, TUNSETOFFLOAD, gcfg.tun_offload );		
+			if(ret == EINVAL)
+			{
+				slog(LOG_INFO,"Tun device can't offload anything\n");
+				gcfg.tun_offload = 0;
+		
+			}
+			else if(ret)
+			{
+				slog(LOG_ERR,"ioctl TUNSETOFFLOAD failed %d\n",errno);
+				exit(1);
+			}
+	
+		}
+		else if(ret)
+		{
+			slog(LOG_ERR,"ioctl TUNSETOFFLOAD failed %d\n",errno);
+			exit(1);
+		}
+	}
+	else if(ret)
+	{
+		slog(LOG_ERR,"ioctl TUNSETOFFLOAD failed %d\n",errno);
+		exit(1);
+	}
+#endif
 
 	set_nonblock(gcfg.tun_fd);
 
@@ -171,6 +228,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	struct ifreq ifr;
 	int fd, do_rename = 0, multi_af;
 	char devname[64];
+	gcfg.tun_offload = 0; /* No offloads on BSD currently */
 
 	if (strncmp(gcfg.tundev, "tun", 3))
 		do_rename = 1;
@@ -300,8 +358,9 @@ static void signal_setup(void)
 static void read_from_tun(void)
 {
 	int ret;
-	struct tun_pi *pi = (struct tun_pi *)gcfg.recv_buf;
 	struct pkt pbuf, *p = &pbuf;
+	struct tun_pi *pi = (struct tun_pi *)(gcfg.recv_buf);
+
 
 	ret = read(gcfg.tun_fd, gcfg.recv_buf, gcfg.recv_buf_size);
 	if (ret < 0) {
@@ -311,18 +370,41 @@ static void read_from_tun(void)
 				"device: %s\n", strerror(errno));
 		return;
 	}
-	if (ret < sizeof(struct tun_pi)) {
+#ifdef CONFIG_GSO
+	if (ret < (sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr_v1))) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
 		return;
 	}
+#else	
+	if (ret < sizeof(struct tun_pi)) {
+	slog(LOG_WARNING, "short read from tun device "
+			"(%d bytes)\n", ret);
+	return;
+}
+#endif
 	if (ret == gcfg.recv_buf_size) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
-	memset(p, 0, sizeof(struct pkt));
+	memset(p, 0, sizeof(struct pkt));	
+#ifdef CONFIG_GSO
+	int proto = TUN_GET_PROTO(pi);
+	p->vnet = (struct virtio_net_hdr_v1 *)(gcfg.recv_buf + sizeof(struct tun_pi));	
+#if 0
+	if(p->vnet->flags) slog(LOG_DEBUG,"Got packet with GSO flags=%x csum=(%d,%d)\n",
+	p->vnet->flags,p->vnet->csum_start,p->vnet->csum_offset);
+#endif
+	p->data = gcfg.recv_buf + sizeof(struct tun_pi) + sizeof(struct virtio_net_hdr_v1);
+	p->data_len = ret - sizeof(struct tun_pi) - sizeof(struct virtio_net_hdr_v1);
+#if 1
+	if(p->vnet->gso_type && proto == 0x86dd) slog(LOG_DEBUG,"Got %x packet with GSO flags=%x type=%x hdr_len=%d gso_size=%d tot_size=%d\n",
+	proto,p->vnet->flags,p->vnet->gso_type,p->vnet->hdr_len,p->vnet->gso_size,p->data_len);
+#endif
+#else 
 	p->data = gcfg.recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
+#endif
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
 		handle_ip4(p);

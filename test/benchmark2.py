@@ -34,6 +34,8 @@ def run_iperf3_tcp_test(server, port=5201, duration=10):
     client.port = port
     client.duration = duration
     client.protocol = 'tcp'
+    #client.bandwidth = 10000000
+    #client.reverse = True
 
     print(f"Running iperf3 TCP test to {server}:{port} for {duration} seconds...")
     result = client.run()

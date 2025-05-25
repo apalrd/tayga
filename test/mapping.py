@@ -8,6 +8,7 @@
 from test_env import (
     test_env,
     test_result,
+    route_dest,
     router
 )
 from random import randbytes
@@ -289,8 +290,7 @@ def rfc7757_eam():
             else:
                 #This case doesn't have an unequal so it runs twice
                 test.tayga_conf.map.append("10.0.0.0 2001:db8:beef:0:cafe::0")
-            if not equal:
-                print(test.tayga_conf.map)
+            #print(test.tayga_conf.map)
             test.reload()
             if equal: test_nm = f"{bits} bits equal"
             else: test_nm = f"{bits} bits unequal"
@@ -299,6 +299,7 @@ def rfc7757_eam():
             # Routers for this test
             rt_v4 = router(f"8.0.0.0/6")
             rt_v6 = router(f"2001:db8:beef::/64")
+            rt_pref = router(f"3fff:6464::800:0/102",route_dest.ROUTE_TEST)
 
             # Addressing
             if bits > 0:
@@ -328,16 +329,21 @@ def rfc7757_eam():
             test.send_and_check(send_pkt,ip6_val, test_nm+" dest max v4->v6")
 
         
-            # Send Invalid packets (just out of range
+            # Send Invalid packets (just out of range)
+            # These get translated using RFC6052 instead of the explicit map
             #v4 -> v6
+            expect_sa = test.public_ipv4_xlate
+            expect_da = test.xlate(this_net4.network_address-1)
             expect_data = randbytes(128)
-            expect_len = 128
+            rt_pref.apply()
             send_pkt = IP(dst=str(this_net4.network_address-1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            test.send_and_none(send_pkt, test_nm+" dest under v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest under v4->v6")
             expect_data = randbytes(128)
+            expect_da = test.xlate(this_net4.broadcast_address+1)
             send_pkt = IP(dst=str(this_net4.broadcast_address+1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            test.send_and_none(send_pkt, test_nm+" dest over v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest over v4->v6")
             rt_v4.remove()
+            rt_pref.remove()
 
             #v4 -> v6 src
             expect_da = test.public_ipv6
@@ -674,13 +680,12 @@ def dynamic_pool():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
 #rfc6052_mapping()
-#rfc7757_eam()
-rfc7757_hairpin()
+rfc7757_eam()
+#rfc7757_hairpin()
 #dynamic_pool()
 
 time.sleep(1)

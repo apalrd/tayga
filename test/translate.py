@@ -1359,7 +1359,6 @@ def sec_5_5():
 
 #test.debug = True
 test.timeout = 0.1
-test.tayga_bin = "./tayga-cov"
 #test.pcap_test_env = True
 test.setup()
 
