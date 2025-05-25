@@ -320,7 +320,6 @@ def invalid_ranges():
 
 #test.debug = True
 test.timeout = 0.05
-test.tayga_bin = "./tayga-cov"
 test.setup()
 
 # Call all tests
