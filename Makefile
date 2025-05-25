@@ -1,7 +1,7 @@
 # Simple Makefile generated based on makefile.am
 
 CC := gcc
-CFLAGS := -Wall -O2 -Isrc
+CFLAGS := -Wall -O2
 LDFLAGS := 
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga
@@ -16,15 +16,15 @@ version.h: .git/*
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> $@
 
 # Dependency generation
-tayga.d: $(SOURCES) version.h
+tayga.d: $(SOURCES) version.h Makefile
 	$(CC) $(CFLAGS) -MM $(SOURCES) -MT tayga $< > $@
 
 -include tayga.d
 
 
 
-$(TARGET): $(SOURCES)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES)
+$(TARGET): $(SOURCES) Makefile
+	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) 
 
 $(TARGET-COV): $(TARGET)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage
