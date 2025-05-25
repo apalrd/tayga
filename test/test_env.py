@@ -238,8 +238,17 @@ class test_env:
             self.tayga_log = None
 
         try:
+            new_args = ["-c",self.tayga_conf_file,"-d"]
+            total_args = []
+            if self.use_valgrind:
+                #Append valgrind command
+                total_args.extend(self.valgrind_opts)
+            # Append Tayga command
+            total_args.append(self.tayga_bin)
+            # Append args to Tayga
+            total_args.extend(new_args)
             self.tayga_proc = subprocess.Popen(
-            [self.tayga_bin, "-c", self.tayga_conf_file,"-d"],
+            total_args,
             stdout=self.tayga_log if self.tayga_log else subprocess.DEVNULL,
             stderr=subprocess.STDOUT
             )
