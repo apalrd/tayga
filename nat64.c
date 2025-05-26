@@ -427,8 +427,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		return;
 	}
 
-	if (sizeof(struct ip6) * 2 + sizeof(struct icmp) + p_em.data_len > 1280)
-		p_em.data_len = 1280 - sizeof(struct ip6) * 2 -
+	if (sizeof(struct ip6) * 2 + sizeof(struct icmp) + p_em.data_len > MTU_MIN)
+		p_em.data_len = MTU_MIN - sizeof(struct ip6) * 2 -
 						sizeof(struct icmp);
 
 	if (map_ip4_to_ip6(&header.ip6_em.src, &p_em.ip4->src, NULL) ||
@@ -482,8 +482,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			if (mtu > gcfg->mtu)
 				mtu = gcfg->mtu;
 			/* Set MTU to 1280 to prevent generation of atomic fragments */
-			if (mtu < 1280) {
-				mtu = 1280;
+			if (mtu < MTU_MIN) {
+				mtu = MTU_MIN;
 			}
 			header.icmp.word = htonl(mtu);
 			break;
@@ -646,8 +646,8 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 		return;
 
 	orig_len = sizeof(struct ip6) + orig->header_len + orig->data_len;
-	if (orig_len > 1280 - sizeof(struct ip6) - sizeof(struct icmp))
-		orig_len = 1280 - sizeof(struct ip6) - sizeof(struct icmp);
+	if (orig_len > MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp))
+		orig_len = MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp);
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
@@ -686,7 +686,7 @@ static void xlate_header_6to4(struct pkt *p, struct ip4 *ip4,
 		/* Always clear DF bit */
 		ip4->flags_offset &= ~htons(IP4_F_DF);
 	/* Smol packets can be fragmented downstream */
-	} else if (p->header_len + payload_length <= 1280) {
+	} else if (p->header_len + payload_length <= MTU_MIN) {
 		/* Need to generate a psuedo-random ident value
 		 * A simple counter is not secure enough
 		 * However, it doesn't actually seem to be that random in practice

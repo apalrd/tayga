@@ -147,6 +147,9 @@ struct icmp {
  */
 #define MTU_ADJ		20
 
+/* Minimum MTU allowed by IPv6 */
+#define MTU_MIN 1280
+
 
 /* TAYGA data definitions */
 

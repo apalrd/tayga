@@ -414,7 +414,7 @@ void read_config(char *conffile)
 	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
 	gcfg->hash_bits = 7;
 	gcfg->cache_size = 8192;
-	gcfg->ipv6_offlink_mtu = 1280;
+	gcfg->ipv6_offlink_mtu = MTU_MIN;
 	gcfg->lazy_frag_hdr = 1;
 	INIT_LIST_HEAD(&gcfg->cache_pool);
 	INIT_LIST_HEAD(&gcfg->cache_active);

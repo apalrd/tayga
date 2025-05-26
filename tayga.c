@@ -150,6 +150,8 @@ static void tun_setup(int do_mktun, int do_rmtun)
 				strerror(errno));
 		exit(1);
 	}
+
+	/* Query MTU from tun adapter */
 	memset(&ifr, 0, sizeof(ifr));
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
@@ -159,7 +161,13 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	}
 	close(fd);
 
+	/* MTU is less than 1280, not allowed */
 	gcfg->mtu = ifr.ifr_mtu;
+	if(gcfg->mtu < MTU_MIN) {
+		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
+				gcfg->mtu, MTU_MIN);
+		exit(1);
+	}
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
