@@ -66,20 +66,23 @@ static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
 
 static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 {
-	uint32_t sum = 0;
-	uint16_t *p;
-	int i;
+	uint64_t sum = 0;
+	
+	sum += ~ip4->src.s_addr;
+	sum += ~ip4->dest.s_addr;
+	sum += ip6->src.s6_addr32[0];
+	sum += ip6->src.s6_addr32[1];
+	sum += ip6->src.s6_addr32[2];
+	sum += ip6->src.s6_addr32[3];
+	sum += ip6->dest.s6_addr32[0];
+	sum += ip6->dest.s6_addr32[1];
+	sum += ip6->dest.s6_addr32[2];
+	sum += ip6->dest.s6_addr32[3];
 
-	sum += ~ip4->src.s_addr >> 16;
-	sum += ~ip4->src.s_addr & 0xffff;
-	sum += ~ip4->dest.s_addr >> 16;
-	sum += ~ip4->dest.s_addr & 0xffff;
-
-	for (i = 0, p = ip6->src.s6_addr16; i < 16; ++i)
-		sum += *p++;
-
-	while (sum > 0xffff)
-		sum = (sum & 0xffff) + (sum >> 16);
+	/* Fold carry-arounds */
+	if(sum > 0xffffffff) sum = (sum & 0xffffffff) + (sum >> 32);
+	if(sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16);
+	if(sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16);
 
 	return sum;
 }
