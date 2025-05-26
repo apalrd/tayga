@@ -204,15 +204,10 @@ static uint32_t hash_ip4(const struct in_addr *addr4)
 static uint32_t hash_ip6(const struct in6_addr *addr6)
 {
 	uint32_t h;
-
-	h = ((uint32_t)addr6->s6_addr16[0] + gcfg->rand[0]) *
-		((uint32_t)addr6->s6_addr16[1] + gcfg->rand[1]);
-	h ^= ((uint32_t)addr6->s6_addr16[2] + gcfg->rand[2]) *
-		((uint32_t)addr6->s6_addr16[3] + gcfg->rand[3]);
-	h ^= ((uint32_t)addr6->s6_addr16[4] + gcfg->rand[4]) *
-		((uint32_t)addr6->s6_addr16[5] + gcfg->rand[5]);
-	h ^= ((uint32_t)addr6->s6_addr16[6] + gcfg->rand[6]) *
-		((uint32_t)addr6->s6_addr16[7] + gcfg->rand[7]);
+	h = addr6->s6_addr32[0] + gcfg->rand[0];
+	h ^= addr6->s6_addr32[1] + gcfg->rand[1];
+	h ^= addr6->s6_addr32[2] + gcfg->rand[2];
+	h ^= addr6->s6_addr32[3] + gcfg->rand[3];
 	return h >> (32 - gcfg->hash_bits);
 }
 

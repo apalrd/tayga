@@ -24,7 +24,7 @@ tayga.d: $(SOURCES) version.h Makefile
 
 
 $(TARGET): $(SOURCES) Makefile
-	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) 
+	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) -flto
 
 $(TARGET-COV): $(TARGET)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage

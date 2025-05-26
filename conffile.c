@@ -478,9 +478,11 @@ void read_config(char *conffile)
 	m6 = list_entry(gcfg->map6_list.next, struct map6, list);
 
 	if (m4->type == MAP_TYPE_RFC6052 && m6->type == MAP_TYPE_RFC6052 &&
-			!gcfg->allow_ident_gen)
+			!gcfg->allow_ident_gen) {
+		slog(LOG_DEBUG,"Disabling cache, not required\n");
 		gcfg->cache_size = 0;
-
+	}
+	//gcfg->cache_size = 0; //let's see what breaks
 	if (!gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: no ipv4-addr directive found\n");
 		exit(1);

@@ -72,7 +72,9 @@ def run_iperf3_tcp_test(server, port=5201, duration=10,reverse=False,unlimited=T
 
 #test.debug = True
 test.timeout = 0.1
-test.use_valgrind = True
+#test.use_valgrind = True
+test.tayga_conf.default()
+test.tayga_conf.dynamic_pool = None
 test.setup()
 
 # Start iperf3 server
