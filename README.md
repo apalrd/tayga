@@ -174,7 +174,7 @@ tayga -d
 Tayga aims to be fully compliant with all relevant RFCs. The following errata / noncompliances are documented:
 
 ## RFC7915
-[Reference Document](https://datatracker.ietf.org/doc/html/rfc791)
+[Reference Document](https://datatracker.ietf.org/doc/html/rfc7915)
 RFC7915 describes the fundamental IP/ICMP Translation Algorithm used by Tayga. This obsoletes the previous guidance (RFC7757, RFC6791, RFC6145, RFC2765). Tayga may be compliant with RFC6145 in some cases.
 
 ### Don't Fragment
