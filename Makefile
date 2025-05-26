@@ -21,9 +21,8 @@ tayga.d: $(SOURCES) version.h Makefile
 
 -include tayga.d
 
-
-
-$(TARGET): $(SOURCES) Makefile
+# Build targets
+$(TARGET): $(SOURCES) tayga.d
 	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) -flto
 
 $(TARGET-COV): $(TARGET)
@@ -41,4 +40,4 @@ install: $(TARGET)
 uninstall:
 	# TODO
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall cov-report
