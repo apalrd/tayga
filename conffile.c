@@ -413,8 +413,8 @@ void read_config(char *conffile)
 	gcfg->dyn_max_lease = 14 * 86400;
 	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
 	gcfg->hash_bits = 7;
-	gcfg->cache_size = 0;
-	gcfg->allow_ident_gen = 0;
+	gcfg->cache_size = 8192;
+	gcfg->allow_ident_gen = 1;
 	gcfg->ipv6_offlink_mtu = 1280;
 	gcfg->lazy_frag_hdr = 1;
 	INIT_LIST_HEAD(&gcfg->cache_pool);

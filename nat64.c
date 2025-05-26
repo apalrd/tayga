@@ -831,6 +831,8 @@ static void xlate_6to4_data(struct pkt *p)
 static int parse_ip6(struct pkt *p)
 {
 	int hdr_len;
+	uint8_t seg_left = 0;
+	uint16_t seg_ptr = sizeof(struct ip6);
 
 	p->ip6 = (struct ip6 *)(p->data);
 
@@ -854,6 +856,13 @@ static int parse_ip6(struct pkt *p)
 		hdr_len = (p->data[1] + 1) * 8;
 		if (p->data_len < hdr_len)
 			return -1;
+		/* If it's a routing header, extract segments left 
+		 * We will drop the packet, but need to finish parsing it first
+		 */
+		if(p->data_proto == 43) seg_left = p->data[3];
+		if(!seg_left) seg_ptr += hdr_len;
+
+		/* Extract next header from extension header */
 		p->data_proto = p->data[0];
 		p->data += hdr_len;
 		p->data_len -= hdr_len;
@@ -885,6 +894,17 @@ static int parse_ip6(struct pkt *p)
 		if (p->data_len < sizeof(struct icmp))
 			return -1;
 		p->icmp = (struct icmp *)(p->data);
+	}
+
+	/* IF we got a routing header with segments left
+	 * kick back a Parameter Problem pointing to the seg field
+	 */
+	if(seg_left) {
+		seg_ptr += 4;
+		slog(LOG_DEBUG,"%s:%d:IPv6 Routing Header w/ Segments Left ptr=%d\n", 
+			 __FUNCTION__,__LINE__,seg_ptr);
+		host_send_icmp6_error(4, 0, seg_ptr, p);
+		return -1;
 	}
 
 	return 0;
