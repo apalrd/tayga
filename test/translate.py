@@ -226,12 +226,14 @@ def ip_val(pkt):
         expect_nh = expect_ref[IPv6ExtHdrRouting].nh
     res.compare("Length",pkt[IP].len,expect_len)
     res.compare("Proto",pkt[IP].proto,expect_nh)
-    res.compare("ID",pkt[IP].id,0)
     #Flags are either DF or None depending on packet size
     if expect_len > 1260:
         res.compare("Flags",pkt[IP].flags,"DF")
+        res.compare("ID",pkt[IP].id,0)
     else:
         res.compare("Flags",pkt[IP].flags,0)
+        #ID is psuedo-randomly generated, but must not be zero
+        res.check("ID Nonzero",(pkt[IP].id != 0))
     res.compare("Frag",pkt[IP].frag,0)
     res.compare("TTL",pkt[IP].ttl,expect_ref[IPv6].hlim-3) #test setup has 3 trips
     res.compare("Src",pkt[IP].src,str(expect_sa))
@@ -932,6 +934,7 @@ def sec_5_1():
     global expect_type
     global expect_code
     global expect_ptr
+    
     expect_sa = test.public_ipv6_xlate
     expect_da = test.public_ipv4
 
@@ -1042,7 +1045,8 @@ def sec_5_2():
 
     #Expected address is same for all tests
     expect_sa = test.public_ipv6_xlate
-
+    expect_ptr = -1
+    
     ####
     #  ICMPv6 PING TYPES (Type 128 / Type 129)
     ####

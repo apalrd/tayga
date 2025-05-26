@@ -255,7 +255,6 @@ struct config {
 	struct dynamic_pool *dynamic_pool;
 	int hash_bits;
 	int cache_size;
-	int allow_ident_gen;
 	int ipv6_offlink_mtu;
 	int lazy_frag_hdr;
 

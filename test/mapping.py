@@ -8,6 +8,7 @@
 from test_env import (
     test_env,
     test_result,
+    route_dest,
     router
 )
 from random import randbytes
@@ -298,6 +299,7 @@ def rfc7757_eam():
             # Routers for this test
             rt_v4 = router(f"8.0.0.0/6")
             rt_v6 = router(f"2001:db8:beef::/64")
+            rt_pref = router("3fff:6464::800:0/102",route_dest.ROUTE_TEST)
 
             # Addressing
             if bits > 0:
@@ -314,6 +316,7 @@ def rfc7757_eam():
             # Also do this where our addr is in src and in dest
 
             #v4 -> v6 dest
+            rt_pref.apply()
             expect_sa = test.public_ipv4_xlate
             expect_da = this_net6.network_address
             expect_data = randbytes(128)
@@ -327,16 +330,19 @@ def rfc7757_eam():
             test.send_and_check(send_pkt,ip6_val, test_nm+" dest max v4->v6")
 
         
-            # Send Invalid packets (just out of range
+            # Send Invalid packets (just out of range) will return rfc6052 ranges
             #v4 -> v6
             expect_data = randbytes(128)
             expect_len = 128
+            expect_da = test.xlate(str(this_net4.network_address-1))
             send_pkt = IP(dst=str(this_net4.network_address-1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            test.send_and_none(send_pkt, test_nm+" dest under v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest under v4->v6")
             expect_data = randbytes(128)
+            expect_da = test.xlate(str(this_net4.broadcast_address+1))
             send_pkt = IP(dst=str(this_net4.broadcast_address+1),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
-            test.send_and_none(send_pkt, test_nm+" dest over v4->v6")
+            test.send_and_check(send_pkt,ip6_val, test_nm+" dest over v4->v6")
             rt_v4.remove()
+            rt_pref.remove()
 
             #v4 -> v6 src
             expect_da = test.public_ipv6

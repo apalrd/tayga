@@ -478,10 +478,11 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			if (mtu < 68)
 				mtu = est_mtu(ntohs(p_em.ip4->length));
 			mtu += MTU_ADJ;
+			/* Path MTU > our own MTU */
 			if (mtu > gcfg->mtu)
 				mtu = gcfg->mtu;
-			if (mtu < 1280 && gcfg->allow_ident_gen && orig_dest) {
-				orig_dest->flags |= CACHE_F_GEN_IDENT;
+			/* Set MTU to 1280 to prevent generation of atomic fragments */
+			if (mtu < 1280) {
 				mtu = 1280;
 			}
 			header.icmp.word = htonl(mtu);
@@ -707,18 +708,28 @@ static void xlate_header_6to4(struct pkt *p, struct ip4 *ip4,
 	ip4->ver_ihl = 0x45;
 	ip4->tos = (ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff;
 	ip4->length = htons(sizeof(struct ip4) + payload_length);
+	/* Have an IPv6 fragment header, translate to a v4 fragment */
 	if (p->ip6_frag) {
 		ip4->ident = htons(ntohl(p->ip6_frag->ident) & 0xffff);
 		ip4->flags_offset =
 			htons(ntohs(p->ip6_frag->offset_flags) >> 3);
 		if (p->ip6_frag->offset_flags & htons(IP6_F_MF))
 			ip4->flags_offset |= htons(IP4_F_MF);
-	} else if (dest && (dest->flags & CACHE_F_GEN_IDENT) &&
-			p->header_len + payload_length <= 1280) {
-		ip4->ident = htons(dest->ip4_ident++);
+		/* Always clear DF bit */
+		ip4->flags_offset &= ~htons(IP4_F_DF);
+	/* Smol packets can be fragmented downstream */
+	} else if (p->header_len + payload_length <= 1280) {
+		/* Need to generate a psuedo-random ident value
+		 * A simple counter is not secure enough
+		 * However, it doesn't actually seem to be that random in practice
+		 * ref. https://datatracker.ietf.org/doc/html/rfc7739#appendix-B
+		 * */
+		static uint32_t ident = 0xb00b;
+		if(ident & 0x1) ident ^= 0x6464beef;
+		ident >>= 1;
+		ip4->ident = (ident& 0xffff);
 		ip4->flags_offset = 0;
-		if (dest->ip4_ident == 0)
-			dest->ip4_ident++;
+	/* Packets > 1280 must kick back a Packet Too Big */
 	} else {
 		ip4->ident = 0;
 		ip4->flags_offset = htons(IP4_F_DF);
