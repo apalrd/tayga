@@ -7,7 +7,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 # i.e. via DHCPv6-PD or via a dynamic routing protocol like OSPF
 
 # Bring up tun interface w/ tayga
-tayga -c clat.conf --mktun
+tayga -c clat-route.conf --mktun
 
 # Add IPv4 IP (implicitly adds /29 route)
 ip addr add 192.0.0.1/29 dev clat

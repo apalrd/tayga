@@ -9,7 +9,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 ip6tables -t nat -A POSTROUTING -s fd64::/64 -o eth0 -j MASQUERADE
 
 # Bring up tun interface w/ tayga
-tayga -c clat.conf --mktun
+tayga -c clat-masq.conf --mktun
 
 # Add IPv4 IP (implicitly adds /29 route)
 ip addr add 192.0.0.1/29 dev clat
