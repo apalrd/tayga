@@ -11,10 +11,12 @@ ip6tables -t nat -A POSTROUTING -s fd64::/64 -o eth0 -j MASQUERADE
 # Bring up tun interface w/ tayga
 tayga -c clat-masq.conf --mktun
 
+# Bring up interface
+ip link set dev clat up
 # Add IPv4 IP (implicitly adds /29 route)
 ip addr add 192.0.0.1/29 dev clat
 # Add IPv4 default route w/ mtu 1280 to prevent fragmentation
-ip route add default via 192.0.0.2 dev clat mtu 1260
+ip route add default dev clat mtu 1260
 # Add IPv6 address (implicitly adds /64 route)
 ip addr add fd64::/64 dev clat
 
