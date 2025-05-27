@@ -16,8 +16,8 @@ tayga -c clat-proxynd.conf --mktun
 
 # Add IPv4 IP (implicitly adds /29 route)
 ip addr add 192.0.0.1/29 dev clat
-# Add IPv4 default route
-ip route add default via 192.0.0.2 dev clat
+# Add IPv4 default route with mtu 1280 to prevent fragmentation
+ip route add default via 192.0.0.2 dev clat mtu 1260
 # Add IPv6 route (/127 adds both ::7 and ::6)
 ip route add 2001:db8:feed::7/127 dev clat 
 
