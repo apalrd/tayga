@@ -1,3 +1,4 @@
+#!/bin/sh
 #Enable IP forwarding of IPv6 (not required for IPv4)
 echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 
