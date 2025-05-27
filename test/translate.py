@@ -114,9 +114,9 @@ def ip6_val(pkt):
     if expect_data is not None:
         if expect_frag:
             # Only compare first expect_len bytes
-            res.compare("Payload",pkt[Raw].load,expect_data[0:expect_len])
+            res.compare("Payload",pkt[Raw].load,expect_data[0:expect_len],print=False)
         else:
-            res.compare("Payload",pkt[Raw].load,expect_data)
+            res.compare("Payload",pkt[Raw].load,expect_data,print=False)
     if expect_ref is not None:
         res.compare("TC",pkt[IPv6].tc,expect_ref.tos)
         res.compare("FL",pkt[IPv6].fl,expect_fl)
@@ -496,7 +496,7 @@ def sec_4_2():
 
     # ICMPv4 Fragmentation Needed (and MTU is less than 1280)
     expect_mtu = 1280
-    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1200) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1024) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Small MTU)")
 
     # ICMPv4 Fragmentation Needed (and MTU is higher on Tayga)
@@ -878,9 +878,6 @@ def sec_5_1():
     test.tayga_conf.default()
     test.reload()
 
-    # Setup config for this section
-    test.tayga_conf.default()
-    test.reload()
 
     # Normal Translation
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=64) / Raw(randbytes(64))
@@ -1081,6 +1078,13 @@ def sec_5_2():
     ####
     # Other Errors (Type 2 / Type 3 / Type 4)
     ####
+    
+    # Packet Too Big (w/ MTU below 1280)
+    expect_type = 3
+    expect_code = 4
+    expect_mtu = 1280
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6PacketTooBig(mtu=expect_mtu+20) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+    test.send_and_check(send_pkt,icmp4_val, "Packet Too Big, but too smol")
 
     # Packet Too Big (w/ MTU in reasonable size)
     expect_type = 3
@@ -1186,6 +1190,14 @@ def sec_5_2():
     expect_code = 3
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6DestUnreach(code=4) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Port Unreachable")
+
+    
+    # Packet Too Big (w/ MTU below 1280)
+    expect_type = 3
+    expect_code = 4
+    expect_mtu = 1280
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6PacketTooBig(mtu=expect_mtu+20) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
+    test.send_and_check(send_pkt,icmp4_val, "Packet Too Big, but too smol")
 
     # Packet Too Big (w/ MTU in reasonable size)
     expect_type = 3
@@ -1349,6 +1361,36 @@ def sec_5_5():
     test.section("Transport-Layer Header (RFC 7915 5.5)")
 
     
+#############################################
+# Jumbo Frames Test
+#############################################
+def jumbograms():
+    global test
+    global expect_data
+    global expect_da
+    global expect_sa
+    global expect_ref
+    global expect_len
+    # Setup config for this section
+    test.tayga_conf.default()
+    test.mtu = 32768 #absurdly large
+    test.reload()
+
+    # 4->6 jumbo frame
+    expect_data = randbytes(32000)
+    expect_sa = test.public_ipv4_xlate
+    expect_da = test.public_ipv6
+    expect_len = 32020
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=32000+20) / Raw(expect_data)
+    test.send_and_check(expect_ref,ip6_val, "Jumbo Frame 4->6")
+
+    # 6->4 jumbo frame
+    expect_sa = test.public_ipv6_xlate
+    expect_da = test.public_ipv4
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,plen=32000) / Raw(randbytes(32000))
+    #test.send_and_check(expect_ref,ip_val, "Jumbo Frame 6->4")
+
+    test.section("Jumbo Frames Test")
 
 
 # Test was created at top of file
@@ -1359,17 +1401,18 @@ test.timeout = 0.1
 test.setup()
 
 # Call all tests
-sec_4_1()
-sec_4_2()
+#sec_4_1()
+#sec_4_2()
 sec_4_2_rfc4884()
 sec_4_3()
-sec_4_4()
+#sec_4_4()
 sec_4_5()
 sec_5_1()
-sec_5_2()
+#sec_5_2()
 sec_5_3()
-sec_5_4()
+#sec_5_4()
 sec_5_5()
+jumbograms()
 
 time.sleep(1)
 

@@ -590,7 +590,9 @@ int main(int argc, char **argv)
 		close(pidfd);
 	}
 
-	slog(LOG_INFO, "starting TAYGA " TAYGA_VERSION "\n");
+	slog(LOG_INFO, "Starting TAYGA " TAYGA_VERSION "\n");
+	slog(LOG_DEBUG, "Compiled from " TAYGA_BRANCH "\n");
+	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
 	if (gcfg->cache_size) {
 		gcfg->urandom_fd = open("/dev/urandom", O_RDONLY);

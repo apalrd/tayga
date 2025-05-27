@@ -12,7 +12,8 @@ cov: $(TARGET-COV)
 
 # Version generation
 version.h: .git/*
-	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --abbrev=0)\"" > $@
+	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --dirty)\"" > $@
+	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> $@
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> $@
 
 # Dependency generation

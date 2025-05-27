@@ -81,10 +81,14 @@ class test_result:
         self.res.append(single_res((test_res.RES_PASS if condition else test_res.RES_FAIL),msg))
 
 
-    def compare(self,msg,left,right):
+    def compare(self,msg,left,right,print=True):
         if(left != right):
             self.has_fail = True
-            self.res.append(single_res(test_res.RES_FAIL,(msg+": got ("+str(left)+") expected ("+str(right)+")")))
+            if print:
+                self.res.append(single_res(test_res.RES_FAIL,(msg+": got ("+str(left)+") expected ("+str(right)+")")))
+            else:
+                self.res.append(single_res(test_res.RES_FAIL,(msg+": got (<too long>) expected (<too long>)")))
+
         else:
             self.res.append(single_res(test_res.RES_PASS,msg))
 
@@ -204,6 +208,7 @@ class test_env:
         # Set NAT64 interface up
         ifi = ipr.link_lookup(ifname='nat64')[0]
         ipr.link('set', index=ifi, state='up')
+        ipr.link("set", index=ifi, mtu=self.mtu)
         # Add IPv4 address to NAT64 interface
         ipr.addr('add', index=ifi, address=str(self.tayga_pool4.network_address), mask=self.tayga_pool4.prefixlen)
         # Add IPv6 address to NAT64 interface
@@ -272,7 +277,7 @@ class test_env:
         tun = TunTapInterface(iface="tun0", mode_tun=True, strip_packet_info=False)
         tun_index = ipr.link_lookup(ifname="tun0")[0]
         ipr.link("set", index=tun_index, state="up")
-        ipr.link("set", index=tun_index, mtu=1500)
+        ipr.link("set", index=tun_index, mtu=self.mtu)
         ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv4), mask=24)
         ipr.addr("add", index=tun_index, address=str(self.test_sys_ipv6), mask=64)
         ipr.route("add",dst="default",oif=tun_index)
@@ -284,6 +289,7 @@ class test_env:
         #These are the default values for the test environment
         self.debug = False
         self.tayga_bin = "./tayga"
+        self.mtu = 1500
         self.tayga_pool4 = ipaddress.ip_network("172.16.0.0/24")
         self.tayga_prefix = ipaddress.ip_network("3fff:6464::/96")
         self.public_ipv4 = ipaddress.ip_address("192.168.1.2")
@@ -345,6 +351,11 @@ class test_env:
             if self.debug:
                 print("Tayga process not found, skipping process termination")
 
+        # Reset link MTU
+        ifi = ipr.link_lookup(ifname='nat64')[0]
+        ipr.link("set", index=ifi, mtu=self.mtu)
+        ifi = ipr.link_lookup(ifname='tun0')[0]
+        ipr.link("set", index=ifi, mtu=self.mtu)
         # Regenerate the conf file and restart
         self.setup_tayga()
 
