@@ -39,7 +39,7 @@ static uint16_t ip_checksum(void *d, int c)
 	return ~sum;
 }
 
-static uint16_t ones_add(uint16_t a, uint16_t b)
+static inline uint16_t ones_add(uint16_t a, uint16_t b)
 {
 	uint32_t sum = (uint16_t)~a + (uint16_t)~b;
 
@@ -66,20 +66,23 @@ static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
 
 static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 {
-	uint32_t sum = 0;
-	uint16_t *p;
-	int i;
+	uint64_t sum = 0;
+	
+	sum += ~ip4->src.s_addr;
+	sum += ~ip4->dest.s_addr;
+	sum += ip6->src.s6_addr32[0];
+	sum += ip6->src.s6_addr32[1];
+	sum += ip6->src.s6_addr32[2];
+	sum += ip6->src.s6_addr32[3];
+	sum += ip6->dest.s6_addr32[0];
+	sum += ip6->dest.s6_addr32[1];
+	sum += ip6->dest.s6_addr32[2];
+	sum += ip6->dest.s6_addr32[3];
 
-	sum += ~ip4->src.s_addr >> 16;
-	sum += ~ip4->src.s_addr & 0xffff;
-	sum += ~ip4->dest.s_addr >> 16;
-	sum += ~ip4->dest.s_addr & 0xffff;
-
-	for (i = 0, p = ip6->src.s6_addr16; i < 16; ++i)
-		sum += *p++;
-
-	while (sum > 0xffff)
-		sum = (sum & 0xffff) + (sum >> 16);
+	/* Fold carry-arounds */
+	if(sum > 0xffffffff) sum = (sum & 0xffffffff) + (sum >> 32);
+	if(sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16);
+	if(sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16);
 
 	return sum;
 }
@@ -95,8 +98,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	} __attribute__ ((__packed__)) header;
 	struct iovec iov[2];
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IP);
 	header.ip4.ver_ihl = 0x45;
 	header.ip4.tos = tos;
 	header.ip4.length = htons(sizeof(header.ip4) + sizeof(header.icmp) +
@@ -156,6 +158,7 @@ static void host_handle_icmp4(struct pkt *p)
 		break;
 	}
 }
+
 
 static void xlate_header_4to6(struct pkt *p, struct ip6 *ip6,
 		int payload_length)
@@ -218,24 +221,29 @@ static void xlate_4to6_data(struct pkt *p)
 	int no_frag_hdr = 0;
 	uint16_t off = ntohs(p->ip4->flags_offset);
 	int frag_size;
+	int ret;
 
 	frag_size = gcfg->ipv6_offlink_mtu;
 	if (frag_size > gcfg->mtu)
 		frag_size = gcfg->mtu;
 	frag_size -= sizeof(struct ip6);
 
-	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest)) {
+	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest);
+	if (ret == ERROR_REJECT) {
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to kick back ICMP4 for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->dest,temp,64));
 		host_send_icmp4_error(3, 1, 0, p);
 		return;
 	}
+	else if(ret == ERROR_DROP) return;
 
-	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src)) {
+	ret = map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src);
+	if (ret == ERROR_REJECT) {
 		host_send_icmp4_error(3, 10, 0, p);
 		return;
 	}
+	else if(ret == ERROR_DROP) return;
 
 	/* We do not respect the DF flag for IP4 packets that are already
 	   fragmented, because the IP6 fragmentation header takes an extra
@@ -270,8 +278,7 @@ static void xlate_4to6_data(struct pkt *p)
 	if (dest)
 		dest->flags |= CACHE_F_SEEN_4TO6;
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 
 	if (no_frag_hdr) {
 		iov[0].iov_base = &header;
@@ -393,7 +400,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	int allow_fake_source = 0;
 	struct cache_entry *orig_dest = NULL;
 
 	memset(&p_em, 0, sizeof(p_em));
@@ -421,8 +427,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		return;
 	}
 
-	if (sizeof(struct ip6) * 2 + sizeof(struct icmp) + p_em.data_len > 1280)
-		p_em.data_len = 1280 - sizeof(struct ip6) * 2 -
+	if (sizeof(struct ip6) * 2 + sizeof(struct icmp) + p_em.data_len > MTU_MIN)
+		p_em.data_len = MTU_MIN - sizeof(struct ip6) * 2 -
 						sizeof(struct icmp);
 
 	if (map_ip4_to_ip6(&header.ip6_em.src, &p_em.ip4->src, NULL) ||
@@ -441,22 +447,21 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		header.icmp.word = 0;
 		switch (p->icmp->code) {
 		case 0: /* Network Unreachable */
-			observe();
+			dummy();
 		case 1: /* Host Unreachable */
-			observe();
+			dummy();
 		case 5: /* Source Route Failed */
-			observe();
+			dummy();
 		case 6:
-			observe();
+			dummy();
 		case 7:
-			observe();
+			dummy();
 		case 8:
-			observe();
+			dummy();
 		case 11:
-			observe();
+			dummy();
 		case 12:
 			header.icmp.code = 0; /* No route to destination */
-			allow_fake_source = 1;
 			break;
 		case 2: /* Protocol Unreachable */
 			header.icmp.type = 4;
@@ -473,21 +478,21 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			if (mtu < 68)
 				mtu = est_mtu(ntohs(p_em.ip4->length));
 			mtu += MTU_ADJ;
+			/* Path MTU > our own MTU */
 			if (mtu > gcfg->mtu)
 				mtu = gcfg->mtu;
-			if (mtu < 1280 && gcfg->allow_ident_gen && orig_dest) {
-				orig_dest->flags |= CACHE_F_GEN_IDENT;
-				mtu = 1280;
+			/* Set MTU to 1280 to prevent generation of atomic fragments */
+			if (mtu < MTU_MIN) {
+				mtu = MTU_MIN;
 			}
 			header.icmp.word = htonl(mtu);
-			allow_fake_source = 1;
 			break;
 		case 9:
-			observe();
+			dummy();
 		case 10:
-			observe();
+			dummy();
 		case 13:
-			observe();
+			dummy();
 		case 15:
 			header.icmp.code = 1; /* Administratively prohibited */
 			break;
@@ -534,10 +539,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to rely on fake source for ip4 %s\n",
 			inet_ntop(AF_INET,&p->ip4->src,temp,64));
-		if (allow_fake_source)
-			header.ip6.src = gcfg->local_addr6;
-		else
-			return;
+		//Fake source IP is our own IP
+		header.ip6.src = gcfg->local_addr6;
 	}
 
 	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, NULL)) {
@@ -557,8 +560,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 						sizeof(header.ip6_em)),
 				ip_checksum(p_em.data, p_em.data_len)));
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 
 	iov[0].iov_base = &header;
 	iov[0].iov_len = sizeof(header);
@@ -609,8 +611,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	} __attribute__ ((__packed__)) header;
 	struct iovec iov[2];
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IPV6);
+	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 	header.ip6.ver_tc_fl = htonl((0x6 << 28) | (tc << 20));
 	header.ip6.payload_length = htons(sizeof(header.icmp) + data_len);
 	header.ip6.next_header = 58;
@@ -645,8 +646,8 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 		return;
 
 	orig_len = sizeof(struct ip6) + orig->header_len + orig->data_len;
-	if (orig_len > 1280 - sizeof(struct ip6) - sizeof(struct icmp))
-		orig_len = 1280 - sizeof(struct ip6) - sizeof(struct icmp);
+	if (orig_len > MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp))
+		orig_len = MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp);
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
@@ -675,18 +676,28 @@ static void xlate_header_6to4(struct pkt *p, struct ip4 *ip4,
 	ip4->ver_ihl = 0x45;
 	ip4->tos = (ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff;
 	ip4->length = htons(sizeof(struct ip4) + payload_length);
+	/* Have an IPv6 fragment header, translate to a v4 fragment */
 	if (p->ip6_frag) {
 		ip4->ident = htons(ntohl(p->ip6_frag->ident) & 0xffff);
 		ip4->flags_offset =
 			htons(ntohs(p->ip6_frag->offset_flags) >> 3);
 		if (p->ip6_frag->offset_flags & htons(IP6_F_MF))
 			ip4->flags_offset |= htons(IP4_F_MF);
-	} else if (dest && (dest->flags & CACHE_F_GEN_IDENT) &&
-			p->header_len + payload_length <= 1280) {
-		ip4->ident = htons(dest->ip4_ident++);
+		/* Always clear DF bit */
+		ip4->flags_offset &= ~htons(IP4_F_DF);
+	/* Smol packets can be fragmented downstream */
+	} else if (p->header_len + payload_length <= MTU_MIN) {
+		/* Need to generate a psuedo-random ident value
+		 * A simple counter is not secure enough
+		 * However, it doesn't actually seem to be that random in practice
+		 * ref. https://datatracker.ietf.org/doc/html/rfc7739#appendix-B
+		 * */
+		static uint32_t ident = 0xb00b;
+		if(ident & 0x1) ident ^= 0x6464beef;
+		ident >>= 1;
+		ip4->ident = (ident& 0xffff);
 		ip4->flags_offset = 0;
-		if (dest->ip4_ident == 0)
-			dest->ip4_ident++;
+	/* Packets > 1280 must kick back a Packet Too Big */
 	} else {
 		ip4->ident = 0;
 		ip4->flags_offset = htons(IP4_F_DF);
@@ -743,15 +754,26 @@ static void xlate_6to4_data(struct pkt *p)
 		struct ip4 ip4;
 	} __attribute__ ((__packed__)) header;
 	struct cache_entry *src = NULL, *dest = NULL;
+	int ret;
 	struct iovec iov[2];
 
-	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0)) {
+	ret = map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0);
+	if (ret == ERROR_REJECT) {
 		host_send_icmp6_error(1, 0, 0, p);
 		return;
 	}
+	else if (ret == ERROR_DROP){
+		/* Drop packet */
+		return;
+	}
 
-	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1)) {
+	ret = map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1);
+	if (ret == ERROR_REJECT) {
 		host_send_icmp6_error(1, 5, 0, p);
+		return;
+	}
+	else if (ret == ERROR_DROP){
+		/* Drop packet */
 		return;
 	}
 
@@ -771,8 +793,7 @@ static void xlate_6to4_data(struct pkt *p)
 	if (dest)
 		dest->flags |= CACHE_F_SEEN_6TO4;
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi, ETH_P_IP);
 
 	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
 
@@ -789,6 +810,8 @@ static void xlate_6to4_data(struct pkt *p)
 static int parse_ip6(struct pkt *p)
 {
 	int hdr_len;
+	uint8_t seg_left = 0;
+	uint16_t seg_ptr = sizeof(struct ip6);
 
 	p->ip6 = (struct ip6 *)(p->data);
 
@@ -812,6 +835,13 @@ static int parse_ip6(struct pkt *p)
 		hdr_len = (p->data[1] + 1) * 8;
 		if (p->data_len < hdr_len)
 			return -1;
+		/* If it's a routing header, extract segments left 
+		 * We will drop the packet, but need to finish parsing it first
+		 */
+		if(p->data_proto == 43) seg_left = p->data[3];
+		if(!seg_left) seg_ptr += hdr_len;
+
+		/* Extract next header from extension header */
 		p->data_proto = p->data[0];
 		p->data += hdr_len;
 		p->data_len -= hdr_len;
@@ -845,6 +875,17 @@ static int parse_ip6(struct pkt *p)
 		p->icmp = (struct icmp *)(p->data);
 	}
 
+	/* IF we got a routing header with segments left
+	 * kick back a Parameter Problem pointing to the seg field
+	 */
+	if(seg_left) {
+		seg_ptr += 4;
+		slog(LOG_DEBUG,"%s:%d:IPv6 Routing Header w/ Segments Left ptr=%d\n", 
+			 __FUNCTION__,__LINE__,seg_ptr);
+		host_send_icmp6_error(4, 0, seg_ptr, p);
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -860,7 +901,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	int allow_fake_source = 0;
 
 	memset(&p_em, 0, sizeof(p_em));
 	p_em.data = p->data + sizeof(struct icmp);
@@ -891,12 +931,11 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		header.icmp.word = 0;
 		switch (p->icmp->code) {
 		case 0: /* No route to destination */
-		observe();
+		dummy();
 		case 2: /* Beyond scope of source address */
-		observe();
+		dummy();
 		case 3: /* Address Unreachable */
 			header.icmp.code = 1; /* Host Unreachable */
-			allow_fake_source = 1;
 			break;
 		case 1: /* Administratively prohibited */
 			header.icmp.code = 10; /* Administratively prohibited */
@@ -920,7 +959,6 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 			mtu = gcfg->mtu;
 		mtu -= MTU_ADJ;
 		header.icmp.word = htonl(mtu);
-		allow_fake_source = 1;
 		break;
 	case 3: /* Time Exceeded */
 		header.icmp.type = 11; /* Time Exceeded */
@@ -976,14 +1014,14 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	header.ip4_em.cksum =
 		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
 
+	//As this is an ICMP error packet, we will not further 
+	//send errors, so treat return of REJECT = DROP
 	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
 		char temp[64];
 		slog(LOG_DEBUG,"Needed to rely on fake source for ip6 %s\n",
 			inet_ntop(AF_INET6,&p->ip6->src,temp,64));
-		if (allow_fake_source)
-			header.ip4.src = gcfg->local_addr4;
-		else
-			return;
+		//fake source IP is our own IP
+		header.ip4.src = gcfg->local_addr4;
 	}
 
 	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, NULL, 0))
@@ -1001,8 +1039,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 							sizeof(header.ip4_em)),
 				ip_checksum(p_em.data, p_em.data_len));
 
-	header.pi.flags = 0;
-	header.pi.proto = htons(ETH_P_IP);
+	TUN_SET_PROTO(&header.pi, ETH_P_IP);
 
 	iov[0].iov_base = &header;
 	iov[0].iov_len = sizeof(header);
