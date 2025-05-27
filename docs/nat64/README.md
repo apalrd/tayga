@@ -15,7 +15,7 @@ This configuration does not require two interfaces, Tayga may use the same inter
 
 
 # Dynamic Pool / Dynamic Address-Port Mapping
-This implementation uses Tayga's dynamic pool mapping functionality. This relies on allocating a translation network of private IPv4 address space, containing sufficient addresses for the number of active IPv6-only clients. Each IPv6-only client will be dynamically assigned an IPv4 address in the translation network by Tayga. The Linux kernel will then perform NAPT (Masquerade) from the translation network to a shared IPv4 address or address pool. This approach is recommended for all networks which are not service providers as it provides a high level of address and port reuse and also allows the same public IPv4 to be used for traditional NAT44 for networks which also offer dual stack service.
+This implementation uses Tayga's dynamic pool mapping functionality. This relies on allocating a translation network of private IPv4 address space, containing sufficient addresses for the number of active IPv6-only clients. Each IPv6-only client will be dynamically assigned an IPv4 address in the translation network by Tayga. The Linux kernel will then perform NAPT (Masquerade) from the translation network to a shared IPv4 address or address pool. This approach is recommended for all networks which are not service providers as it provides a high level of address and port reuse and also allows the same public IPv4 to be used for traditional NAT44 on the same router, for networks which provide dual-stack.
 
 ## Addressing
 The following IP addresses are used in this example:
@@ -34,5 +34,7 @@ The following IP addresses are used in this example:
 * `203.0.113.0/24` is the public IPv4 address range for customers assigned to the translator
 * `192.0.2.0` is the public IPv4 address of the translator
 * `2001:db8::/32` is the prefix assigned to this ISP
-*  `2001:db8:1000::/36` is assumed to be assigned to customers, each customer receives a /48 out of this range, with customers sharing public IPv4 addresses at a fixed ratio of 16:1
+*  `2001:db8:1000::/36` is assumed to be assigned to customers, each customer receives a /48 out of this range, with customers sharing public IPv4 addresses at a fixed ratio of 16:1 with fixed mapping of subscribers to IP+port ranges (as is common with CGNAT)
 * `2001:db8::/48` is reserved for the ISP's routers, including the range `2001:db8:0:6464::/64` for the translator itself.
+* `fd64::/120` is used between NAT66 and Tayga in the translator, and is not routed outside of the system. It directly maps to `203.0.113.24`.
+* In this example, this router is assumed to be a purely layer 3 device, with routes distributed via a dynamic routing protocol. `203.0.113.0/24`, `192.0.2.0/32`, `2001:db8:0:6464::/64`, and `64:ff9b::/96` (or `/64`, for FIB efficiency) are to be routed to this host. 
