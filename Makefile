@@ -11,7 +11,7 @@ all: $(TARGET)
 cov: $(TARGET-COV)
 
 # Version generation
-version.h: .git/*
+version.h: .git/index
 	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --dirty)\"" > $@
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> $@
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> $@

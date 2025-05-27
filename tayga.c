@@ -26,6 +26,7 @@
 #include <grp.h>
 
 #define USAGE_TEXT	\
+"TAYGA version %s\n" \
 "Usage: %s [-c|--config CONFIGFILE] [-d] [-n|--nodetach] [-u|--user USERID]\n" \
 "             [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n" \
 "--config FILE      : Read configuration options from FILE\n" \
@@ -449,7 +450,7 @@ int main(int argc, char **argv)
 				}
 				do_rmtun = 1;
 			} else if (longind == 2) {
-				fprintf(stderr, USAGE_TEXT, argv[0]);
+				fprintf(stderr, USAGE_TEXT, TAYGA_VERSION, argv[0]);
 				exit(0);
 			}
 			break;
