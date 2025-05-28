@@ -1,9 +1,11 @@
 #!/bin/sh
 #Enable IP forwarding of IPv4 and IPv6
-#echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
-#echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
+echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 
 # Masquerade using ip6tables
+# This is certainly not the best way to configure netfilter
+# For example purposes only
 # for each public IP (256 hosts = 2 hex digits)
 for pub in $(seq 0 255)
 do
@@ -11,17 +13,20 @@ do
     for sub in $(seq 0 15)
     do
         echo Configuring client pub $pub sub $sub
+        # Build client's IPv6 prefix out of their public IP suffix (2 hex digit) + sub-id (1 hex digit)
         echo IPv6 range is $(printf '2001:db8:1%02x%01x::/48' $pub $sub)
+        # Internal translation range is just the public IP in hex
         echo Translation range is $(printf 'fd64::%x' $pub)
+        # Port range is 4000 ports starting at 1024
         echo Port range is $(printf '%d:%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
+        # Using SNAT with fixed port ranges we must specify a rule for each protocol (so it will not pass non-tcp/udp/sctp)
         ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p tcp -o nat64 -j SNAT --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
         ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p udp -o nat64 -j SNAT --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
         ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p sctp -o nat64 -j SNAT --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
-        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p icmp6 -o nat64 -j SNAT --to-source [$(printf 'fd64::%x' $pub)]
+        # In the case of ICMP, pass it without port numbers, although error packets will be routed by the above rules as 'related'
+        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p icmpv6 -o nat64 -j SNAT --to-source [$(printf 'fd64::%x' $pub)]
     done
 done
-
-return
 
 # Bring up tun interface w/ tayga
 tayga -c nat64-static.conf --mktun
