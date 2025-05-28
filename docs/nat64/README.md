@@ -32,9 +32,9 @@ For applications such as service providers which require fine control of the map
 The following IP addresses are used in this example:
 * `64:ff9b::/96` as the translation prefix `pref64`
 * `203.0.113.0/24` is the public IPv4 address range for customers assigned to the translator
-* `192.0.2.0` is the public IPv4 address of the translator
+* `192.0.2.0` is the public IPv4 address of the translator (for sourcing ICMP errors)
 * `2001:db8::/32` is the prefix assigned to this ISP
 *  `2001:db8:1000::/36` is assumed to be assigned to customers, each customer receives a /48 out of this range, with customers sharing public IPv4 addresses at a fixed ratio of 16:1 with fixed mapping of subscribers to IP+port ranges (as is common with CGNAT)
-* `2001:db8::/48` is reserved for the ISP's routers, including the range `2001:db8:0:6464::/64` for the translator itself.
+* `2001:db8::/48` is reserved for the ISP's routers, including the range `2001:db8:0:6464::/64` for the translator itself (for sourcing ICMP errors).
 * `fd64::/120` is used between NAT66 and Tayga in the translator, and is not routed outside of the system. It directly maps to `203.0.113.24`.
 * In this example, this router is assumed to be a purely layer 3 device, with routes distributed via a dynamic routing protocol. `203.0.113.0/24`, `192.0.2.0/32`, `2001:db8:0:6464::/64`, and `64:ff9b::/96` (or `/64`, for FIB efficiency) are to be routed to this host. 
