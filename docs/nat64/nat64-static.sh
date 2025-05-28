@@ -14,7 +14,10 @@ do
         echo IPv6 range is $(printf '2001:db8:1%02x%01x::/48' $pub $sub)
         echo Translation range is $(printf 'fd64::%x' $pub)
         echo Port range is $(printf '%d:%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
-        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -o nat64 -j MASQUERADE --to-source $(printf 'fd64::%x' $pub) --to-ports  $(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
+        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p tcp -o nat64 -j MASQUERADE --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
+        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p udp -o nat64 -j MASQUERADE --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
+        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p sctp -o nat64 -j MASQUERADE --to-source [$(printf 'fd64::%x' $pub)]:$(printf '%d-%d' $((1024+4000*$sub)) $((5023+4000*$sub)))
+        ip6tables -t nat -A POSTROUTING -s $(printf '2001:db8:1%02x%01x::/48' $pub $sub) -p icmp6 -o nat64 -j MASQUERADE --to-source [$(printf 'fd64::%x' $pub)]
     done
 done
 
