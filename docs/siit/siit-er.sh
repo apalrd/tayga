@@ -10,8 +10,9 @@ tayga -c siit-er.conf --mktun
 ip link set dev siit up
 # Add IPv4 default route to the world
 ip route add default dev siit
-# Add route to Tayga, and the v4-translated addresses
-# Notice how I snuck in Tayga in the /125? you don't have to do that
+# Add route to Tayga, and the v4-translated address space
+# Distribute this (or an aggregate) via your dynamic routing protocol
+# OR use proxy-ND for these 8 addresses
 ip route add 2001:db8:beef::420/125 dev siit
 # As is tradition, we completely waste the zero and max address in IPv4
 # So, take the first (usable) address for outselves on the island network
