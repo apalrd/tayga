@@ -4,10 +4,10 @@
 #echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 
 # Masquerade using ip6tables
-# for each public IP
+# for each public IP (256 hosts = 2 hex digits)
 for pub in $(seq 0 255)
 do
-    # for each host within this public IP
+    # for each host within this public IP (16 hosts = 1 hex digit)
     for sub in $(seq 0 15)
     do
         echo Configuring client pub $pub sub $sub
@@ -30,9 +30,9 @@ ip route add 203.0.113.0/24 dev nat64
 ip route add 192.0.2.0/32 dev nat64
 # Add IPv6 address (implicitly adds /64 route) (distribute this via your routing protocol)
 ip addr add 2001:db8:0:6464::/64 dev nat64
-# Add routes to translation network
+# Add routes to translation network (do *not* distribute these outside of this host)
 ip route add fd64::/64 dev nat64
-# Add pref64 route (distribute this via your routing protocol))
+# Add pref64 route (distribute this via your routing protocol)
 ip route add 64:ff9b::/96 dev nat64
 
 # Start Tayga
