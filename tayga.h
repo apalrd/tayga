@@ -47,12 +47,17 @@
 #error "Could not find headers for platform"
 #endif
 #include "list.h"
+
+#ifdef COVERAGE_TESTING
 //for coverage testing
-static void dummy()
+inline static void dummy()
 {
 	volatile static int temp;
 	temp++;
 }
+#else
+#define dummy()
+#endif
 
 
 #ifdef __linux__

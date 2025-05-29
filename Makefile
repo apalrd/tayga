@@ -27,7 +27,7 @@ $(TARGET): $(SOURCES) tayga.d
 	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) -flto
 
 $(TARGET-COV): $(TARGET)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage
+	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage -DCOVERAGE_TESTING
 
 cov-report:
 	gcov -a -g -f *.gcno
