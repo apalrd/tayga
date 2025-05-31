@@ -335,9 +335,11 @@ static int parse_ip4(struct pkt *p)
 {
 	p->ip4 = (struct ip4 *)(p->data);
 
+	/* Not long enough for IPv4 header */
 	if (p->data_len < sizeof(struct ip4))
-		return -1;
+		return ERROR_DROP;
 
+	/* Read IHL field for actual header len */
 	p->header_len = (p->ip4->ver_ihl & 0x0f) * 4;
 
 	if ((p->ip4->ver_ihl >> 4) != 4 || p->header_len < sizeof(struct ip4) ||
@@ -345,7 +347,7 @@ static int parse_ip4(struct pkt *p)
 			ntohs(p->ip4->length) < p->header_len ||
 			validate_ip4_addr(&p->ip4->src) ||
 			validate_ip4_addr(&p->ip4->dest))
-		return -1;
+		return ERROR_DROP;
 
 	if (p->data_len > ntohs(p->ip4->length))
 		p->data_len = ntohs(p->ip4->length);
@@ -354,20 +356,26 @@ static int parse_ip4(struct pkt *p)
 	p->data_len -= p->header_len;
 	p->data_proto = p->ip4->proto;
 
-	if (p->data_proto == 1) {
+	if (p->data_proto == 1) { /* ICMPv4 */
 		if (p->ip4->flags_offset & htons(IP4_F_MASK | IP4_F_MF))
-			return -1; /* fragmented ICMP is unsupported */
+			return ERROR_DROP; /* fragmented ICMP is unsupported */
 		if (p->data_len < sizeof(struct icmp))
-			return -1;
+			return ERROR_DROP;
 		p->icmp = (struct icmp *)(p->data);
+	} else if(p->data_proto == 0 ||  /* IPv6 Hop By Hop */
+		      p->data_proto == 43 || /* IPv6 Routing Header */
+		      p->data_proto == 44 || /* IPv6 Fragment Header */
+		      p->data_proto == 58 || /* IPv6 ICMPv6 */
+			  p->data_proto == 60) { /* IPv6 Destination Options Header */
+		return ERROR_DROP;
 	} else {
 		if ((p->ip4->flags_offset & htons(IP4_F_MF)) &&
 				(p->data_len & 0x7))
-			return -1;
+			return ERROR_DROP;
 
 		if ((uint32_t)((ntohs(p->ip4->flags_offset) & IP4_F_MASK) * 8) +
 				p->data_len > 65535)
-			return -1;
+			return ERROR_DROP;
 	}
 
 	return 0;
@@ -819,7 +827,7 @@ static int parse_ip6(struct pkt *p)
 			(ntohl(p->ip6->ver_tc_fl) >> 28) != 6 ||
 			validate_ip6_addr(&p->ip6->src) ||
 			validate_ip6_addr(&p->ip6->dest))
-		return -1;
+		return ERROR_DROP;
 
 	p->data_proto = p->ip6->next_header;
 	p->data += sizeof(struct ip6);
@@ -831,10 +839,10 @@ static int parse_ip6(struct pkt *p)
 	while (p->data_proto == 0 || p->data_proto == 43 ||
 			p->data_proto == 60) {
 		if (p->data_len < 2)
-			return -1;
+			return ERROR_DROP-1;
 		hdr_len = (p->data[1] + 1) * 8;
 		if (p->data_len < hdr_len)
-			return -1;
+			return ERROR_DROP;
 		/* If it's a routing header, extract segments left 
 		 * We will drop the packet, but need to finish parsing it first
 		 */
@@ -850,7 +858,7 @@ static int parse_ip6(struct pkt *p)
 
 	if (p->data_proto == 44) {
 		if (p->ip6_frag || p->data_len < sizeof(struct ip6_frag))
-			return -1;
+			return ERROR_DROP;
 		p->ip6_frag = (struct ip6_frag *)p->data;
 		p->data_proto = p->ip6_frag->next_header;
 		p->data += sizeof(struct ip6_frag);
@@ -859,20 +867,22 @@ static int parse_ip6(struct pkt *p)
 
 		if ((p->ip6_frag->offset_flags & htons(IP6_F_MF)) &&
 				(p->data_len & 0x7))
-			return -1;
+			return ERROR_DROP;
 
 		if ((uint32_t)(ntohs(p->ip6_frag->offset_flags) & IP6_F_MASK) +
 				p->data_len > 65535)
-			return -1;
+			return ERROR_DROP;
 	}
 
 	if (p->data_proto == 58) {
 		if (p->ip6_frag && (p->ip6_frag->offset_flags &
 					htons(IP6_F_MASK | IP6_F_MF)))
-			return -1; /* fragmented ICMP is unsupported */
+			return ERROR_DROP; /* fragmented ICMP is unsupported */
 		if (p->data_len < sizeof(struct icmp))
-			return -1;
+			return ERROR_DROP;
 		p->icmp = (struct icmp *)(p->data);
+	} else if(p->data_proto == 1) { /* ICMPv4, which is not valid to translate */
+		return ERROR_DROP;
 	}
 
 	/* IF we got a routing header with segments left
@@ -883,10 +893,10 @@ static int parse_ip6(struct pkt *p)
 		slog(LOG_DEBUG,"%s:%d:IPv6 Routing Header w/ Segments Left ptr=%d\n", 
 			 __FUNCTION__,__LINE__,seg_ptr);
 		host_send_icmp6_error(4, 0, seg_ptr, p);
-		return -1;
+		return ERROR_DROP;
 	}
 
-	return 0;
+	return ERROR_NONE;
 }
 
 static void xlate_6to4_icmp_error(struct pkt *p)

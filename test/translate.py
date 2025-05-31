@@ -26,10 +26,12 @@ from scapy.layers.inet6 import (
     IPv6ExtHdrDestOpt,
     IPv6ExtHdrRouting,
     IPv6ExtHdrFragment,
+    IPerror6
 )
 from scapy.layers.inet import (
     IPOption_Stream_Id,
     IPOption_SSRR,
+    UDPerror
 )
 import time
 
@@ -100,6 +102,7 @@ def icmp6_val(pkt):
 ####
 expect_fl = 0
 expect_frag = False
+expect_len = -1
 def ip6_val(pkt):
     res = test_result()
     # layer 0 is LinuxTunInfo
@@ -236,6 +239,76 @@ def ip_val(pkt):
     res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load)
     return res
 
+####
+#  IPv6 Nested Validator
+####
+expect_sa2 = ""
+expect_da2 = ""
+expect_len2 = -1
+def ip6_nest_val(pkt):
+    res = test_result()
+    # layer 0 is LinuxTunInfo
+    res.check("Contains IPv6 Outer",isinstance(pkt.getlayer(1),IPv6))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Outer Field Comparison
+    res.compare("Src Outer",pkt[IPv6].src,str(expect_sa))
+    res.compare("Dest Outer",pkt[IPv6].dst,str(expect_da))
+    if expect_len >= 0:
+        res.compare("Length Outer",pkt[IPv6].plen,expect_len)
+    res.compare("Expected Class Outer",type(pkt.getlayer(2)),type(expect_class))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    # Compare type/code in ICMP
+    res.compare("Type Outer",pkt.getlayer(2).type,expect_type)
+    res.compare("Code Outer",pkt.getlayer(2).code,expect_code)
+    #Check that the * next * layer is IPv6
+    res.check("Contains IPv6 Inner",pkt.haslayer(IPerror6))
+    #Bail so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Inner Field Comparison
+    res.compare("Src Inner",pkt[IPerror6].src,str(expect_sa2))
+    res.compare("Dest Inner",pkt[IPerror6].dst,str(expect_da2))
+    # Use expect ref for comparison of inner packet
+    if expect_ref is not None: 
+        res.compare("TC",pkt[IPerror6].tc,expect_ref.tos)
+        res.compare("FL",pkt[IPerror6].fl,expect_fl)
+        res.compare("Length",pkt[IPerror6].plen,expect_ref.len - 20)
+        if expect_ref.proto != 1:
+            res.compare("NH",pkt[IPerror6].nh,expect_ref.proto)
+        else:
+            res.compare("NH",pkt[IPerror6].nh,58)
+        res.compare("HLIM",pkt[IPerror6].hlim,expect_ref.ttl)
+        #Ref may contain a data payload
+        if expect_ref.haslayer(UDP):
+            res.check("Contains UDP Inner",pkt.haslayer(UDPerror))
+            #Bail so we don't get derefrence errors
+            if res.has_fail:
+                return res
+            res.compare("Inner Sport",pkt[UDPerror].sport,expect_ref[UDP].sport)
+            res.compare("Inner Dport",pkt[UDPerror].dport,expect_ref[UDP].dport)
+            # Payload will be truncated even more with UDP header
+            pload_len = len(pkt[IPerror6].load)
+            res.check("Payload Length >= 128",((pload_len + 40 + 8) >= 128))
+            res.compare("Payload",pkt[IPerror6].load,expect_ref[Raw].load[0:pload_len])
+        elif expect_ref.haslayer(Raw):
+            #Payload may be truncated, as long as total length is at least 128 bytes
+            pload_len = len(pkt[IPerror6].load)
+            res.check("Payload Length >= 128",((pload_len + 40) >= 128))
+            res.compare("Payload",pkt[IPerror6].load,expect_ref[Raw].load[0:pload_len])
+        elif expect_ref.haslayer(ICMP):
+            #Check that we got an echo request back
+            res.check("Contains ICMP Echo Request",pkt.haslayer(ICMPv6EchoRequest))
+            #Bail so we don't get derefrence errors
+            if res.has_fail:
+                return res
+            res.compare("ID",pkt[ICMPv6EchoRequest].id,expect_ref[ICMP].id)
+            res.compare("Seq",pkt[ICMPv6EchoRequest].seq,expect_ref[ICMP].seq)
+    return res
+
 #############################################
 # IPv4 -> IPv6 (RFC 7915 4.1)
 #############################################
@@ -300,10 +373,25 @@ def sec_4_1():
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=69,len=128+20,ttl=127) / Raw(expect_data)
     test.send_and_check(expect_ref,ip6_val, "NH High")
     expect_data = randbytes(128)
+
     # This case is a nh which is not valid for IPv4
-    # However, the translator is not required to check this, so it passes through
+    # However, the translator is not required to check this
+    # Despite that, we will check for it anyway, since it is a * bad idea * 
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=0,len=128+20,ttl=255) / Raw(expect_data)
+    test.send_and_none(expect_ref, "NH v6-only Hop By Hop")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=43,len=128+20,ttl=255) / Raw(expect_data)
+    test.send_and_none(expect_ref, "NH v6-only Routing")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=44,len=128+20,ttl=255) / Raw(expect_data)
+    test.send_and_none(expect_ref, "NH v6-only Fragment")
+    expect_data = randbytes(128)
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=58,len=128+20,ttl=255) / Raw(expect_data)
-    test.send_and_check(expect_ref,ip6_val, "NH Overlaps with IPv6")
+    test.send_and_none(expect_ref, "NH v6-only ICMPv6")
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=60,len=128+20,ttl=255) / Raw(expect_data)
+    test.send_and_none(expect_ref, "NH v6-only Dest Options")
 
 
     # IPv4 invalid checksum should be silently dropped
@@ -754,16 +842,97 @@ def sec_4_2_rfc4884():
 #############################################
 def sec_4_3():
     global test
-    
+    global expect_class
+    global expect_sa
+    global expect_da
+    global expect_sa2
+    global expect_da2
+    global expect_ref
+    global expect_type
+    global expect_code
+    global expect_data 
+
     # Setup config for this section
     test.tayga_conf.default()
     test.reload()
     
-    # One Nested Header
-    test.tfail("One Nested Header","Not Implemented")
+    # Nested header is arbitrary
+    expect_class = ICMPv6DestUnreach()
+    expect_sa = test.public_ipv4_xlate
+    expect_da = test.public_ipv6
+    expect_sa2 = test.public_ipv6
+    expect_da2 = test.public_ipv4_xlate
+    expect_type = 1
+    expect_code = 0
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=16,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_check(send_pkt,ip6_nest_val, "Nested Header Data")
 
-    # Two Nested Headers
-    test.tfail("Two Nested Headers","Not Implemented")
+    # Invalid SA
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str("127.0.0.1"),proto=16,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header Invalid SA")
+
+    # Invalid DA
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str("127.0.0.1"),src=str(test.public_ipv6_xlate),proto=16,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header Invalid DA")
+
+    # Zero Plen
+    expect_data = None
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=16,len=20,ttl=64)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_check(send_pkt,ip6_nest_val, "Nested Header Zero Plen")
+
+    # Zero Next Header (Hop By Hop)
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=0,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header NH Hop By Hop")
+    
+    # Routing header
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=43,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header NH Routing")
+
+    # Fragment header
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=44,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header NH Fragment")
+
+    # ICMPv6
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=58,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header NH ICMPv6")
+
+    # Dest Opts header
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),proto=60,len=128+20,ttl=64) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header NH Dest Opts")
+
+    # Nested header is a protocol that needs a checksum adjustment
+    expect_data = randbytes(128)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),len=128+20+8,ttl=64) / UDP(sport=6969,dport=9696) / Raw(expect_data)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_check(send_pkt,ip6_nest_val, "Nested Header UDP")
+
+    # Nested header is ICMP Echo Request
+    expect_data = None
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),ttl=64,len=28) / ICMP(type=8,code=0,id=22,seq=9)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_check(send_pkt,ip6_nest_val, "Nested Header ICMP Echo")
+
+    # Nested header is ICMP Error (itself nested)
+    expect_ref = IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate),ttl=64,len=28) / ICMP(type=11,code=0) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
+    send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=1) / expect_ref
+    test.send_and_none(send_pkt, "Nested Header ICMP Error (multiple nesting)")
 
 
     test.section("ICMPv4 Inner Translation (RFC 7915 4.3)")
@@ -909,7 +1078,11 @@ def sec_5_1():
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=16,hlim=5,plen=1420) / Raw(randbytes(1420))
     test.send_and_check(expect_ref,ip_val, "TTL Small")
 
-    # ICMP translation (proto 1 / proto 58) is handled section 5.2 tests
+    # ICMP translation (proto 58) is handled section 5.2 tests
+
+    # ICMPv4 is not valid in IPv6, so it is dropped 
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),nh=1,plen=72) / Raw(randbytes(72))
+    test.send_and_none(expect_ref, "ICMPv4 Next Header")
 
     # IPv6 Hop By Hop Options
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8) / IPv6ExtHdrHopByHop(nh=16) / Raw(randbytes(72))
