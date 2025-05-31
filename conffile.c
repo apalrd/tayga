@@ -28,18 +28,18 @@ static int parse_prefix(int af, const char *src, void *prefix, int *prefix_len)
 
 	p = strchr(src, '/');
 	if (!p)
-		return -1;
+		return ERROR_REJECT;
 	*p = 0;
 	a = strtol(p + 1, &end, 10);
 	r = *end || !inet_pton(af, src, prefix);
 	*p = '/';
 	if (r)
-		return -1;
+		return ERROR_REJECT;
 	if (a < 0 || a > (af == AF_INET6 ? 128 : 32))
-		return -1;
+		return ERROR_REJECT;
 
 	*prefix_len = a;
-	return 0;
+	return ERROR_NONE;
 }
 
 static struct map_static *alloc_map_static(int ln)
@@ -112,45 +112,47 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 	exit(1);
 }
 
-static void config_ipv4_addr(int ln, int arg_count, char **args)
+static int config_ipv4_addr(int ln, int arg_count, char **args)
 {
 	if (gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: duplicate ipv4-addr directive on "
 				"line %d\n", ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (!inet_pton(AF_INET, args[0], &gcfg->local_addr4)) {
 		slog(LOG_CRIT, "Expected an IPv4 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (validate_ip4_addr(&gcfg->local_addr4) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv4-addr "
 				"directive, aborting...\n", args[0]);
-		exit(1);
+		return ERROR_REJECT;
 	}
+	return ERROR_NONE;
 }
 
-static void config_ipv6_addr(int ln, int arg_count, char **args)
+static int config_ipv6_addr(int ln, int arg_count, char **args)
 {
 	if (gcfg->local_addr6.s6_addr[0]) {
 		slog(LOG_CRIT, "Error: duplicate ipv6-addr directive on line "
 				"%d\n", ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (!inet_pton(AF_INET6, args[0], &gcfg->local_addr6)) {
 		slog(LOG_CRIT, "Expected an IPv6 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (validate_ip6_addr(&gcfg->local_addr6) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv6-addr "
 				"directive, aborting...\n", args[0]);
-		exit(1);
+		return ERROR_REJECT;
 	}
+	return ERROR_NONE;
 }
 
-static void config_prefix(int ln, int arg_count, char **args)
+static int config_prefix(int ln, int arg_count, char **args)
 {
 	struct map_static *m;
 	struct map6 *m6;
@@ -166,50 +168,68 @@ static void config_prefix(int ln, int arg_count, char **args)
 			calc_ip6_mask(&m6->mask, &m6->addr, m6->prefix_len)) {
 		slog(LOG_CRIT, "Expected an IPv6 prefix but found \"%s\" on "
 				"line %d\n", args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (validate_ip6_addr(&m6->addr) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in prefix "
 				"directive, aborting...\n", args[0]);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (m6->prefix_len != 32 && m6->prefix_len != 40 &&
 			m6->prefix_len != 48 && m6->prefix_len != 56 &&
 			m6->prefix_len != 64 && m6->prefix_len != 96) {
 		slog(LOG_CRIT, "NAT prefix length must be 32, 40, 48, 56, 64 "
 				"or 96 only, aborting...\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (insert_map4(&m->map4, NULL) < 0) {
 		slog(LOG_CRIT, "Error: duplicate prefix directive on line %d\n",
 				ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
-	if (insert_map6(&m->map6, &m6) < 0)
+	if (insert_map6(&m->map6, &m6) < 0) {
 		abort_on_conflict6("Error: NAT64 prefix", ln, m6);
+		return ERROR_REJECT;
+	}
+	return ERROR_NONE;
 }
 
-static void config_wkpf_strict(int ln, int arg_count, char **args)
+static int config_wkpf_strict(int ln, int arg_count, char **args)
 {
-	gcfg->wkpf_strict = strcmp("no",args[0]) ? 1 : 0;
+	if (!strcasecmp(args[0], "true") ||
+	    !strcasecmp(args[0], "on") ||
+	    !strcasecmp(args[0], "yes") ||
+		!strcasecmp(args[0], "1")) {
+		gcfg->wkpf_strict = 1;
+	} else if (!strcasecmp(args[0], "false") ||
+			   !strcasecmp(args[0], "off") ||
+			   !strcasecmp(args[0], "no") ||
+			   !strcasecmp(args[0], "0")) {
+		gcfg->wkpf_strict = 0;
+	} else {
+		slog(LOG_CRIT, "Error: invalid value for wkpf-strict on line %d\n",ln);
+		return ERROR_REJECT;
+	}
+	return ERROR_NONE;
 }
 
-static void config_tun_device(int ln, int arg_count, char **args)
+static int config_tun_device(int ln, int arg_count, char **args)
 {
 	if (gcfg->tundev[0]) {
 		slog(LOG_CRIT, "Error: duplicate tun-device directive on line "
 				"%d\n", ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (strlen(args[0]) + 1 > sizeof(gcfg->tundev)) {
 		slog(LOG_CRIT, "Device name \"%s\" is invalid on line %d\n",
 				args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	strcpy(gcfg->tundev, args[0]);
+	return ERROR_NONE;
 }
 
-static void config_map(int ln, int arg_count, char **args)
+static int config_map(int ln, int arg_count, char **args)
 {
 	struct map_static *m;
 	struct map4 *m4;
@@ -228,7 +248,7 @@ static void config_map(int ln, int arg_count, char **args)
 	if (!inet_pton(AF_INET, args[0], &m->map4.addr)) {
 		slog(LOG_CRIT, "Expected an IPv4 subnet but found \"%s\" on "
 		     "line %d\n", args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	m->map4.prefix_len = prefix4;
 	calc_ip4_mask(&m->map4.mask, NULL, prefix4);
@@ -243,13 +263,13 @@ static void config_map(int ln, int arg_count, char **args)
 	if ((32 - prefix4) != (128 - prefix6)) {
 		slog(LOG_CRIT, "IPv4 and IPv6 subnet must be of the same size, but found"
 				" %s and %s on line %d\n", args[0], args[1], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	if (!inet_pton(AF_INET6, args[1], &m->map6.addr)) {
 		slog(LOG_CRIT, "Expected an IPv6 subnet but found \"%s\" on "
 				"line %d\n", args[1], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	m->map6.prefix_len = prefix6;
 	calc_ip6_mask(&m->map6.mask, NULL, prefix6);
@@ -257,21 +277,22 @@ static void config_map(int ln, int arg_count, char **args)
 	if (validate_ip4_addr(&m->map4.addr) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[0]);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (validate_ip6_addr(&m->map6.addr) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[1]);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (m->map6.addr.s6_addr32[0] == WKPF &&
 	    m->map6.addr.s6_addr32[1] == 0 &&
 	    m->map6.addr.s6_addr32[2] == 0) {
+		/* This validation must happen later, since we don't know wkpf_strict yet */
 		if(gcfg->wkpf_strict)
 		{
 			slog(LOG_CRIT, "Cannot create single-host maps inside "
 					"64:ff9b::/96, aborting...\n");
-			exit(1);
+			return ERROR_REJECT;
 		}
 		else 
 		{
@@ -280,15 +301,20 @@ static void config_map(int ln, int arg_count, char **args)
 					" compliance is disabled\n");
 		}
 	}
-	if (insert_map4(&m->map4, &m4) < 0)
+	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: IPv4 address in map directive",
 				ln, m4);
-	if (insert_map6(&m->map6, &m6) < 0)
+		return ERROR_REJECT;
+	}
+	if (insert_map6(&m->map6, &m6) < 0) {
 		abort_on_conflict6("Error: IPv6 address in map directive",
 				ln, m6);
+		return ERROR_REJECT;
+	}
+	return ERROR_NONE;
 }
 
-static void config_dynamic_pool(int ln, int arg_count, char **args)
+static int config_dynamic_pool(int ln, int arg_count, char **args)
 {
 	struct dynamic_pool *pool;
 	struct map4 *m4;
@@ -296,13 +322,13 @@ static void config_dynamic_pool(int ln, int arg_count, char **args)
 	if (gcfg->dynamic_pool) {
 		slog(LOG_CRIT, "Error: duplicate dynamic-pool directive on "
 				"line %d\n", ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	pool = (struct dynamic_pool *)malloc(sizeof(struct dynamic_pool));
 	if (!pool) {
 		slog(LOG_CRIT, "Unable to allocate config memory\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 	memset(pool, 0, sizeof(struct dynamic_pool));
 	INIT_LIST_HEAD(&pool->mapped_list);
@@ -317,21 +343,23 @@ static void config_dynamic_pool(int ln, int arg_count, char **args)
 			calc_ip4_mask(&m4->mask, &m4->addr, m4->prefix_len)) {
 		slog(LOG_CRIT, "Expected an IPv4 prefix but found \"%s\" on "
 				"line %d\n", args[0], ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (validate_ip4_addr(&m4->addr) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in dynamic-pool "
 				"directive, aborting...\n", args[0]);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (m4->prefix_len > 31) {
 		slog(LOG_CRIT, "Cannot use a prefix longer than /31 in "
 			       "dynamic-pool directive, aborting...\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
-	if (insert_map4(&pool->map4, &m4) < 0)
+	if (insert_map4(&pool->map4, &m4) < 0) {
 		abort_on_conflict4("Error: IPv4 prefix in dynamic-pool "
 				"directive", ln, m4);
+		return ERROR_REJECT;
+	}
 
 	pool->free_head.addr = ntohl(m4->addr.s_addr);
 	pool->free_head.count = (1 << (32 - m4->prefix_len)) - 1;
@@ -339,23 +367,25 @@ static void config_dynamic_pool(int ln, int arg_count, char **args)
 	list_add(&pool->free_head.list, &pool->free_list);
 
 	gcfg->dynamic_pool = pool;
+	return ERROR_NONE;
 }
 
-static void config_data_dir(int ln, int arg_count, char **args)
+static int config_data_dir(int ln, int arg_count, char **args)
 {
 	if (gcfg->data_dir[0]) {
 		slog(LOG_CRIT, "Error: duplicate data-dir directive on line "
 				"%d\n", ln);
-		exit(1);
+		return ERROR_REJECT;
 	}
 	if (args[0][0] != '/') {
 		slog(LOG_CRIT, "Error: data-dir must be an absolute path\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 	strcpy(gcfg->data_dir, args[0]);
+	return ERROR_NONE;
 }
 
-static void config_strict_fh(int ln, int arg_count, char **args)
+static int config_strict_fh(int ln, int arg_count, char **args)
 {
 	if (!strcasecmp(args[0], "true") || !strcasecmp(args[0], "on") ||
 			!strcasecmp(args[0], "1")) {
@@ -366,45 +396,39 @@ static void config_strict_fh(int ln, int arg_count, char **args)
 		gcfg->lazy_frag_hdr = 1;
 	} else {
 		slog(LOG_CRIT, "Error: invalid value for strict-frag-hdr\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
+	return ERROR_NONE;
 }
 
 struct {
+	/* Long name */
 	char *name;
-	void (*config_func)(int ln, int arg_count, char **args);
+	/* Parser function */
+	int (*config_func)(int ln, int arg_count, char **args);
+	/* Required args (more are allowed) */
 	int need_args;
 } config_directives[] = {
-	{ "ipv4-addr", config_ipv4_addr, 1 },
-	{ "ipv6-addr", config_ipv6_addr, 1 },
-	{ "prefix", config_prefix, 1 },
-	{ "wkpf-strict", config_wkpf_strict, 1 },
-	{ "tun-device", config_tun_device, 1 },
-	{ "map", config_map, 2 },
-	{ "dynamic-pool", config_dynamic_pool, 1 },
-	{ "data-dir", config_data_dir, 1 },
-	{ "strict-frag-hdr", config_strict_fh, 1 },
+	{ "ipv4-addr", 		config_ipv4_addr, 	1 },
+	{ "ipv6-addr", 		config_ipv6_addr, 	1 },
+	{ "prefix", 		config_prefix, 		1 },
+	{ "wkpf-strict", 	config_wkpf_strict, 1 },
+	{ "tun-device", 	config_tun_device, 	1 },
+	{ "map", 			config_map, 		2 },
+	{ "dynamic-pool", 	config_dynamic_pool,1 },
+	{ "data-dir", 		config_data_dir, 	1 },
+	{ "strict-frag-hdr",config_strict_fh, 	1 },
 	{ NULL, NULL, 0 }
 };
 
-void read_config(char *conffile)
+void config_init(void)
 {
-	FILE *in;
-	int ln = 0;
-	char line[512];
-	char addrbuf[128];
-	char *c, *tokptr;
-#define MAX_ARGS 10
-	char *args[MAX_ARGS];
-	int arg_count;
-	int i;
-	struct map_static *m;
-	struct map4 *m4;
-	struct map6 *m6;
-
+	/* Initialize configuration structure to defaults */
 	gcfg = (struct config *)malloc(sizeof(struct config));
-	if (!gcfg)
-		goto malloc_fail;
+	if (!gcfg) {
+		slog(LOG_CRIT, "Unable to allocate config memory\n");
+		exit(1);
+	}
 	memset(gcfg, 0, sizeof(struct config));
 	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi);
 	INIT_LIST_HEAD(&gcfg->map4_list);
@@ -419,19 +443,36 @@ void read_config(char *conffile)
 	INIT_LIST_HEAD(&gcfg->cache_pool);
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
+}
 
+void config_read(char *conffile)
+{
+	FILE *in;
+	int ln = 0;
+	char line[512];
+	char *c, *tokptr;
+#define MAX_ARGS 10
+	char *args[MAX_ARGS];
+	int arg_count;
+	int i;
+
+	/* Has conf file failed validation, should we exit? */
+	int willexit = 0;
+
+	/* Read in conf file */
 	in = fopen(conffile, "r");
 	if (!in) {
 		slog(LOG_CRIT, "unable to open %s, aborting: %s\n", conffile,
 				strerror(errno));
 		exit(1);
 	}
+	/* Parse each line of conf file */
 	while (fgets(line, sizeof(line), in)) {
 		++ln;
 		if (strlen(line) + 1 == sizeof(line)) {
-			slog(LOG_CRIT, "Line %d of %s is too long, "
-					"aborting...\n", ln, conffile);
-			exit(1);
+			slog(LOG_CRIT, "Line %d of %s is too long\n", ln, conffile);
+			willexit = 1;
+			continue;
 		}
 		arg_count = 0;
 		for (;;) {
@@ -439,9 +480,10 @@ void read_config(char *conffile)
 			if (!c || *c == '#')
 				break;
 			if (arg_count == MAX_ARGS) {
-				slog(LOG_CRIT, "Line %d of %s is too long, "
-						"aborting...\n", ln, conffile);
-				exit(1);
+				slog(LOG_CRIT, "Line %d of %s has too many tokens, "
+					"aborting\n", ln, conffile);
+				willexit = 1;
+				break;
 			}
 			args[arg_count++] = c;
 		}
@@ -452,21 +494,35 @@ void read_config(char *conffile)
 				break;
 		if (!config_directives[i].name) {
 			slog(LOG_CRIT, "Unknown directive \"%s\" on line %d of "
-					"%s, aborting...\n", args[0],
+					"%s\n", args[0],
 					ln, conffile);
-			exit(1);
+			willexit = 1;
+			continue;
 		}
 		--arg_count;
 		if (config_directives[i].need_args >= 0 &&
 				arg_count != config_directives[i].need_args) {
 			slog(LOG_CRIT, "Incorrect number of arguments on "
 					"line %d\n", ln);
-			exit(1);
+			willexit = 1;
+			continue;
 		}
-		config_directives[i].config_func(ln, arg_count, &args[1]);
+		willexit |= config_directives[i].config_func(ln, arg_count, &args[1]);
 	}
 	fclose(in);
 
+	/* At this point, exit if we had parsing errors */
+	if(willexit) exit(1);
+}
+
+void config_validate(void)
+{
+	struct map_static *m;
+	struct map4 *m4;
+	struct map6 *m6;
+	char addrbuf[128];
+
+	/* Now, validate the inputs */
 	if (list_empty(&gcfg->map6_list)) {
 		slog(LOG_CRIT, "Error: no translation maps or NAT64 prefix "
 				"configured\n");
@@ -539,15 +595,4 @@ void read_config(char *conffile)
 		exit(1);
 	}
 	return;
-
-malloc_fail:
-	slog(LOG_CRIT, "Unable to allocate config memory\n");
-	exit(1);
 }
-
-/*
-Local Variables:
-c-basic-offset: 8
-indent-tabs-mode: t
-End:
-*/

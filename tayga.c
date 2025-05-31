@@ -371,28 +371,68 @@ static void read_from_signalfd(void)
 	}
 }
 
-void print_maps(void)
+static void print_op_info(void)
 {
 	struct list_head *entry;
 	struct map4 *s4;
 	struct map6 *s6;
-	char temp[64],temp2[64];
+	struct map6 *m6;
+	char addrbuf[64],addrbuf2[64];
+
+	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
+	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
+	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
+	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
+	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+	if (m6->type == MAP_TYPE_RFC6052) {
+		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
+		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
+				addrbuf, m6->prefix_len);
+		if (m6->addr.s6_addr32[0] == WKPF 
+			&& !m6->addr.s6_addr32[1]
+			&& !m6->addr.s6_addr32[2]
+			&& gcfg->wkpf_strict)
+			slog(LOG_INFO, "Note: traffic between IPv6 hosts and "
+					"private IPv4 addresses (i.e. to/from "
+					"64:ff9b::10.0.0.0/104, "
+					"64:ff9b::192.168.0.0/112, etc) "
+					"will be dropped.  Use a translation "
+					"prefix within your organization's "
+					"IPv6 address space instead of "
+					"64:ff9b::/96 if you need your "
+					"IPv6 hosts to communicate with "
+					"private IPv4 addresses.\n");
+	}
+	if (gcfg->dynamic_pool) {
+		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
+				addrbuf, sizeof(addrbuf));
+		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
+				gcfg->dynamic_pool->map4.prefix_len);
+		if (gcfg->data_dir[0])
+			load_dynamic(gcfg->dynamic_pool);
+		else
+			slog(LOG_INFO, "Note: dynamically-assigned mappings "
+					"will not be saved across restarts.  "
+					"Specify data-dir in config if you would "
+					"like dynamic mappings to be "
+					"persistent.\n");
+	}
 
 	slog(LOG_DEBUG,"Map4 List:\n");
 	list_for_each(entry, &gcfg->map4_list) {
 		s4 = list_entry(entry, struct map4, list);
 
 		slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
-			inet_ntop(AF_INET,&s4->addr,temp,64),
+			inet_ntop(AF_INET,&s4->addr,addrbuf,64),
 			s4->prefix_len,s4->type,
-			inet_ntop(AF_INET,&s4->mask,temp2,64));
+			inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
 	list_for_each(entry, &gcfg->map6_list) {
 		s6 = list_entry(entry, struct map6, list);
 
 		slog(LOG_DEBUG,"Entry %s/%d type %d\n",
-			inet_ntop(AF_INET6,&s6->addr,temp,64),
+			inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
 			s6->prefix_len,s6->type);
 	}
 }
@@ -402,7 +442,6 @@ int main(int argc, char **argv)
 	int c, ret, longind;
 	int pidfd;
 	struct pollfd pollfds[2];
-	struct map6 *m6;
 	char addrbuf[INET6_ADDRSTRLEN];
 
 	char *conffile = TAYGA_CONF_PATH;
@@ -415,6 +454,9 @@ int main(int argc, char **argv)
 	int do_rmtun = 0;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
+
+	/* Init config structure */
+	config_init();
 
 	static struct option longopts[] = {
 		{ "mktun", 0, 0, 0 },
@@ -478,11 +520,18 @@ int main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Try `%s --help' for more "
-					"information.\n", argv[0]);
+					"information (got %c)\n", argv[0],c);
 			exit(1);
 		}
 	}
 
+	/* Parse config file options */
+	config_read(conffile);
+
+	/* Validate config */
+	config_validate();
+
+	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {
 		use_stdout = 1;
 		if (user) {
@@ -500,14 +549,15 @@ int main(int argc, char **argv)
 					"with mktun/rmtun operation\n");
 			exit(1);
 		}
-		read_config(conffile);
 		tun_setup(do_mktun, do_rmtun);
 		return 0;
 	}
 
+	/* Setup logging */
 	if (!use_stdout)
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
+	/* Change user */
 	if (user) {
 		pw = getpwnam(user);
 		if (!pw) {
@@ -516,6 +566,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* Change group */
 	if (group) {
 		gr = getgrnam(group);
 		if (!gr) {
@@ -525,8 +576,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	read_config(conffile);
-
+	/* Chroot */
 	if (!gcfg->data_dir[0]) {
 		if (do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
@@ -642,45 +692,8 @@ int main(int argc, char **argv)
 
 	signal_setup();
 
-	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
-	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
-	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
-	if (m6->type == MAP_TYPE_RFC6052) {
-		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
-		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
-				addrbuf, m6->prefix_len);
-		if (m6->addr.s6_addr32[0] == WKPF 
-			&& !m6->addr.s6_addr32[1]
-			&& !m6->addr.s6_addr32[2]
-			&& gcfg->wkpf_strict)
-			slog(LOG_INFO, "Note: traffic between IPv6 hosts and "
-					"private IPv4 addresses (i.e. to/from "
-					"64:ff9b::10.0.0.0/104, "
-					"64:ff9b::192.168.0.0/112, etc) "
-					"will be dropped.  Use a translation "
-					"prefix within your organization's "
-					"IPv6 address space instead of "
-					"64:ff9b::/96 if you need your "
-					"IPv6 hosts to communicate with "
-					"private IPv4 addresses.\n");
-	}
-	if (gcfg->dynamic_pool) {
-		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
-				addrbuf, sizeof(addrbuf));
-		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
-				gcfg->dynamic_pool->map4.prefix_len);
-		if (gcfg->data_dir[0])
-			load_dynamic(gcfg->dynamic_pool);
-		else
-			slog(LOG_INFO, "Note: dynamically-assigned mappings "
-					"will not be saved across restarts.  "
-					"Specify data-dir in %s if you would "
-					"like dynamic mappings to be "
-					"persistent.\n", conffile);
-	}
-	print_maps();
+	/* Print running information */
+	print_op_info();
 
 	if (gcfg->cache_size)
 		create_cache();
@@ -698,6 +711,7 @@ int main(int argc, char **argv)
 	pollfds[1].fd = gcfg->tun_fd;
 	pollfds[1].events = POLLIN;
 
+	/* Main loop */
 	for (;;) {
 		ret = poll(pollfds, 2, POOL_CHECK_INTERVAL * 1000);
 		if (ret < 0) {

@@ -335,7 +335,9 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 void addrmap_maint(void);
 
 /* conffile.c */
-void read_config(char *conffile);
+void config_init(void);
+void config_read(char *conffile);
+void config_validate(void);
 
 /* dynamic.c */
 struct map6 *assign_dynamic(const struct in6_addr *addr6);
