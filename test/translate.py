@@ -31,6 +31,8 @@ from scapy.layers.inet6 import (
 from scapy.layers.inet import (
     IPOption_Stream_Id,
     IPOption_SSRR,
+    IPerror,
+    ICMPerror,
     UDPerror
 )
 import time
@@ -307,6 +309,74 @@ def ip6_nest_val(pkt):
                 return res
             res.compare("ID",pkt[ICMPv6EchoRequest].id,expect_ref[ICMP].id)
             res.compare("Seq",pkt[ICMPv6EchoRequest].seq,expect_ref[ICMP].seq)
+    return res
+
+####
+#  Nested IPv4 Validator
+####
+def ip_nest_val(pkt):
+    res = test_result()
+    # layer 0 is LinuxTunInfo
+    res.check("Contains IPv4",isinstance(pkt.getlayer(1),IP))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Field Comparison
+    res.compare("Version",pkt[IP].version,4)
+    if expect_len >= 0:
+        res.compare("Length Outer",pkt[IP].len,expect_len)
+    #Version must be ICMP for this to be nested
+    res.compare("Proto Outer",pkt[IP].proto,1)
+    res.compare("Src Outer",pkt[IP].src,str(expect_sa))
+    res.compare("Dest Outer",pkt[IP].dst,str(expect_da))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    # Compare type/code in ICMP
+    res.compare("Type Outer",pkt.getlayer(2).type,expect_type)
+    res.compare("Code Outer",pkt.getlayer(2).code,expect_code)
+    #Check that the * next * layer is IPv4
+    res.check("Contains IPv4 Inner",pkt.haslayer(IPerror))
+    #Bail so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Inner Field Comparison
+    res.compare("Src Inner",pkt[IPerror].src,str(expect_sa2))
+    res.compare("Dest Inner",pkt[IPerror].dst,str(expect_da2))
+    # Use expect ref for comparison of inner packet
+    if expect_ref is not None: 
+        res.compare("TOS",pkt[IPerror].tos,expect_ref.tc)
+        res.compare("Length",pkt[IPerror].len,expect_ref.plen + 20)
+        if expect_ref.nh != 58:
+            res.compare("Proto",pkt[IPerror].proto,expect_ref.nh)
+        else:
+            res.compare("Proto",pkt[IPerror].proto,1)
+        res.compare("TTL",pkt[IPerror].ttl,expect_ref.hlim)
+        #Ref may contain a data payload
+        if expect_ref.haslayer(UDP):
+            res.check("Contains UDP Inner",pkt.haslayer(UDPerror))
+            #Bail so we don't get derefrence errors
+            if res.has_fail:
+                return res
+            res.compare("Inner Sport",pkt[UDPerror].sport,expect_ref[UDP].sport)
+            res.compare("Inner Dport",pkt[UDPerror].dport,expect_ref[UDP].dport)
+            # Payload will be truncated even more with UDP header
+            pload_len = len(pkt[IPerror].load)
+            res.check("Payload Length >= 128",((pload_len + 20 + 8) >= 128))
+            res.compare("Payload",pkt[IPerror].load,expect_ref[Raw].load[0:pload_len])
+        elif expect_ref.haslayer(Raw):
+            #Payload may be truncated, as long as total length is at least 128 bytes
+            pload_len = len(pkt[IPerror].load)
+            res.check("Payload Length >= 128",((pload_len + 20) >= 128))
+            res.compare("Payload",pkt[IPerror].load,expect_ref[Raw].load[0:pload_len])
+        elif expect_ref.haslayer(ICMP):
+            #Check that we got an echo request back
+            res.check("Contains ICMP in Error packet",pkt.haslayer(ICMPerror))
+            #Bail so we don't get derefrence errors
+            if res.has_fail:
+                return res
+            res.compare("ID",pkt[ICMPerror].id,expect_ref[ICMP].id)
+            res.compare("Seq",pkt[ICMPerror].seq,expect_ref[ICMP].seq)
     return res
 
 #############################################
@@ -1410,17 +1480,82 @@ def sec_5_2():
 #############################################
 def sec_5_3():
     global test
-    
+    global expect_class
+    global expect_sa
+    global expect_da
+    global expect_sa2
+    global expect_da2
+    global expect_ref
+    global expect_type
+    global expect_code
+    global expect_data 
+    global expect_id
+    global expect_seq
+
     # Setup config for this section
     test.tayga_conf.default()
     test.reload()
+    
+    # Nested header is arbitrary
+    expect_class = ICMPv6DestUnreach()
+    expect_sa = test.public_ipv6_xlate
+    expect_da = test.public_ipv4
+    expect_sa2 = test.public_ipv4
+    expect_da2 = test.public_ipv6_xlate
+    expect_id = 15
+    expect_seq = 21
+    expect_type = 3
+    expect_code = 1
+    expect_data = randbytes(128)
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),nh=16,plen=128) / Raw(expect_data)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_check(send_pkt,ip_nest_val, "Normal Translation")
 
-    # One Nested Header
-    test.tfail("One Nested Header","Not Implemented")
+    # Invalid SA
+    expect_data = randbytes(128)
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str("2001:db8::6969"),nh=16,plen=128) / Raw(expect_data)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_none(send_pkt, "Invalid SA")
 
-    # Two Nested Headers
-    test.tfail("Two Nested Headers","Not Implemented")
+    # Invalid DA
+    expect_data = randbytes(128)
+    expect_ref = IPv6(dst="2001:db8::6969",src=str(test.public_ipv4_xlate),nh=16,plen=128) / Raw(expect_data)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_none(send_pkt, "Invalid DA")
 
+    # Zero Plen
+    expect_data = None
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),nh=16,plen=0)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_check(send_pkt,ip_nest_val, "Zero Plen")
+
+    # Invalid Next Header (ICMPv4)
+    expect_data = randbytes(128)
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),nh=1,plen=128) / Raw(expect_data)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_none(send_pkt, "Invalid Proto (ICMP)")
+    
+    # Nested header is a protocol that needs a checksum adjustment
+    expect_data = randbytes(128)
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),plen=128+8) / UDP(sport=6969,dport=9696) / Raw(expect_data)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_check(send_pkt,ip_nest_val, "Normal UDP")
+
+    # Nested header is ICMP Echo Request
+    expect_data = None
+    expect_id = 69
+    expect_seq = 111
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),plen=128+8) / ICMPv6EchoRequest(seq=expect_seq,id=expect_id)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_check(send_pkt,ip_nest_val, "Normal ICMP Echo Request")
+
+    # Nested header is ICMP Error (itself nested)
+    expect_data = None
+    expect_id = -1
+    expect_seq = -1
+    expect_ref = IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate),plen=8) / ICMPv6DestUnreach(code=4)
+    send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6DestUnreach(code=3) / expect_ref
+    test.send_and_none(send_pkt, "Nested ICMP Error")
 
     test.section("ICMPv6 Inner Translation (RFC 7915 5.3)")
 #############################################
