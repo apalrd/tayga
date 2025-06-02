@@ -1087,8 +1087,12 @@ def sec_4_5():
     # UDP Header w/ checksum
     test.tfail("UDP Header w/ checksum","Not Implemented")
 
-    # UDP Header w/o checksum
-    test.tfail("UDP Header w/o checksum","Not Implemented")
+    # UDP Header w/o checksum w/ drop behavior
+    test.tfail("UDP Header w/o checksum, drop","Not Implemented")
+    # UDP Header w/o checksum w/ forward behavior
+    test.tfail("UDP Header w/o checksum, forward","Not Implemented")
+    # UDP Header w/o checksum w/ calculate behavior
+    test.tfail("UDP Header w/o checksum, calculate","Not Implemented")
 
     # ICMP Header
     test.tfail("ICMP Header","Not Implemented")
@@ -1659,8 +1663,12 @@ def sec_5_5():
     # UDP Header w/ checksum
     test.tfail("UDP Header w/ checksum","Not Implemented")
 
-    # UDP Header w/o checksum
-    test.tfail("UDP Header w/o checksum","Not Implemented")
+    # UDP Header w/o checksum w/ drop behavior
+    test.tfail("UDP Header w/o checksum, drop","Not Implemented")
+    # UDP Header w/o checksum w/ forward behavior
+    test.tfail("UDP Header w/o checksum, forward","Not Implemented")
+    # UDP Header w/o checksum w/ calculate behavior
+    test.tfail("UDP Header w/o checksum, calculate","Not Implemented")
 
     # ICMP Header
     test.tfail("ICMP Header","Not Implemented")
