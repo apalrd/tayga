@@ -2,7 +2,7 @@
 FROM alpine:latest AS build-env
 
 # Install build tools
-RUN apk add --no-cache g++ make linux-headers
+RUN apk add --no-cache g++ make linux-headers git binutils
 
 # Set working directory
 WORKDIR /app
@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy source code into the container
 COPY ./ ./
 
-# Build the code
-RUN ./configure && make
+# Build the code statically
+RUN make static
 
 # Stage 2: Final image
 FROM alpine:latest

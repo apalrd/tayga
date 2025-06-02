@@ -56,6 +56,8 @@ fi
 
 # Make tunnel adapter
 echo "Creating tunnel adapter"
+ls -lan /dev/net
+whoami
 /app/tayga -c /app/tayga.conf -d --mktun || exit 1
 
 # Bring up the interface

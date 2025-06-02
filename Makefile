@@ -2,7 +2,7 @@
 
 CC := gcc
 CFLAGS := -Wall -O2
-LDFLAGS := 
+LDFLAGS := -flto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga
 TARGET-COV := $(TARGET)-cov
@@ -24,7 +24,10 @@ tayga.d: $(SOURCES) version.h Makefile
 
 # Build targets
 $(TARGET): $(SOURCES) tayga.d
-	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) -flto
+	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
+
+static: $(SOURCES) tayga.d
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS) -static
 
 $(TARGET-COV): $(TARGET)
 	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage -DCOVERAGE_TESTING
