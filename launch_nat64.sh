@@ -1,7 +1,6 @@
-## Launch Tayga to perform NAT64 in a container
+## Launch Tayga within a container
 
 # Default environment variables
-TAYGA_POOL4="${TAYGA_POOL4:-192.168.255.0/24}"
 TAYGA_POOL6="${TAYGA_POOL6:-64:ff9b::/96}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
 
@@ -26,6 +25,13 @@ if [[ -z "${TAYGA_ADDR6}" ]]; then
     echo Using Container Addr6 $TAYGA_ADDR6
 fi
 
+# If Pool4 is defined, then create a dynamic-pool entry
+# Otherwise, do not
+if [[ -n "${TAYGA_POOL4}" ]]; then
+    DYNPOOL = "dynamic-pool ${TAYGA_POOL4}"
+fi
+
+
 # Generate tayga.conf file
 cat << EOF > /app/tayga.conf.gen
 # tayga.conf
@@ -34,7 +40,7 @@ cat << EOF > /app/tayga.conf.gen
 tun-device nat64
 ipv4-addr ${TAYGA_ADDR4}
 prefix ${TAYGA_POOL6}
-dynamic-pool ${TAYGA_POOL4}
+${DYNPOOL}
 ipv6-addr ${TAYGA_ADDR6}
 data-dir /var/tayga
 wkpf-strict ${TAYGA_WKPF_STRICT}
@@ -50,13 +56,15 @@ fi
 
 # Make tunnel adapter
 echo "Creating tunnel adapter"
-./tayga-cov -c /app/tayga.conf -d --mktun || exit 1
+/app/tayga -c /app/tayga.conf -d --mktun || exit 1
 
 # Bring up the interface
 echo "Bringing up the interface"
 ip link set dev nat64 up
-ip addr add ${TAYGA_POOL4} dev nat64
-ip addr add ${TAYGA_POOL6} dev nat64
+if [[ -n "${TAYGA_POOL4}" ]]; then
+    ip route add ${TAYGA_POOL4} dev nat64
+fi
+ip route add ${TAYGA_POOL6} dev nat64
 
 # Enable Forwarding
 echo "Enabling IPv4 and IPv6 forwarding"
@@ -65,7 +73,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 
 # Start tayga
 echo "Starting tayga"
-./tayga-cov -c /app/tayga.conf -d
+/app/tayga -c /app/tayga.conf -d
 
 # Delete tunnel adapter on exit
 echo "Deleting tunnel adapter on exit"
