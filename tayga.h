@@ -17,6 +17,8 @@
  */
 
 #include <stdio.h>
+#include <assert.h>
+#include <stdalign.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -111,7 +113,10 @@ struct ip4 {
 	uint16_t cksum;
 	struct in_addr src;
 	struct in_addr dest;
-} __attribute__ ((__packed__));
+};
+
+static_assert(alignof(struct ip4) <= 4);
+static_assert(sizeof(struct ip4) == 20);
 
 #define IP4_F_DF	0x4000
 #define IP4_F_MF	0x2000
@@ -124,14 +129,20 @@ struct ip6 {
 	uint8_t hop_limit;
 	struct in6_addr src;
 	struct in6_addr dest;
-} __attribute__ ((__packed__));
+};
+
+static_assert(alignof(struct ip6) <= 4);
+static_assert(sizeof(struct ip6) == 40);
 
 struct ip6_frag {
 	uint8_t next_header;
 	uint8_t reserved;
 	uint16_t offset_flags; /* 15-3: frag offset, 2-0: flags */
 	uint32_t ident;
-} __attribute__ ((__packed__));
+};
+
+static_assert(alignof(struct ip6_frag) <= 4);
+static_assert(sizeof(struct ip6_frag) == 8);
 
 #define IP6_F_MF	0x0001
 #define IP6_F_MASK	0xfff8
@@ -141,7 +152,10 @@ struct icmp {
 	uint8_t code;
 	uint16_t cksum;
 	uint32_t word;
-} __attribute__ ((__packed__));
+};
+
+static_assert(alignof(struct icmp) <= 4);
+static_assert(sizeof(struct icmp) == 8);
 
 #define	WKPF	(htonl(0x0064ff9b))
 
@@ -169,6 +183,10 @@ struct pkt {
 	uint32_t data_len;
 	uint32_t header_len; /* inc IP hdr for v4 but excl IP hdr for v6 */
 };
+
+// Ensure that the data field has enough alignment for ip4 and ip6 structs
+static_assert((offsetof(struct pkt, data) & (alignof(struct ip4) - 1)) == 0);
+static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0);
 
 /// Type of mapping in mapping list
 enum {

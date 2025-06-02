@@ -236,7 +236,7 @@ static void xlate_4to6_data(struct pkt *p)
 		struct tun_pi pi;
 		struct ip6 ip6;
 		struct ip6_frag ip6_frag;
-	} __attribute__ ((__packed__)) header;
+	} header;
 	struct cache_entry *src = NULL, *dest = NULL;
 	struct iovec iov[2];
 	int no_frag_hdr = 0;
@@ -424,7 +424,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		struct ip6 ip6;
 		struct icmp icmp;
 		struct ip6 ip6_em;
-	} __attribute__ ((__packed__)) header;
+	} header;
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
@@ -637,7 +637,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 		struct tun_pi pi;
 		struct ip6 ip6;
 		struct icmp icmp;
-	} __attribute__ ((__packed__)) header;
+	} header;
 	struct iovec iov[2];
 
 	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
@@ -802,7 +802,7 @@ static void xlate_6to4_data(struct pkt *p)
 	struct {
 		struct tun_pi pi;
 		struct ip4 ip4;
-	} __attribute__ ((__packed__)) header;
+	} header;
 	struct cache_entry *src = NULL, *dest = NULL;
 	int ret;
 	struct iovec iov[2];
@@ -948,7 +948,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		struct ip4 ip4;
 		struct icmp icmp;
 		struct ip4 ip4_em;
-	} __attribute__ ((__packed__)) header;
+	} header;
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
