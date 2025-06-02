@@ -18,6 +18,14 @@
 
 #include "tayga.h"
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+#  define BIG_LITTLE(x, y) (x)
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#  define BIG_LITTLE(x, y) (y)
+#else
+# error Unsupported byte order
+#endif
+
 extern struct config *gcfg;
 extern time_t now;
 
@@ -404,61 +412,43 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		return ERROR_NONE;
 	case 40:
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr >> 8);
-		addr6->s6_addr32[2] = (addr4->s_addr << 16) & 0x00ff0000;
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr << 8);
-		addr6->s6_addr32[2] = (addr4->s_addr >> 16) & 0x0000ff00;
-# endif
-#endif
+        addr6->s6_addr32[1] = BIG_LITTLE(
+                prefix->s6_addr32[1] | (addr4->s_addr >> 8),
+                prefix->s6_addr32[1] | (addr4->s_addr << 8));
+        addr6->s6_addr32[2] = BIG_LITTLE(
+                (addr4->s_addr << 16) & 0x00ff0000,
+                (addr4->s_addr >> 16) & 0x0000ff00);
 		addr6->s6_addr32[3] = 0;
 		return ERROR_NONE;
 	case 48:
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr >> 16);
-		addr6->s6_addr32[2] = (addr4->s_addr << 8) & 0x00ffff00;
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr << 16);
-		addr6->s6_addr32[2] = (addr4->s_addr >> 8) & 0x00ffff00;
-# endif
-#endif
+		addr6->s6_addr32[1] = BIG_LITTLE(
+                prefix->s6_addr32[1] | (addr4->s_addr >> 16),
+                prefix->s6_addr32[1] | (addr4->s_addr << 16));
+		addr6->s6_addr32[2] = BIG_LITTLE(
+                (addr4->s_addr << 8) & 0x00ffff00,
+                (addr4->s_addr >> 8) & 0x00ffff00);
 		addr6->s6_addr32[3] = 0;
 		return ERROR_NONE;
 	case 56:
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr >> 24);
-		addr6->s6_addr32[2] = addr4->s_addr & 0x00ffffff;
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr6->s6_addr32[1] = prefix->s6_addr32[1] |
-					(addr4->s_addr << 24);
-		addr6->s6_addr32[2] = addr4->s_addr & 0xffffff00;
-# endif
-#endif
+		addr6->s6_addr32[1] = BIG_LITTLE(
+                prefix->s6_addr32[1] | (addr4->s_addr >> 24),
+                prefix->s6_addr32[1] | (addr4->s_addr << 24));
+		addr6->s6_addr32[2] = BIG_LITTLE(
+                addr4->s_addr & 0x00ffffff,
+                addr4->s_addr & 0xffffff00);
 		addr6->s6_addr32[3] = 0;
 		return ERROR_NONE;
 	case 64:
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
 		addr6->s6_addr32[1] = prefix->s6_addr32[1];
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr6->s6_addr32[2] = addr4->s_addr >> 8;
-		addr6->s6_addr32[3] = addr4->s_addr << 24;
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr6->s6_addr32[2] = addr4->s_addr << 8;
-		addr6->s6_addr32[3] = addr4->s_addr >> 24;
-# endif
-#endif
+		addr6->s6_addr32[2] = BIG_LITTLE(
+                addr4->s_addr >> 8,
+                addr4->s_addr << 8);
+		addr6->s6_addr32[3] = BIG_LITTLE(
+                addr4->s_addr << 24,
+                addr4->s_addr >> 24);
 		return ERROR_NONE;
 	case 96:
 		//Do not allow translation of well-known prefix
@@ -577,55 +567,32 @@ static int extract_from_prefix(struct in_addr *addr4,
 		if (addr6->s6_addr32[2] & htonl(0xff00ffff) ||
 				addr6->s6_addr32[3])
 			return ERROR_DROP;
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr4->s_addr = (addr6->s6_addr32[1] << 8) | addr6->s6_addr[9];
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr4->s_addr = (addr6->s6_addr32[1] >> 8) |
-				(addr6->s6_addr32[2] << 16);
-# endif
-#endif
+		addr4->s_addr = BIG_LITTLE(
+                (addr6->s6_addr32[1] << 8) | addr6->s6_addr[9],
+                (addr6->s6_addr32[1] >> 8) | (addr6->s6_addr32[2] << 16));
 		break;
 	case 48:
 		if (addr6->s6_addr32[2] & htonl(0xff0000ff) ||
 				addr6->s6_addr32[3])
 			return ERROR_DROP;
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr4->s_addr = (addr6->s6_addr16[3] << 16) |
-				(addr6->s6_addr32[2] >> 8);
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr4->s_addr = addr6->s6_addr16[3] |
-				(addr6->s6_addr32[2] << 8);
-# endif
-#endif
+		addr4->s_addr = BIG_LITTLE(
+            (addr6->s6_addr16[3] << 16) | (addr6->s6_addr32[2] >> 8),
+            (addr6->s6_addr16[3]      ) | (addr6->s6_addr32[2] << 8));
 		break;
 	case 56:
 		if (addr6->s6_addr[8] || addr6->s6_addr32[3])
 			return ERROR_DROP;
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr4->s_addr = (addr6->s6_addr[7] << 24) |
-				addr6->s6_addr32[2];
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr4->s_addr = addr6->s6_addr[7] |
-				addr6->s6_addr32[2];
-# endif
-#endif
+		addr4->s_addr = BIG_LITTLE(
+                (addr6->s6_addr[7] << 24) | addr6->s6_addr32[2],
+		        addr6->s6_addr[7] | addr6->s6_addr32[2]);
 		break;
 	case 64:
 		if (addr6->s6_addr[8] ||
 				addr6->s6_addr32[3] & htonl(0x00ffffff))
 			return ERROR_DROP;
-#if __BYTE_ORDER == __BIG_ENDIAN
-		addr4->s_addr = (addr6->s6_addr32[2] << 8) |
-				addr6->s6_addr[12];
-#else
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-		addr4->s_addr = (addr6->s6_addr32[2] >> 8) |
-				(addr6->s6_addr32[3] << 24);
-# endif
-#endif
+		addr4->s_addr = BIG_LITTLE(
+                (addr6->s6_addr32[2] << 8) | addr6->s6_addr[12],
+		        (addr6->s6_addr32[2] >> 8) | (addr6->s6_addr32[3] << 24));
 		break;
 	case 96:
 		addr4->s_addr = addr6->s6_addr32[3];
