@@ -18,6 +18,44 @@
 
 #include "tayga.h"
 
+/* Protocol headers */
+struct ip6_data {
+    struct tun_pi pi;
+    struct ip6 ip6;
+    struct ip6_frag ip6_frag;
+};
+
+struct ip6_icmp {
+    struct tun_pi pi;
+    struct ip6 ip6;
+    struct icmp icmp;
+};
+
+struct ip6_error {
+    struct tun_pi pi;
+    struct ip6 ip6;
+    struct icmp icmp;
+    struct ip6 ip6_em;
+};
+
+struct ip4_data {
+    struct tun_pi pi;
+    struct ip4 ip4;
+};
+
+struct ip4_icmp {
+    struct tun_pi pi;
+    struct ip4 ip4;
+    struct icmp icmp;
+};
+
+struct ip4_error {
+    struct tun_pi pi;
+    struct ip4 ip4;
+    struct icmp icmp;
+    struct ip4 ip4_em;
+};
+
 extern struct config *gcfg;
 
 static uint16_t ip_checksum(void *d, int c)
@@ -91,11 +129,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 		struct in_addr *dest, struct icmp *icmp,
 		uint8_t *data, int data_len)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip4 ip4;
-		struct icmp icmp;
-	} __attribute__ ((__packed__)) header;
+	struct ip4_icmp header;
 	struct iovec iov[2];
 
 	TUN_SET_PROTO(&header.pi,  ETH_P_IP);
@@ -232,11 +266,7 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6)
 
 static void xlate_4to6_data(struct pkt *p)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip6 ip6;
-		struct ip6_frag ip6_frag;
-	} header;
+	struct ip6_data header;
 	struct cache_entry *src = NULL, *dest = NULL;
 	struct iovec iov[2];
 	int no_frag_hdr = 0;
@@ -419,12 +449,7 @@ static unsigned int est_mtu(unsigned int too_big)
 
 static void xlate_4to6_icmp_error(struct pkt *p)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip6 ip6;
-		struct icmp icmp;
-		struct ip6 ip6_em;
-	} header;
+	struct ip6_error header;
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
@@ -633,11 +658,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 		struct in6_addr *dest, struct icmp *icmp,
 		uint8_t *data, int data_len)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip6 ip6;
-		struct icmp icmp;
-	} header;
+	struct ip6_icmp header;
 	struct iovec iov[2];
 
 	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
@@ -799,10 +820,7 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4)
 
 static void xlate_6to4_data(struct pkt *p)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip4 ip4;
-	} header;
+	struct ip4_data header;
 	struct cache_entry *src = NULL, *dest = NULL;
 	int ret;
 	struct iovec iov[2];
@@ -943,12 +961,7 @@ static int parse_ip6(struct pkt *p)
 
 static void xlate_6to4_icmp_error(struct pkt *p)
 {
-	struct {
-		struct tun_pi pi;
-		struct ip4 ip4;
-		struct icmp icmp;
-		struct ip4 ip4_em;
-	} header;
+	struct ip4_error header;
 	struct iovec iov[2];
 	struct pkt p_em;
 	uint32_t mtu;
