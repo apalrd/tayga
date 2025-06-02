@@ -174,10 +174,12 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6)
 	uint16_t *tck;
 	uint16_t cksum;
 
+	/* Do not adjust fragment packets */
 	if (p->ip4->flags_offset & htons(IP4_F_MASK))
-		return 0;
+		return ERROR_NONE;
 
 	switch (p->data_proto) {
+	/* ICMPv4 */
 	case 1:
 		cksum = ip6_checksum(ip6, htons(p->ip4->length) -
 						p->header_len, 58);
@@ -189,24 +191,43 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6)
 			p->icmp->type = 129;
 			p->icmp->cksum = ones_add(cksum, ~(129 - 0));
 		}
-		return 0;
+		return ERROR_NONE;
+	/* UDP */
 	case 17:
 		if (p->data_len < 8)
 			return -1;
 		tck = (uint16_t *)(p->data + 6);
-		if (!*tck)
-			return -1; /* drop UDP packets with no checksum */
+		if (!*tck) {
+			/* UDP packet has no checksum, how do we deal? */
+			switch(gcfg->udp_cksum_mode) {
+			default:
+			case UDP_CKSUM_DROP:
+				/* Do not handle zero checksum packets */
+				return ERROR_DROP;
+			case UDP_CKSUM_FWD:
+				/* Ignore the lack of checksum and forward anyway */
+				return ERROR_NONE;
+			case UDP_CKSUM_CALC:
+				/* Calculate a real UDP checksum, now */
+				*tck = ones_add(ip_checksum(p->data,p->data_len), /* Body */
+								ip6_checksum(ip6,p->data_len,17));/* IP6 header */
+				return ERROR_NONE;
+			}
+		}
 		break;
+	/* TCP */
 	case 6:
 		if (p->data_len < 20)
 			return -1;
 		tck = (uint16_t *)(p->data + 16);
 		break;
+	/* Any other protocol */
 	default:
-		return 0;
+		return ERROR_NONE;
 	}
+	/* Calculate checksum adjustment */
 	*tck = ones_add(*tck, ~convert_cksum(ip6, p->ip4));
-	return 0;
+	return ERROR_NONE;
 }
 
 static void xlate_4to6_data(struct pkt *p)
@@ -720,10 +741,12 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4)
 	uint16_t *tck;
 	uint16_t cksum;
 
+	/* Do not adjust fragments */
 	if (p->ip6_frag && (p->ip6_frag->offset_flags & ntohs(IP6_F_MASK)))
-		return 0;
+		return ERROR_NONE;
 
 	switch (p->data_proto) {
+	/* ICMPv6 */
 	case 58:
 		cksum = ~ip6_checksum(p->ip6, htons(p->ip6->payload_length) -
 							p->header_len, 58);
@@ -735,24 +758,43 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4)
 			p->icmp->type = 0;
 			p->icmp->cksum = ones_add(cksum, 129 - 0);
 		}
-		return 0;
+		return ERROR_NONE;
+	/* UDP */
 	case 17:
 		if (p->data_len < 8)
-			return -1;
+			return ERROR_DROP;
 		tck = (uint16_t *)(p->data + 6);
-		if (!*tck)
-			return -1; /* drop UDP packets with no checksum */
+		if (!*tck) {
+			/* UDP packet has no checksum, how do we deal? */
+			switch(gcfg->udp_cksum_mode) {
+			default:
+			case UDP_CKSUM_DROP:
+				/* Do not handle zero checksum packets */
+				return ERROR_DROP;
+			case UDP_CKSUM_FWD:
+				/* Ignore the lack of checksum and forward anyway */
+				return ERROR_NONE;
+			case UDP_CKSUM_CALC:
+				/* Calculate a real UDP checksum, now */
+				*tck = ones_add(ip_checksum(p->data,p->data_len), /* Body */
+								ip_checksum(ip4,20));			  /* IP4 header */
+				return ERROR_NONE;
+			}
+		}
 		break;
+	/* TCP */
 	case 6:
 		if (p->data_len < 20)
-			return -1;
+			return ERROR_DROP;
 		tck = (uint16_t *)(p->data + 16);
 		break;
+	/* Other */
 	default:
-		return 0;
+		return ERROR_NONE;
 	}
+	/* Adjust checksum */
 	*tck = ones_add(*tck, convert_cksum(p->ip6, ip4));
-	return 0;
+	return ERROR_NONE;
 }
 
 static void xlate_6to4_data(struct pkt *p)

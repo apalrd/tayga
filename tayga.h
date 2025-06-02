@@ -248,6 +248,13 @@ enum {
 	CACHE_F_REP_AGEOUT	= (1<<3),
 };
 
+/// UDP Checksum options
+enum udp_cksum_mode {
+	UDP_CKSUM_DROP,
+	UDP_CKSUM_CALC,
+	UDP_CKSUM_FWD
+};
+
 /// Configuration structure
 struct config {
 	char tundev[IFNAMSIZ];
@@ -284,6 +291,8 @@ struct config {
 	int map_write_pending;
 
 	int wkpf_strict;
+
+	enum udp_cksum_mode udp_cksum_mode;
 };
 
 /// Packet error codes

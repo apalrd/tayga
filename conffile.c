@@ -213,6 +213,25 @@ static int config_wkpf_strict(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_udp_cksum_mode(int ln, int arg_count, char **args)
+{
+	/* Drop, or some variant of that */
+	if (!strncasecmp(args[0], "dr",2)){
+		gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	/* Calculate, or some variant of that */
+	} else if (!strncasecmp(args[0], "calc",4)) {
+		gcfg->udp_cksum_mode = UDP_CKSUM_CALC;
+	} else if(!strncasecmp(args[0],"forw",4) ||
+		      !strncasecmp(args[0],"fwd",3)) {
+		gcfg->udp_cksum_mode = UDP_CKSUM_FWD;
+	} else {
+		slog(LOG_CRIT, "Error: invalid value for udp-cksum-mode on line %d\n",ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_DEBUG,"Got valid udp-cksum-mode of %d\n",gcfg->udp_cksum_mode);
+	return ERROR_NONE;
+}
+
 static int config_tun_device(int ln, int arg_count, char **args)
 {
 	if (gcfg->tundev[0]) {
@@ -409,15 +428,16 @@ struct {
 	/* Required args (more are allowed) */
 	int need_args;
 } config_directives[] = {
-	{ "ipv4-addr", 		config_ipv4_addr, 	1 },
-	{ "ipv6-addr", 		config_ipv6_addr, 	1 },
-	{ "prefix", 		config_prefix, 		1 },
-	{ "wkpf-strict", 	config_wkpf_strict, 1 },
-	{ "tun-device", 	config_tun_device, 	1 },
-	{ "map", 			config_map, 		2 },
-	{ "dynamic-pool", 	config_dynamic_pool,1 },
-	{ "data-dir", 		config_data_dir, 	1 },
-	{ "strict-frag-hdr",config_strict_fh, 	1 },
+	{ "ipv4-addr", 		config_ipv4_addr, 		1 },
+	{ "ipv6-addr", 		config_ipv6_addr, 		1 },
+	{ "prefix", 		config_prefix, 			1 },
+	{ "wkpf-strict", 	config_wkpf_strict, 	1 },
+	{ "udp-cksum-mode", config_udp_cksum_mode, 	1 },
+	{ "tun-device", 	config_tun_device, 		1 },
+	{ "map", 			config_map, 			2 },
+	{ "dynamic-pool", 	config_dynamic_pool,	1 },
+	{ "data-dir", 		config_data_dir, 		1 },
+	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ NULL, NULL, 0 }
 };
 
@@ -443,6 +463,7 @@ void config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_pool);
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
+	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
 }
 
 void config_read(char *conffile)
