@@ -16,3 +16,5 @@ latex/*
 version.h
 .vscode/*
 callgrind*
+unit-mapping
+unit-dynamic

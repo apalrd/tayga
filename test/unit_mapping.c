@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 
     /* Insert an entry at the beginning */
     uut.addr4.s_addr = 0;
-    uut.prefix_len4 = 0;
+    uut.prefix_len4 = 1;
     uut.addr6.s6_addr32[0] = htonl(0x0064ff9b);
     uut.prefix_len6 = 96;
     uut.type = MAP_TYPE_RFC6052;
@@ -103,6 +103,27 @@ int main(int argc, char **argv) {
     expect(!map_insert(&uut),"Insert Different V4/V6 Map");
 
     
+    /* Insert a very long prefix */
+    uut.addr4.s_addr = htonl(0x0c000000);
+    uut.prefix_len4 = 8;
+    uut.addr6.s6_addr32[0] = htonl(0x3fff0000);
+    uut.addr6.s6_addr32[3] = 0;
+    uut.prefix_len6 = 16;
+    uut.type = MAP_TYPE_DYNAMIC;
+    uut.line = 5;
+    expect(!map_insert(&uut),"Insert Very Short Prefix");
+    
+    /* Another prefix we need later */
+    uut.addr4.s_addr = htonl(0x0d000000);
+    uut.prefix_len4 = 8;
+    uut.addr6.s6_addr32[0] = htonl(0x3fffabcd);
+    uut.addr6.s6_addr32[3] = 0;
+    uut.prefix_len6 = 32;
+    uut.type = MAP_TYPE_DYNAMIC;
+    uut.line = 5;
+    expect(!map_insert(&uut),"Insert Very Short Prefix 2");
+
+    
     /* Insert so many entries that we need to resize the maps */
     for(int i = 0; i < 24; i++) {
         uut.addr4.s_addr = htonl(0x0b000000 | i);
@@ -111,7 +132,7 @@ int main(int argc, char **argv) {
         uut.addr6.s6_addr32[3] = htonl(0x64640000 | i);
         uut.prefix_len6 = 128;
         uut.type = MAP_TYPE_STATIC;
-        uut.line = 5+i;
+        uut.line = 6+i;
         expect(!map_insert(&uut),"Insert A Lot of Maps");
     }
 
@@ -124,11 +145,13 @@ int main(int argc, char **argv) {
         else if(i < 25) expect(gcfg.map4[i].addr4.s_addr == htonl(0x0b000000 | (i - 1)),testid);
         else if(i < 26) expect(gcfg.map4[i].addr4.s_addr == htonl(0x09090900),testid);
         else if(i < 27) expect(gcfg.map4[i].addr4.s_addr == htonl(0x0a000000),testid);
+        else if(i < 28) expect(gcfg.map4[i].addr4.s_addr == htonl(0x0c000000),testid);
+        else if(i < 29) expect(gcfg.map4[i].addr4.s_addr == htonl(0x0d000000),testid);
         else expect(gcfg.map4[i].addr4.s_addr == htonl(0),testid);
         sprintf(testid,"Map4 Entry %d Type",i);
         if(i < 26) expect(gcfg.map4[i].type == MAP_TYPE_STATIC,testid);
-        else if(i < 27) expect(gcfg.map4[i].type == MAP_TYPE_DYNAMIC,testid);
-        else if(i < 28) expect(gcfg.map4[i].type == MAP_TYPE_RFC6052,testid);
+        else if(i < 29) expect(gcfg.map4[i].type == MAP_TYPE_DYNAMIC,testid);
+        else if(i < 30) expect(gcfg.map4[i].type == MAP_TYPE_RFC6052,testid);
         else expect(gcfg.map4[i].type == MAP_TYPE_INVALID,testid);
     }
     /* Check results for map6 */    
@@ -140,6 +163,8 @@ int main(int argc, char **argv) {
         if(i < 26) ip6.s6_addr32[0] = htonl(0x20010db8);
         else if(i < 27) ip6.s6_addr32[0] = htonl(0x64ff9b);
         else if(i < 28) ip6.s6_addr32[0] = htonl(0x20010db8);
+        else if(i < 29) ip6.s6_addr32[0] = htonl(0x3fffabcd);
+        else if(i < 30) ip6.s6_addr32[0] = htonl(0x3fff0000);
         if(i < 1) ip6.s6_addr32[3] = htonl(0x420);
         else if(i < 25) ip6.s6_addr32[3] = htonl(0x64640000 | (i - 1));
         else if(i < 26) ip6.s6_addr32[3] = htonl(0x6900);
@@ -147,10 +172,41 @@ int main(int argc, char **argv) {
         sprintf(testid,"Map6 Entry %d Type",i);
         if(i < 26) expect(gcfg.map6[i].type == MAP_TYPE_STATIC,testid);
         else if(i < 27) expect(gcfg.map6[i].type == MAP_TYPE_RFC6052,testid);
-        else if(i < 28) expect(gcfg.map6[i].type == MAP_TYPE_DYNAMIC,testid);
+        else if(i < 30) expect(gcfg.map6[i].type == MAP_TYPE_DYNAMIC,testid);
         else expect(gcfg.map6[i].type == MAP_TYPE_INVALID,testid);
     }
     dump_maps();
+
+    /* Now test cases for search4 */
+    struct in_addr test4;
+    test4.s_addr = htonl(0x0b00000c);
+    expect(map_search4(test4) == &gcfg.map4[13],"Search4 /32");
+    test4.s_addr = htonl(0x0909090a);
+    expect(map_search4(test4) == &gcfg.map4[25],"Search4 /24");
+    test4.s_addr = htonl(0x0a006942);
+    expect(map_search4(test4) == &gcfg.map4[26],"Search4 /16");
+    test4.s_addr = htonl(0x01020304);
+    expect(map_search4(test4) == &gcfg.map4[29],"Search4 /1");
+    test4.s_addr = htonl(0x81020304);
+    expect(map_search4(test4) == NULL,"Search4 Default");
+
+    struct in6_addr test6;
+    test6.s6_addr32[0] = htonl(0x3fff1234);
+    expect(map_search6(test6) == &gcfg.map6[29],"Search6 /16");
+    test6.s6_addr32[0] = htonl(0x3fffabcd);
+    expect(map_search6(test6) == &gcfg.map6[28],"Search6 /32");
+    test6.s6_addr32[0] = htonl(0x20010db8);
+    test6.s6_addr32[1] = htonl(0x00006940);
+    expect(map_search6(test6) == &gcfg.map6[27],"Search6 /48");
+    test6.s6_addr32[0] = htonl(0x0064ff9b);
+    test6.s6_addr32[1] = 0;
+    expect(map_search6(test6) == &gcfg.map6[26],"Search6 /96");
+    test6.s6_addr32[0] = htonl(0x20010db8);
+    test6.s6_addr32[3] = htonl(0x00006901);
+    expect(map_search6(test6) == &gcfg.map6[25],"Search6 /126");
+    test6.s6_addr32[0] = htonl(0x20010db8);
+    test6.s6_addr32[3] = htonl(0x64640003);
+    expect(map_search6(test6) == &gcfg.map6[4],"Search6 /128");
 
     printf("%s: Overall Test Status\n",(test_stat ? "FAIL" : "PASS"));
 

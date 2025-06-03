@@ -30,6 +30,12 @@ $(TARGET): $(SOURCES) tayga.d
 unit-mapping: test/unit_mapping.c mapping.c test/unit.c tayga.h
 	$(CC) $(CFLAGS) -o $@ test/unit_mapping.c mapping.c test/unit.c $(LDFLAGS) -flto -coverage -fcondition-coverage -DCOVERAGE_TESTING
 
+
+# Build unit tests
+unit-dynamic: test/unit_dynamic.c dynamic.c test/unit.c tayga.h
+	$(CC) $(CFLAGS) -o $@ test/unit_dynamic.c dynamic.c test/unit.c $(LDFLAGS) -flto -coverage -fcondition-coverage -DCOVERAGE_TESTING
+
+
 cov-report:
 	gcov -a -g -f *.gcno
 

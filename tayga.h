@@ -82,12 +82,6 @@ struct tun_pi {
 
 /* Configuration knobs */
 
-/* Number of seconds of silence before a map ages out of the cache */
-#define CACHE_MAX_AGE		120
-
-/* Number of seconds between cache ageing passes */
-#define CACHE_CHECK_INTERVAL	5
-
 /* Number of seconds between dynamic pool ageing passes */
 #define POOL_CHECK_INTERVAL	45
 
@@ -176,7 +170,6 @@ enum map_type_t {
 	MAP_TYPE_STATIC,
 	MAP_TYPE_RFC6052,
 	MAP_TYPE_DYNAMIC,
-	MAP_TYPE_AP,
 	MAP_TYPE_MAX
 };
 
@@ -201,11 +194,11 @@ struct map_entry {
 };
 
 /// Mapping entry (Dynamic Pool)
-struct map_dynamic {
+struct dyn_entry {
 	struct in6_addr addr6;
+	struct in_addr addr4;
 	time_t created;
 	time_t last_seen;
-	struct in_addr addr4;
 	int flags;
 };
 
@@ -235,7 +228,7 @@ struct config {
 	int map_entry_size;
 	int map_entry_len;
 	/* Pointer to dynamic table */
-	struct map_dynamic *dyn;
+	struct dyn_entry *dyn;
 	int dyn_size;
 	/* Dynamic timers */
 	int dyn_min_lease;
@@ -295,16 +288,12 @@ int validate_ip6_addr(const struct in6_addr *a);
 int is_private_ip4_addr(const struct in_addr *a);
 int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len);
 int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len);
-void create_cache(void);
-struct map4 *find_map4(const struct in_addr *addr4);
-struct map6 *find_map6(const struct in6_addr *addr6);
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len);
 int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
-		struct cache_entry **c_ptr);
+		struct map_entry **map_ptr);
 int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
-		struct cache_entry **c_ptr, int dyn_alloc);
-void addrmap_maint(void);
+		struct map_entry **map_ptr, int dyn_alloc);
 
 /* conffile.c */
 extern struct config gcfg;
@@ -313,15 +302,16 @@ void config_read(char *conffile);
 void config_validate(void);
 
 /* dynamic.c */
-struct map6 *assign_dynamic(const struct in6_addr *addr6);
-void load_dynamic(struct dynamic_pool *pool);
-void dynamic_maint(struct dynamic_pool *pool, int shutdown);
+void dyn_init(void);
+int dyn_map4(struct map_entry *m,struct in_addr a4, struct in6_addr *a6);
+int dyn_map6(struct map_entry *m,struct in_addr *a4, struct in6_addr *a6, int alloc);
 
 /* nat64.c */
 void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
 
 /* tayga.c */
+extern time_t now;
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
 

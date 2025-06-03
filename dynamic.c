@@ -21,9 +21,110 @@
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
 
-extern struct config *gcfg;
-extern time_t now;
+/**
+ * @brief Initialize dynamic tables
+ * 
+ * Allocates space for dynamic tables, exits on failure
+ */
+void dyn_init(void) {
+	/* Basically, we create a single table big enough for all dyn
+	 * entries. To do this, we search map4 for all dyn type
+	 * (they must exist in both map4 and map6). We add up
+	 * the individual number of addresses in each mapping. 
+	 * We then create a single table that long. 
+	 */
+	int next_dyn = 0;
+	for(int i = 0; i < gcfg.map_entry_len; i++) {
+		if(gcfg.map4[i].type == MAP_TYPE_DYNAMIC) {
+			/* Find the corresponding map6 entry */
+			struct map_entry *map6 = map_search6(gcfg.map4[i].addr6);
+			if(map6) {
+				/* dyn is index into the global table */
+				gcfg.map4[i].dyn.offset = next_dyn;
+				map6->dyn.offset = next_dyn;
+				/* Figure out how many addresses this mapping is */
+				int addrs = (1 << (32 - gcfg.map4[i].prefix_len4));
+				next_dyn += addrs;
+			}
+		}
+	}
+	if(next_dyn > 65536) slog(LOG_WARNING,"Warning: Dynamic pool is rather large, will consume significant memory\n");
+	
+	/* Now, malloc a table next_dyn big */
+	gcfg.dyn = malloc(next_dyn * sizeof(struct dyn_entry));
+	if(!gcfg.dyn) {
+		slog(LOG_CRIT,"Failed to allocate dynamic map\n");
+		exit(-1);
+	}
+	memset(gcfg.dyn,0,next_dyn * sizeof(struct dyn_entry));
 
+	/* Go through the dyn map and populate addr4 */
+	for(int i = 0; i < gcfg.map_entry_len; i++) {
+		if(gcfg.map4[i].type == MAP_TYPE_DYNAMIC) {
+			/* Find the dynamic table for this entry */
+			struct dyn_entry *dt = &gcfg.dyn[gcfg.map4[i].dyn.offset];
+
+			/* Figure out how many addresses this mapping is */
+			int addrs = (1 << (32 - gcfg.map4[i].prefix_len4));
+			for(int a = 0; a < addrs; a++) {
+				/* Initialize the entry (memset initialized most of it) */
+				dt[a].addr4.s_addr = gcfg.map4[i].addr4.s_addr | htonl(a);
+			}
+		}
+	}
+}
+
+/**
+ * @brief Return a mapped ipv6 address
+ * 
+ * Takes a map entry (which must be dynamic) and an IPv4 address,
+ * and maps it to the corresponding IPv6 address
+ *
+ * @param m struct map_entry to use
+ * @param a4 IPv4 address to map
+ * @param a6 IPv6 address to return
+ * @returns Nonzero on error
+ */
+int dyn_map4(struct map_entry *m,struct in_addr a4, struct in6_addr *a6) {
+	/* v4 path:
+	 * Determine how many addrs there are in this map entry
+	 * Mask out those bits from a4
+	 * Index dyn[a4]
+	 * Return a6 if valid, else return error
+	 */
+	return ERROR_NONE;
+}
+
+/**
+ * @brief Return a mapped ipv4 address
+ * 
+ * Takes a map entry (which must be dynamic) and an IPv6 address,
+ * and maps it to the corresponding IPv4 address. Optionally, may
+ * allocate a new dynamic address from the pool
+ *
+ * @param m struct map_entry to use
+ * @param a4 IPv4 address to return
+ * @param a6 IPv6 address to map
+ * @param alloc allow allocation of a new address
+ * @returns Nonzero on error
+ */
+int dyn_map6(struct map_entry *m,struct in_addr *a4, struct in6_addr *a6, int alloc) {
+	/* v6 path:
+	 * Take hash of v6 addr mod num of mappings in m
+	 * Index dyn[hash]
+	 * If us:
+	 * 	- Return that v4 addr
+	 * If empty:
+	 * 	- Allocate it for us or error out if we can't alloc
+	 * Else:
+	 * 	- Increment hash by 1 mod num of mappings in m and try again
+	 * Allow this to go for some config number of iterations
+	 * Fail if we can't allocate an addr
+	 */
+	return ERROR_NONE;
+}
+
+#if 0
 static struct map_dynamic *alloc_map_dynamic(const struct in6_addr *addr6,
 		const struct in_addr *addr4, struct free_addr *f)
 {
@@ -395,3 +496,4 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 		}
 	}
 }
+#endif

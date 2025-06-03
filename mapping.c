@@ -35,13 +35,6 @@ void map_init(void) {
         slog(LOG_CRIT,"Failed to allocate map6\n");
         exit(-1);
     }
-
-    /* Tentatively do not allocate a dynamic pool */
-    gcfg.dyn_size = 0;
-
-    /* Defaults for timeouts */
-    gcfg.dyn_min_lease = 120;
-    gcfg.dyn_max_lease = 7200;
 }
 
 /**
@@ -154,7 +147,39 @@ struct map_entry *map_search4(struct in_addr a) {
 struct map_entry *map_search6(struct in6_addr a) {
     for(int i = 0; i < gcfg.map_entry_len; i++)
     {
-
+        /* Short prefixes compare 1 word */
+        if(gcfg.map6[i].prefix_len6 < 32 && 
+            gcfg.map6[i].addr6.s6_addr32[0] ==
+            (a.s6_addr32[0] & htonl(~(0xffffffff >> gcfg.map6[i].prefix_len6)))) {
+            return &gcfg.map6[i];
+        /* 2 word prefixes */
+        } else if (gcfg.map6[i].prefix_len6 < 64 && 
+            gcfg.map6[i].addr6.s6_addr32[0] == a.s6_addr32[0] &&
+            gcfg.map6[i].addr6.s6_addr32[1] ==
+            (a.s6_addr32[1] & htonl(~(0xffffffff >> (gcfg.map6[i].prefix_len6-32))))) {
+        return &gcfg.map6[i];
+        /* 3 word prefixes */
+        } else if (gcfg.map6[i].prefix_len6 < 96 && 
+            gcfg.map6[i].addr6.s6_addr32[0] == a.s6_addr32[0] &&
+            gcfg.map6[i].addr6.s6_addr32[1] == a.s6_addr32[1] &&
+            gcfg.map6[i].addr6.s6_addr32[2] ==
+            (a.s6_addr32[2] & htonl(~(0xffffffff >> (gcfg.map6[i].prefix_len6-64))))) {
+        return &gcfg.map6[i];
+        /* 4 word prefixes */
+        } else if (gcfg.map6[i].prefix_len6 < 128 && 
+            gcfg.map6[i].addr6.s6_addr32[0] == a.s6_addr32[0] &&
+            gcfg.map6[i].addr6.s6_addr32[1] == a.s6_addr32[1] &&
+            gcfg.map6[i].addr6.s6_addr32[2] == a.s6_addr32[2] &&
+            gcfg.map6[i].addr6.s6_addr32[3] ==
+            (a.s6_addr32[3] & htonl(~(0xffffffff >> (gcfg.map6[i].prefix_len6-96))))) {
+        return &gcfg.map6[i];
+        /* full prefixes */
+        } else if (gcfg.map6[i].addr6.s6_addr32[0] == a.s6_addr32[0] &&
+            gcfg.map6[i].addr6.s6_addr32[1] == a.s6_addr32[1] &&
+            gcfg.map6[i].addr6.s6_addr32[2] == a.s6_addr32[2] &&
+            gcfg.map6[i].addr6.s6_addr32[3] == a.s6_addr32[3]) {
+        return &gcfg.map6[i];
+        }
     }
 
     /* Not found */
