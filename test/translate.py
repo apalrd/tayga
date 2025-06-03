@@ -148,7 +148,7 @@ def ip6_val(pkt):
 ####
 #  IPv6 Second Fragment Validator
 ####
-def ip6_val_frag(pkt):
+def ip6_frag_val(pkt):
     res = test_result()
     # layer 0 is LinuxTunInfo
     res.check("Contains IPv6",isinstance(pkt.getlayer(1),IPv6))
@@ -206,6 +206,7 @@ def ip_val(pkt):
     expect_len = expect_ref[IPv6].plen+20
     expect_nh = expect_ref[IPv6].nh
     # Validator assumes extension headers are in this order
+    expect_frag = False
     # If it has a hop-by-hop header, adjust length / nexthop
     if expect_ref.haslayer(IPv6ExtHdrHopByHop):
         #Length subtracts 8 bytes for extension header
@@ -224,8 +225,58 @@ def ip_val(pkt):
         expect_len -= 8
         #next-hop comes from extension header
         expect_nh = expect_ref[IPv6ExtHdrRouting].nh
+    # If it has a Fragment header, again
+    if expect_ref.haslayer(IPv6ExtHdrFragment):
+        expect_len -= 8
+        expect_nh = expect_ref[IPv6ExtHdrFragment].nh
+        expect_frag = True
+        if expect_ref[IPv6ExtHdrFragment].m:
+            res.compare("Flags",pkt[IP].flags,"MF")
+        else:
+            res.compare("Flags",pkt[IP].flags,0)
+        res.compare("Frag Offset",pkt[IP].frag,expect_ref[IPv6ExtHdrFragment].offset)
+        #ID must match v6 frag header
+        res.compare("ID",pkt[IP].id,expect_ref[IPv6ExtHdrFragment].id)
     res.compare("Length",pkt[IP].len,expect_len)
     res.compare("Proto",pkt[IP].proto,expect_nh)
+    #Flags are either DF or None depending on packet size
+    if expect_frag:
+        pass # Already checked these flags
+    elif expect_len > 1260:
+        res.compare("Flags",pkt[IP].flags,"DF")
+        res.compare("ID",pkt[IP].id,0)
+    else:
+        res.compare("Flags",pkt[IP].flags,0)
+        #ID is psuedo-randomly generated, but must not be zero
+        res.check("ID Nonzero",(pkt[IP].id != 0))
+    if not expect_frag:
+        res.compare("Frag",pkt[IP].frag,0)
+    res.compare("TTL",pkt[IP].ttl,expect_ref[IPv6].hlim-3) #test setup has 3 trips
+    res.compare("Src",pkt[IP].src,str(expect_sa))
+    res.compare("Dest",pkt[IP].dst,str(expect_da))
+    res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load)
+    return res
+
+
+####
+#  IPv4 fragment validator
+####
+def ip_frag_val(pkt):
+    res = test_result()
+    # layer 0 is LinuxTunInfo
+    res.check("Contains IPv4",isinstance(pkt.getlayer(1),IP))
+    #Bail early so we don't get derefrence errors
+    if res.has_fail:
+        return res
+    #Field Comparison
+    res.compare("Version",pkt[IP].version,4)
+    res.compare("IHL",pkt[IP].ihl,5)
+    res.compare("TC",pkt[IP].tos,expect_ref[IPv6].tc)
+    res.compare("Src",pkt[IP].src,str(expect_sa))
+    res.compare("Dest",pkt[IP].dst,str(expect_da))
+    res.compare("Proto",pkt[IP].proto,expect_ref[IPv6].nh)
+    res.compare("Frag",pkt[IP].frag,0)
+    res.compare("TTL",pkt[IP].ttl,expect_ref[IPv6].hlim-3) #test setup has 3 trips
     #Flags are either DF or None depending on packet size
     if expect_len > 1260:
         res.compare("Flags",pkt[IP].flags,"DF")
@@ -234,11 +285,11 @@ def ip_val(pkt):
         res.compare("Flags",pkt[IP].flags,0)
         #ID is psuedo-randomly generated, but must not be zero
         res.check("ID Nonzero",(pkt[IP].id != 0))
-    res.compare("Frag",pkt[IP].frag,0)
-    res.compare("TTL",pkt[IP].ttl,expect_ref[IPv6].hlim-3) #test setup has 3 trips
-    res.compare("Src",pkt[IP].src,str(expect_sa))
-    res.compare("Dest",pkt[IP].dst,str(expect_da))
-    res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load)
+    # Expected fragment
+    if expect_frag:
+        # Expected length subtracts first fragment
+        res.compare("Length",pkt[IP].len,expect_ref[IPv6].plen - expect_len)
+        res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load[expect_len:])
     return res
 
 ####
@@ -489,7 +540,7 @@ def sec_4_1():
     expect_id = 1 #increments each time
     expect_len = 1240-8 # Length of first fragment, second is calculated from this
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1480+20,ttl=4) / Raw(expect_data)
-    test.send_and_check_two(expect_ref,ip6_val,ip6_val_frag, "Requires Fragmentation")
+    test.send_and_check_two(expect_ref,ip6_val,ip6_frag_val, "Requires Fragmentation")
 
     # IPv4 Already Fragmented
     expect_data = randbytes(128)
@@ -1195,14 +1246,20 @@ def sec_5_1():
     expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=72+8+8) / IPv6ExtHdrHopByHop() / IPv6ExtHdrRouting(nh=16,segleft=4,type=253) / Raw(randbytes(72))
     test.send_and_check(expect_ref,icmp6_val, "Hop-By-Hop + Routing Segments Left Option")
 
-    # Fragmentation Needed
+    # Since IPv6 is 20 bytes larger than IPv4, it's not possible to fragment packets in the translator
+    # Our MTU is the same on v4 and v6, Linux must deal with cases where it is not. 
+
+    # IPv6 Fragment Header    
     expect_sa = test.public_ipv6_xlate
     expect_da = test.public_ipv4
-    test.tfail("Fragmentation Needed","Not Implemented")
-
-    # IPv6 Fragment Header
-    test.tfail("IPv6 Fragment Header","Not Implemented")
-
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=1448) / IPv6ExtHdrFragment(nh=16,offset=0,id=69,m=1) / Raw(randbytes(1440))
+    test.send_and_check(expect_ref,ip_val, "First Framgnet, More Remaining")
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=1448) / IPv6ExtHdrFragment(nh=16,offset=0,id=69,m=0) / Raw(randbytes(1440))
+    test.send_and_check(expect_ref,ip_val, "First Framgnet, No More (atomic)")
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=1448) / IPv6ExtHdrFragment(nh=16,offset=1440,id=69,m=0) / Raw(randbytes(1440))
+    test.send_and_check(expect_ref,ip_val, "Last Fragment")
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=1448) / IPv6ExtHdrFragment(nh=16,offset=1440,id=69,m=1) / Raw(randbytes(1440))
+    test.send_and_check(expect_ref,ip_val, "Middle Fragment")
     # Illegal Addresses are covered by addressing test suite
 
     test.section("IPv6 to IPv4 Translation (RFC 7915 5.1)")
