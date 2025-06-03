@@ -16,6 +16,9 @@ RUN make static
 # Stage 2: Final image
 FROM alpine:latest
 
+# Add iproute2
+RUN apk add --no-cache iproute2
+
 # Set working directory
 WORKDIR /app
 
