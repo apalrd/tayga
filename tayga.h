@@ -218,6 +218,7 @@ static_assert(sizeof(time_t) == 8, "64-bit time_t is required");
 /// Mapping entry (Dynamic Pool)
 struct dyn_entry {
 	struct in6_addr addr6;
+	struct in_addr addr4;
 	time_t created;
 	time_t last_seen;
 	struct in_addr addr4;
