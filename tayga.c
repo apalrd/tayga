@@ -75,7 +75,7 @@ void read_random_bytes(void *d, int len)
 {
 	int ret;
 
-	ret = read(gcfg->urandom_fd, d, len);
+	ret = read(gcfg.urandom_fd, d, len);
 	if (ret < 0) {
 		slog(LOG_CRIT, "read /dev/urandom returned %s\n",
 				strerror(errno));
@@ -93,8 +93,8 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	struct ifreq ifr;
 	int fd;
 
-	gcfg->tun_fd = open("/dev/net/tun", O_RDWR);
-	if (gcfg->tun_fd < 0) {
+	gcfg.tun_fd = open("/dev/net/tun", O_RDWR);
+	if (gcfg.tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 				strerror(errno));
 		exit(1);
@@ -102,48 +102,48 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN;
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
+	strcpy(ifr.ifr_name, gcfg.tundev);
+	if (ioctl(gcfg.tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
-				"%s\n", gcfg->tundev, strerror(errno));
+				"%s\n", gcfg.tundev, strerror(errno));
 		exit(1);
 	}
 
 	if (do_mktun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 1) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETPERSIST, 1) < 0) {
 			slog(LOG_CRIT, "Unable to set persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			exit(1);
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETOWNER, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETOWNER, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set owner on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			exit(1);
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETGROUP, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETGROUP, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set group on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			exit(1);
 		}
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return;
 	} else if (do_rmtun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETPERSIST, 0) < 0) {
 			slog(LOG_CRIT, "Unable to clear persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			exit(1);
 		}
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return;
 	}
 
-	set_nonblock(gcfg->tun_fd);
+	set_nonblock(gcfg.tun_fd);
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
@@ -154,7 +154,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	/* Query MTU from tun adapter */
 	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
+	strcpy(ifr.ifr_name, gcfg.tundev);
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
@@ -163,15 +163,15 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	close(fd);
 
 	/* MTU is less than 1280, not allowed */
-	gcfg->mtu = ifr.ifr_mtu;
-	if(gcfg->mtu < MTU_MIN) {
+	gcfg.mtu = ifr.ifr_mtu;
+	if(gcfg.mtu < MTU_MIN) {
 		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
-				gcfg->mtu, MTU_MIN);
+				gcfg.mtu, MTU_MIN);
 		exit(1);
 	}
 
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg.tundev,
+			gcfg.mtu);
 }
 #endif
 
@@ -182,7 +182,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	int fd, do_rename = 0, multi_af;
 	char devname[64];
 
-	if (strncmp(gcfg->tundev, "tun", 3))
+	if (strncmp(gcfg.tundev, "tun", 3))
 		do_rename = 1;
 
 	if ((do_mktun || do_rmtun) && do_rename)
@@ -193,10 +193,10 @@ static void tun_setup(int do_mktun, int do_rmtun)
 		exit(1);
 	}
 
-	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg->tundev);
+	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg.tundev);
 
-	gcfg->tun_fd = open(devname, O_RDWR);
-	if (gcfg->tun_fd < 0) {
+	gcfg.tun_fd = open(devname, O_RDWR);
+	if (gcfg.tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
 				devname, strerror(errno));
 		exit(1);
@@ -204,12 +204,12 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	if (do_mktun) {
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return;
 	} else if (do_rmtun) {
 
 		/* Close socket before removal */
-		close(gcfg->tun_fd);
+		close(gcfg.tun_fd);
 
 		fd = socket(PF_INET, SOCK_DGRAM, 0);
 		if (fd < 0) {
@@ -219,32 +219,32 @@ static void tun_setup(int do_mktun, int do_rmtun)
 		}
 
 		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, gcfg->tundev);
+		strcpy(ifr.ifr_name, gcfg.tundev);
 		if (ioctl(fd, SIOCIFDESTROY, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to destroy interface %s, aborting: %s\n",
-					gcfg->tundev, strerror(errno));
+					gcfg.tundev, strerror(errno));
 			exit(1);
 		}
 
 		close(fd);
 
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return;
 	}
 
 	/* Set multi-AF mode */
 	multi_af = 1;
-	if (ioctl(gcfg->tun_fd, TUNSIFHEAD, &multi_af) < 0) {
+	if (ioctl(gcfg.tun_fd, TUNSIFHEAD, &multi_af) < 0) {
 			slog(LOG_CRIT, "Unable to set multi-AF on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			exit(1);
 	}
 
-	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg->tundev);
+	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg.tundev);
 
-	set_nonblock(gcfg->tun_fd);
+	set_nonblock(gcfg.tun_fd);
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
@@ -255,18 +255,18 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	if (do_rename) {
 		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, fdevname(gcfg->tun_fd));
-		ifr.ifr_data = gcfg->tundev;
+		strcpy(ifr.ifr_name, fdevname(gcfg.tun_fd));
+		ifr.ifr_data = gcfg.tundev;
 		if (ioctl(fd, SIOCSIFNAME, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to rename interface %s to %s, aborting: %s\n",
-					fdevname(gcfg->tun_fd), gcfg->tundev,
+					fdevname(gcfg.tun_fd), gcfg.tundev,
 					strerror(errno));
 			exit(1);
 		}
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
+	strcpy(ifr.ifr_name, gcfg.tundev);
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
@@ -274,10 +274,10 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	}
 	close(fd);
 
-	gcfg->mtu = ifr.ifr_mtu;
+	gcfg.mtu = ifr.ifr_mtu;
 
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg.tundev,
+			gcfg.mtu);
 }
 #endif
 
@@ -310,10 +310,10 @@ static void signal_setup(void)
 static void read_from_tun(void)
 {
 	int ret;
-	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
+	struct tun_pi *pi = (struct tun_pi *)gcfg.recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
+	ret = read(gcfg.tun_fd, gcfg.recv_buf, gcfg.recv_buf_size);
 	if (ret < 0) {
 		if (errno == EAGAIN)
 			return;
@@ -326,12 +326,12 @@ static void read_from_tun(void)
 				"(%d bytes)\n", ret);
 		return;
 	}
-	if (ret == gcfg->recv_buf_size) {
+	if (ret == gcfg.recv_buf_size) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
 	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
+	p->data = gcfg.recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
@@ -364,8 +364,8 @@ static void read_from_signalfd(void)
 			slog(LOG_CRIT, "signal fd was closed\n");
 			exit(1);
 		}
-		if (gcfg->dynamic_pool)
-			dynamic_maint(gcfg->dynamic_pool, 1);
+		if (gcfg.dynamic_pool)
+			dynamic_maint(gcfg.dynamic_pool, 1);
 		slog(LOG_NOTICE, "exiting on signal %d\n", sig);
 		exit(0);
 	}
@@ -379,11 +379,11 @@ static void print_op_info(void)
 	struct map6 *m6;
 	char addrbuf[64],addrbuf2[64];
 
-	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET, &gcfg.local_addr4, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
-	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET6, &gcfg.local_addr6, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
-	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+	m6 = list_entry(gcfg.map6_list.prev, struct map6, list);
 	if (m6->type == MAP_TYPE_RFC6052) {
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
@@ -391,7 +391,7 @@ static void print_op_info(void)
 		if (m6->addr.s6_addr32[0] == WKPF 
 			&& !m6->addr.s6_addr32[1]
 			&& !m6->addr.s6_addr32[2]
-			&& gcfg->wkpf_strict)
+			&& gcfg.wkpf_strict)
 			slog(LOG_INFO, "Note: traffic between IPv6 hosts and "
 					"private IPv4 addresses (i.e. to/from "
 					"64:ff9b::10.0.0.0/104, "
@@ -403,13 +403,13 @@ static void print_op_info(void)
 					"IPv6 hosts to communicate with "
 					"private IPv4 addresses.\n");
 	}
-	if (gcfg->dynamic_pool) {
-		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
+	if (gcfg.dynamic_pool) {
+		inet_ntop(AF_INET, &gcfg.dynamic_pool->map4.addr,
 				addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
-				gcfg->dynamic_pool->map4.prefix_len);
-		if (gcfg->data_dir[0])
-			load_dynamic(gcfg->dynamic_pool);
+				gcfg.dynamic_pool->map4.prefix_len);
+		if (gcfg.data_dir[0])
+			load_dynamic(gcfg.dynamic_pool);
 		else
 			slog(LOG_INFO, "Note: dynamically-assigned mappings "
 					"will not be saved across restarts.  "
@@ -419,7 +419,7 @@ static void print_op_info(void)
 	}
 
 	slog(LOG_DEBUG,"Map4 List:\n");
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
 		s4 = list_entry(entry, struct map4, list);
 
 		slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
@@ -428,7 +428,7 @@ static void print_op_info(void)
 			inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
 		s6 = list_entry(entry, struct map6, list);
 
 		slog(LOG_DEBUG,"Entry %s/%d type %d\n",
@@ -577,7 +577,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Chroot */
-	if (!gcfg->data_dir[0]) {
+	if (!gcfg.data_dir[0]) {
 		if (do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
 					"is specified in %s\n", conffile);
@@ -588,22 +588,22 @@ int main(int argc, char **argv)
 					strerror(errno));
 			exit(1);
 		}
-	} else if (chdir(gcfg->data_dir) < 0) {
+	} else if (chdir(gcfg.data_dir) < 0) {
 		if (user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
-					"aborting: %s\n", gcfg->data_dir,
+					"aborting: %s\n", gcfg.data_dir,
 					strerror(errno));
 			exit(1);
 		}
-		if (mkdir(gcfg->data_dir, 0777) < 0) {
+		if (mkdir(gcfg.data_dir, 0777) < 0) {
 			slog(LOG_CRIT, "Error: unable to create %s, aborting: "
-					"%s\n", gcfg->data_dir,
+					"%s\n", gcfg.data_dir,
 					strerror(errno));
 			exit(1);
 		}
-		if (chdir(gcfg->data_dir) < 0) {
+		if (chdir(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Error: created %s but unable to chdir "
-					"to it!?? (%s)\n", gcfg->data_dir,
+					"to it!?? (%s)\n", gcfg.data_dir,
 					strerror(errno));
 			exit(1);
 		}
@@ -645,23 +645,23 @@ int main(int argc, char **argv)
 	slog(LOG_DEBUG, "Compiled from " TAYGA_BRANCH "\n");
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
-	if (gcfg->cache_size) {
-		gcfg->urandom_fd = open("/dev/urandom", O_RDONLY);
-		if (gcfg->urandom_fd < 0) {
+	if (gcfg.cache_size) {
+		gcfg.urandom_fd = open("/dev/urandom", O_RDONLY);
+		if (gcfg.urandom_fd < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/urandom, "
 					"aborting: %s\n", strerror(errno));
 			exit(1);
 		}
-		read_random_bytes(gcfg->rand, 8 * sizeof(uint32_t));
-		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
+		read_random_bytes(gcfg.rand, 8 * sizeof(uint32_t));
+		gcfg.rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 
 	tun_setup(0, 0);
 
 	if (do_chroot) {
-		if (chroot(gcfg->data_dir) < 0) {
+		if (chroot(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Unable to chroot to %s: %s\n",
-					gcfg->data_dir, strerror(errno));
+					gcfg.data_dir, strerror(errno));
 			exit(1);
 		}
 		if (chdir("/")) {
@@ -695,20 +695,20 @@ int main(int argc, char **argv)
 	/* Print running information */
 	print_op_info();
 
-	if (gcfg->cache_size)
+	if (gcfg.cache_size)
 		create_cache();
 
-	gcfg->recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
-	if (!gcfg->recv_buf) {
+	gcfg.recv_buf = (uint8_t *)malloc(gcfg.recv_buf_size);
+	if (!gcfg.recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
-				"receive buffer\n", gcfg->recv_buf_size);
+				"receive buffer\n", gcfg.recv_buf_size);
 		exit(1);
 	}
 
 	memset(pollfds, 0, 2 * sizeof(struct pollfd));
 	pollfds[0].fd = signalfds[0];
 	pollfds[0].events = POLLIN;
-	pollfds[1].fd = gcfg->tun_fd;
+	pollfds[1].fd = gcfg.tun_fd;
 	pollfds[1].events = POLLIN;
 
 	/* Main loop */
@@ -726,17 +726,17 @@ int main(int argc, char **argv)
 			read_from_signalfd();
 		if (pollfds[1].revents)
 			read_from_tun();
-		if (gcfg->cache_size && (gcfg->last_cache_maint +
+		if (gcfg.cache_size && (gcfg.last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
-					gcfg->last_cache_maint > now)) {
+					gcfg.last_cache_maint > now)) {
 			addrmap_maint();
-			gcfg->last_cache_maint = now;
+			gcfg.last_cache_maint = now;
 		}
-		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
+		if (gcfg.dynamic_pool && (gcfg.last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
-					gcfg->last_dynamic_maint > now)) {
-			dynamic_maint(gcfg->dynamic_pool, 0);
-			gcfg->last_dynamic_maint = now;
+					gcfg.last_dynamic_maint > now)) {
+			dynamic_maint(gcfg.dynamic_pool, 0);
+			gcfg.last_dynamic_maint = now;
 		}
 	}
 

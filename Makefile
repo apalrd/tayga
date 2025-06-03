@@ -1,7 +1,7 @@
 # Simple Makefile generated based on makefile.am
 
 CC := gcc
-CFLAGS := -Wall -O2
+CFLAGS := -Wall -O2 -I.
 LDFLAGS := 
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga
@@ -26,8 +26,9 @@ tayga.d: $(SOURCES) version.h Makefile
 $(TARGET): $(SOURCES) tayga.d
 	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) -flto
 
-$(TARGET-COV): $(TARGET)
-	$(CC) $(LDFLAGS) -o $@ $(SOURCES) -coverage -fcondition-coverage -DCOVERAGE_TESTING
+# Build unit tests
+unit-mapping: test/unit_mapping.c mapping.c test/unit.c tayga.h
+	$(CC) $(CFLAGS) -o $@ test/unit_mapping.c mapping.c test/unit.c $(LDFLAGS) -flto -coverage -fcondition-coverage -DCOVERAGE_TESTING
 
 cov-report:
 	gcov -a -g -f *.gcno

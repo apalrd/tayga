@@ -171,81 +171,49 @@ struct pkt {
 };
 
 /// Type of mapping in mapping list
-enum {
+enum map_type_t {
+	MAP_TYPE_INVALID,
 	MAP_TYPE_STATIC,
 	MAP_TYPE_RFC6052,
-	MAP_TYPE_DYNAMIC_POOL,
-	MAP_TYPE_DYNAMIC_HOST,
+	MAP_TYPE_DYNAMIC,
+	MAP_TYPE_AP,
+	MAP_TYPE_MAX
 };
 
-/// Mapping entry (IPv4)
-struct map4 {
-	struct in_addr addr;
-	struct in_addr mask;
-	int prefix_len;
-	int type;
-	struct list_head list;
-};
-
-/// Mapping entry (IPv6)
-struct map6 {
-	struct in6_addr addr;
-	struct in6_addr mask;
-	int prefix_len;
-	int type;
-	struct list_head list;
-};
-
-/// Mapping entry (Static Maps)
-struct map_static {
-	struct map4 map4;
-	struct map6 map6;
-	int conffile_lineno;
-};
-
-struct free_addr {
-	uint32_t addr; /* in-use address (host order) */
-	uint32_t count; /* num of free addresses after addr */
-	struct list_head list;
-};
-
-/// Mapping entry (Dynamic Map)
-struct map_dynamic {
-	struct map4 map4;
-	struct map6 map6;
-	struct cache_entry *cache_entry;
-	time_t last_use;
-	struct list_head list;
-	struct free_addr free;
+/// Mapping entry
+/// Meaning of these fields changes when they are indexed by addr4 or addr6
+struct map_entry {
+	struct in6_addr addr6;
+	struct in_addr addr4;
+	enum map_type_t type;
+	int prefix_len4;
+	int prefix_len6;
+	int line;
+	union {
+		/* Static type has no data */
+		/* RFC6052 type has no data */
+		/* Dynamic type data*/
+		struct {
+			int offset;
+		} dyn;
+		/* AP type has no data */
+	};
 };
 
 /// Mapping entry (Dynamic Pool)
-struct dynamic_pool {
-	struct map4 map4;
-	struct list_head mapped_list;
-	struct list_head dormant_list;
-	struct list_head free_list;
-	struct free_addr free_head;
-};
-
-/// IP Cache entry
-struct cache_entry {
+struct map_dynamic {
 	struct in6_addr addr6;
+	time_t created;
+	time_t last_seen;
 	struct in_addr addr4;
-	time_t last_use;
-	uint32_t flags;
-	uint16_t ip4_ident;
-	struct list_head list;
-	struct list_head hash4;
-	struct list_head hash6;
+	int flags;
 };
 
 /// Cache flag bits
 enum {
-	CACHE_F_SEEN_4TO6	= (1<<0),
-	CACHE_F_SEEN_6TO4	= (1<<1),
-	CACHE_F_GEN_IDENT	= (1<<2),
-	CACHE_F_REP_AGEOUT	= (1<<3),
+	DYN_F_SEEN_4TO6	= (1<<0),
+	DTN_F_SEEN_6TO4	= (1<<1),
+	DYN_F_FROM_FILE = (1<<2),
 };
 
 /// UDP Checksum options
@@ -259,39 +227,36 @@ enum udp_cksum_mode {
 struct config {
 	char tundev[IFNAMSIZ];
 	char data_dir[512];
-	uint32_t recv_buf_size;
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
-	struct list_head map4_list;
-	struct list_head map6_list;
+	/* Pointers to map4 and map6 tables */
+	struct map_entry *map4;
+	struct map_entry *map6;
+	int map_entry_size;
+	int map_entry_len;
+	/* Pointer to dynamic table */
+	struct map_dynamic *dyn;
+	int dyn_size;
+	/* Dynamic timers */
 	int dyn_min_lease;
 	int dyn_max_lease;
-	int max_commit_delay;
-	struct dynamic_pool *dynamic_pool;
-	int hash_bits;
-	int cache_size;
+
+	/* What is this? */
 	int ipv6_offlink_mtu;
-	int lazy_frag_hdr;
 
 	int urandom_fd;
 	int tun_fd;
 
 	uint16_t mtu;
 	uint8_t *recv_buf;
+	uint32_t recv_buf_size;
 
 	uint32_t rand[8];
-	struct list_head cache_pool;
-	struct list_head cache_active;
-	time_t last_cache_maint;
-	struct list_head *hash_table4;
-	struct list_head *hash_table6;
 
-	time_t last_dynamic_maint;
-	time_t last_map_write;
-	int map_write_pending;
-
+	/* Strict well-known-prefix checking */
 	int wkpf_strict;
 
+	/* UDP checksumming mode */
 	enum udp_cksum_mode udp_cksum_mode;
 };
 
@@ -331,8 +296,6 @@ int is_private_ip4_addr(const struct in_addr *a);
 int calc_ip4_mask(struct in_addr *mask, const struct in_addr *addr, int len);
 int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len);
 void create_cache(void);
-int insert_map4(struct map4 *m, struct map4 **conflict);
-int insert_map6(struct map6 *m, struct map6 **conflict);
 struct map4 *find_map4(const struct in_addr *addr4);
 struct map6 *find_map6(const struct in6_addr *addr6);
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
@@ -344,6 +307,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 void addrmap_maint(void);
 
 /* conffile.c */
+extern struct config gcfg;
 void config_init(void);
 void config_read(char *conffile);
 void config_validate(void);
@@ -360,3 +324,9 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
+
+/* mapping.c */
+void map_init(void);
+int map_insert(struct map_entry *m);
+struct map_entry *map_search4(struct in_addr a);
+struct map_entry *map_search6(struct in6_addr a);

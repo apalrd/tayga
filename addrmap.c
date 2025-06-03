@@ -198,24 +198,24 @@ int calc_ip6_mask(struct in6_addr *mask, const struct in6_addr *addr, int len)
 static uint32_t hash_ip4(const struct in_addr *addr4)
 {
 	return ((uint32_t)(addr4->s_addr *
-				gcfg->rand[0])) >> (32 - gcfg->hash_bits);
+				gcfg.rand[0])) >> (32 - gcfg.hash_bits);
 }
 
 static uint32_t hash_ip6(const struct in6_addr *addr6)
 {
 	uint32_t h;
-	h = addr6->s6_addr32[0] + gcfg->rand[0];
-	h ^= addr6->s6_addr32[1] + gcfg->rand[1];
-	h ^= addr6->s6_addr32[2] + gcfg->rand[2];
-	h ^= addr6->s6_addr32[3] + gcfg->rand[3];
-	return h >> (32 - gcfg->hash_bits);
+	h = addr6->s6_addr32[0] + gcfg.rand[0];
+	h ^= addr6->s6_addr32[1] + gcfg.rand[1];
+	h ^= addr6->s6_addr32[2] + gcfg.rand[2];
+	h ^= addr6->s6_addr32[3] + gcfg.rand[3];
+	return h >> (32 - gcfg.hash_bits);
 }
 
 static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
 		uint32_t hash6)
 {
-	list_add(&c->hash4, &gcfg->hash_table4[hash4]);
-	list_add(&c->hash6, &gcfg->hash_table6[hash6]);
+	list_add(&c->hash4, &gcfg.hash_table4[hash4]);
+	list_add(&c->hash6, &gcfg.hash_table6[hash6]);
 }
 
 /**
@@ -226,40 +226,40 @@ static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
  */
 void create_cache(void)
 {
-	int i, hash_size = 1 << gcfg->hash_bits;
+	int i, hash_size = 1 << gcfg.hash_bits;
 	struct list_head *entry;
 	struct cache_entry *c;
 
-	if (gcfg->hash_table4) {
-		free(gcfg->hash_table4);
-		free(gcfg->hash_table6);
+	if (gcfg.hash_table4) {
+		free(gcfg.hash_table4);
+		free(gcfg.hash_table6);
 	}
 
-	gcfg->hash_table4 = (struct list_head *)
+	gcfg.hash_table4 = (struct list_head *)
 				malloc(hash_size * sizeof(struct list_head));
-	gcfg->hash_table6 = (struct list_head *)
+	gcfg.hash_table6 = (struct list_head *)
 				malloc(hash_size * sizeof(struct list_head));
-	if (!gcfg->hash_table4 || !gcfg->hash_table6) {
+	if (!gcfg.hash_table4 || !gcfg.hash_table6) {
 		slog(LOG_CRIT, "unable to allocate %d bytes for hash table\n",
 				hash_size * sizeof(struct list_head));
 		exit(1);
 	}
 	for (i = 0; i < hash_size; ++i) {
-		INIT_LIST_HEAD(&gcfg->hash_table4[i]);
-		INIT_LIST_HEAD(&gcfg->hash_table6[i]);
+		INIT_LIST_HEAD(&gcfg.hash_table4[i]);
+		INIT_LIST_HEAD(&gcfg.hash_table6[i]);
 	}
 
-	if (list_empty(&gcfg->cache_pool) && list_empty(&gcfg->cache_active)) {
-		c = calloc(gcfg->cache_size, sizeof(struct cache_entry));
-		for (i = 0; i < gcfg->cache_size; ++i) {
+	if (list_empty(&gcfg.cache_pool) && list_empty(&gcfg.cache_active)) {
+		c = calloc(gcfg.cache_size, sizeof(struct cache_entry));
+		for (i = 0; i < gcfg.cache_size; ++i) {
 			INIT_LIST_HEAD(&c->list);
 			INIT_LIST_HEAD(&c->hash4);
 			INIT_LIST_HEAD(&c->hash6);
-			list_add_tail(&c->list, &gcfg->cache_pool);
+			list_add_tail(&c->list, &gcfg.cache_pool);
 			++c;
 		}
 	} else {
-		list_for_each(entry, &gcfg->cache_active) {
+		list_for_each(entry, &gcfg.cache_active) {
 			c = list_entry(entry, struct cache_entry, list);
 			INIT_LIST_HEAD(&c->hash4);
 			INIT_LIST_HEAD(&c->hash6);
@@ -275,15 +275,15 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 {
 	struct cache_entry *c;
 
-	if (list_empty(&gcfg->cache_pool))
+	if (list_empty(&gcfg.cache_pool))
 		return NULL;
-	c = list_entry(gcfg->cache_pool.next, struct cache_entry, list);
+	c = list_entry(gcfg.cache_pool.next, struct cache_entry, list);
 	c->addr4 = *addr4;
 	c->addr6 = *addr6;
 	c->last_use = now;
 	c->flags = 0;
 	c->ip4_ident = 1;
-	list_add(&c->list, &gcfg->cache_active);
+	list_add(&c->list, &gcfg.cache_active);
 	add_to_hash_table(c, hash4, hash6);
 	return c;
 }
@@ -298,7 +298,7 @@ struct map4 *find_map4(const struct in_addr *addr4)
 	struct list_head *entry;
 	struct map4 *m;
 
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
 		m = list_entry(entry, struct map4, list);
 		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr))
 			return m;
@@ -316,7 +316,7 @@ struct map6 *find_map6(const struct in6_addr *addr6)
 	struct list_head *entry;
 	struct map6 *m;
 
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
 		m = list_entry(entry, struct map6, list);
 		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask))
 			return m;
@@ -335,7 +335,7 @@ int insert_map4(struct map4 *m, struct map4 **conflict)
 	struct list_head *entry;
 	struct map4 *s;
 
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
 		s = list_entry(entry, struct map4, list);
 		if (s->prefix_len < m->prefix_len)
 			break;
@@ -363,7 +363,7 @@ int insert_map6(struct map6 *m, struct map6 **conflict)
 	struct list_head *entry, *insert_pos = NULL;
 	struct map6 *s;
 
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
 		s = list_entry(entry, struct map6, list);
 		if (s->prefix_len < m->prefix_len) {
 			if (IN6_IS_IN_NET(&m->addr, &s->addr, &s->mask))
@@ -375,7 +375,7 @@ int insert_map6(struct map6 *m, struct map6 **conflict)
 				goto conflict;
 		}
 	}
-	list_add_tail(&m->list, insert_pos ? insert_pos : &gcfg->map6_list);
+	list_add_tail(&m->list, insert_pos ? insert_pos : &gcfg.map6_list);
 	return 0;
 
 conflict:
@@ -466,7 +466,7 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		if (prefix->s6_addr32[0] == WKPF && 
 			!prefix->s6_addr32[1] && 
 			!prefix->s6_addr32[2] && 
-			gcfg->wkpf_strict &&
+			gcfg.wkpf_strict &&
 			is_private_ip4_addr(addr4))
 			return ERROR_REJECT;
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
@@ -498,10 +498,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		hash = hash_ip4(addr4);
 
-		list_for_each(entry, &gcfg->hash_table4[hash]) {
+		list_for_each(entry, &gcfg.hash_table4[hash]) {
 			c = list_entry(entry, struct cache_entry, hash4);
 			if (addr4->s_addr == c->addr4.s_addr) {
 				*addr6 = c->addr6;
@@ -549,7 +549,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		return ERROR_DROP;
 	}
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		c = cache_insert(addr4, addr6, hash, hash_ip6(addr6));
 
 		if (c_ptr)
@@ -655,10 +655,10 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	struct map_static *s;
 	struct map_dynamic *d = NULL;
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		hash = hash_ip6(addr6);
 
-		list_for_each(entry, &gcfg->hash_table6[hash]) {
+		list_for_each(entry, &gcfg.hash_table6[hash]) {
 			c = list_entry(entry, struct cache_entry, hash6);
 			if (IN6_ARE_ADDR_EQUAL(addr6, &c->addr6)) {
 				*addr4 = c->addr4;
@@ -697,7 +697,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		if (map6->addr.s6_addr32[0] == WKPF &&
 			map6->addr.s6_addr32[1] == 0 &&
 			map6->addr.s6_addr32[2] == 0 &&
-			gcfg->wkpf_strict &&
+			gcfg.wkpf_strict &&
 				is_private_ip4_addr(addr4))
 			return ERROR_REJECT;
 		s = container_of(map6, struct map_static, map6);
@@ -716,7 +716,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		return ERROR_DROP;
 	}
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		c = cache_insert(addr4, addr6, hash_ip4(addr4), hash);
 
 		if (c_ptr)
@@ -753,12 +753,12 @@ void addrmap_maint(void)
 	struct list_head *entry, *next;
 	struct cache_entry *c;
 
-	list_for_each_safe(entry, next, &gcfg->cache_active) {
+	list_for_each_safe(entry, next, &gcfg.cache_active) {
 		c = list_entry(entry, struct cache_entry, list);
 		if (c->last_use + CACHE_MAX_AGE < now) {
 			if (c->flags & CACHE_F_REP_AGEOUT)
 				report_ageout(c);
-			list_add(&c->list, &gcfg->cache_pool);
+			list_add(&c->list, &gcfg.cache_pool);
 			list_del(&c->hash4);
 			list_del(&c->hash6);
 		}
