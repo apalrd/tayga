@@ -2,6 +2,7 @@
 
 CC := gcc
 CFLAGS := -Wall -O2 -I.
+CFLAGS := -Wall -O2 -I.
 LDFLAGS := -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 TARGET := tayga

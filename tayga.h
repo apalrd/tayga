@@ -185,6 +185,8 @@ static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0);
 /// Type of mapping in mapping list
 enum map_type_t {
 	MAP_TYPE_INVALID,
+enum map_type_t {
+	MAP_TYPE_INVALID,
 	MAP_TYPE_STATIC,
 	MAP_TYPE_RFC6052,
 	MAP_TYPE_DYNAMIC,
@@ -216,6 +218,8 @@ static_assert(sizeof(time_t) == 8, "64-bit time_t is required");
 /// Mapping entry (Dynamic Pool)
 struct dyn_entry {
 	struct in6_addr addr6;
+	time_t created;
+	time_t last_seen;
 	struct in_addr addr4;
 	time_t created;
 	time_t last_seen;

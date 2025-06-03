@@ -207,6 +207,7 @@ static uint32_t hash_ip4(const struct in_addr *addr4)
 {
 	return ((uint32_t)(addr4->s_addr *
 				gcfg.rand[0])) >> (32 - gcfg.hash_bits);
+				gcfg.rand[0])) >> (32 - gcfg.hash_bits);
 }
 
 static uint32_t hash_ip6(const struct in6_addr *addr6)
@@ -219,6 +220,191 @@ static uint32_t hash_ip6(const struct in6_addr *addr6)
 	return h >> (32 - gcfg.hash_bits);
 }
 
+static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
+		uint32_t hash6)
+{
+	list_add(&c->hash4, &gcfg.hash_table4[hash4]);
+	list_add(&c->hash6, &gcfg.hash_table6[hash6]);
+}
+
+/**
+ * @brief Initialize address translation cache
+ *  
+ * This function initializes the two hash sets used
+ * for caching address translations.
+ * If it has not been done already, this function allocates
+ * `gcfg->cache_size` cache entries for the memory pool.
+ * 
+ * The address translation state is a set of IPv4-IPv6 address pairs.
+ * There is additional metada as well: see `struct cache_entry`.
+ * These pairs are stored in the linked list `gcfg->list`.
+ * The cache is two hash sets (`gcfg->hash_table4` and `gcfg->hash_table6`)
+ * that let Tayga query elements of this set using the IPv4
+ * or the IPv6 address.
+ * These hash sets use separate-chaining with a fixed bucket size
+ * (configurable as `gcfg->cache_size`),
+ * so the code here must initialize each of the buckets.
+ *
+ */
+void create_cache(void)
+{
+	int i, hash_size = 1 << gcfg.hash_bits;
+	struct list_head *entry;
+	struct cache_entry *c;
+
+	if (gcfg.hash_table4) {
+		free(gcfg.hash_table4);
+		free(gcfg.hash_table6);
+	}
+
+	gcfg.hash_table4 = (struct list_head *)
+				malloc(hash_size * sizeof(struct list_head));
+	gcfg.hash_table6 = (struct list_head *)
+				malloc(hash_size * sizeof(struct list_head));
+	if (!gcfg.hash_table4 || !gcfg.hash_table6) {
+		slog(LOG_CRIT, "unable to allocate %d bytes for hash table\n",
+				hash_size * sizeof(struct list_head));
+		exit(1);
+	}
+	for (i = 0; i < hash_size; ++i) {
+		INIT_LIST_HEAD(&gcfg.hash_table4[i]);
+		INIT_LIST_HEAD(&gcfg.hash_table6[i]);
+	}
+
+	if (list_empty(&gcfg.cache_pool) && list_empty(&gcfg.cache_active)) {
+		c = calloc(gcfg.cache_size, sizeof(struct cache_entry));
+		for (i = 0; i < gcfg.cache_size; ++i) {
+			INIT_LIST_HEAD(&c->list);
+			INIT_LIST_HEAD(&c->hash4);
+			INIT_LIST_HEAD(&c->hash6);
+			list_add_tail(&c->list, &gcfg.cache_pool);
+			++c;
+		}
+	} else {
+		list_for_each(entry, &gcfg.cache_active) {
+			c = list_entry(entry, struct cache_entry, list);
+			INIT_LIST_HEAD(&c->hash4);
+			INIT_LIST_HEAD(&c->hash6);
+			add_to_hash_table(c, hash_ip4(&c->addr4),
+						hash_ip6(&c->addr6));
+		}
+	}
+}
+
+static struct cache_entry *cache_insert(const struct in_addr *addr4,
+		const struct in6_addr *addr6,
+		uint32_t hash4, uint32_t hash6)
+{
+	struct cache_entry *c;
+
+	if (list_empty(&gcfg.cache_pool))
+		return NULL;
+	c = list_entry(gcfg.cache_pool.next, struct cache_entry, list);
+	c->addr4 = *addr4;
+	c->addr6 = *addr6;
+	c->last_use = now;
+	c->flags = 0;
+	c->ip4_ident = 1;
+	list_add(&c->list, &gcfg.cache_active);
+	add_to_hash_table(c, hash4, hash6);
+	return c;
+}
+/**
+ * @brief Check if an IPv4 address is in the cache
+ *  
+ * @param addr4 IPv4 address to check
+ * @returns Cache entry, or NULL if none found
+ */
+struct map4 *find_map4(const struct in_addr *addr4)
+{
+	struct list_head *entry;
+	struct map4 *m;
+
+	list_for_each(entry, &gcfg.map4_list) {
+		m = list_entry(entry, struct map4, list);
+		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr))
+			return m;
+	}
+	return NULL;
+}
+/**
+ * @brief Check if an IPv6 address is in the cache
+ *  
+ * @param addr6 IPv6 address to check
+ * @returns Cache entry, or NULL if none found
+ */
+struct map6 *find_map6(const struct in6_addr *addr6)
+{
+	struct list_head *entry;
+	struct map6 *m;
+
+	list_for_each(entry, &gcfg.map6_list) {
+		m = list_entry(entry, struct map6, list);
+		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask))
+			return m;
+	}
+	return NULL;
+}
+/**
+ * @brief Insert an IPv4 entry into the cache
+ *  
+ * @param map4 Cache entry to add
+ * @param[out] conflict Pointer to return conflicting object
+ * @returns -1 on conflict
+ */
+int insert_map4(struct map4 *m, struct map4 **conflict)
+{
+	struct list_head *entry;
+	struct map4 *s;
+
+	list_for_each(entry, &gcfg.map4_list) {
+		s = list_entry(entry, struct map4, list);
+		if (s->prefix_len < m->prefix_len)
+			break;
+		if (s->prefix_len == m->prefix_len &&
+				s->addr.s_addr == m->addr.s_addr)
+			goto conflict;
+	}
+	list_add_tail(&m->list, entry);
+	return 0;
+
+conflict:
+	if (conflict)
+		*conflict = s;
+	return -1;
+}
+/**
+ * @brief Insert an IPv6 entry into the cache
+ *  
+ * @param map6 Cache entry to add
+ * @param[out] conflict Pointer to return conflicting object
+ * @returns -1 on conflict
+ */
+int insert_map6(struct map6 *m, struct map6 **conflict)
+{
+	struct list_head *entry, *insert_pos = NULL;
+	struct map6 *s;
+
+	list_for_each(entry, &gcfg.map6_list) {
+		s = list_entry(entry, struct map6, list);
+		if (s->prefix_len < m->prefix_len) {
+			if (IN6_IS_IN_NET(&m->addr, &s->addr, &s->mask))
+				goto conflict;
+			if (!insert_pos)
+				insert_pos = entry;
+		} else {
+			if (IN6_IS_IN_NET(&s->addr, &m->addr, &m->mask))
+				goto conflict;
+		}
+	}
+	list_add_tail(&m->list, insert_pos ? insert_pos : &gcfg.map6_list);
+	return 0;
+
+conflict:
+	if (conflict)
+		*conflict = s;
+	return -1;
+}
 /**
  * @brief Append an IPv4 address to an IPv6 translation prefix
  *  
