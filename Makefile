@@ -37,33 +37,31 @@ cov-report:
 
 # Container images
 container: tayga-clat.tar tayga-nat64.tar tayga.tar
-
 .PHONY: container
+
 tayga.tar: tayga launch.sh
 	rm $@ || true
 	podman manifest create tayga
 	podman build --all-platforms . --manifest tayga
 	podman manifest push --all tayga ghcr.io/apalrd/tayga:latest
-	podman manifest rm tayga
 	podman save -o $@ tayga
+	podman manifest rm tayga
 
 tayga-clat.tar: tayga launch-clat.sh
 	rm $@ || true
 	podman manifest create tayga-clat
 	podman build --all-platforms . --manifest tayga-clat --target final-clat
 	podman manifest push --all tayga-clat ghcr.io/apalrd/tayga-clat:latest
-	podman manifest rm tayg-clat
 	podman save -o $@ tayga-clat
+	podman manifest rm tayga-clat
 
-	
 tayga-nat64.tar: tayga launch-nat64.sh
 	rm $@ || true
 	podman manifest create tayga-nat64
 	podman build --all-platforms . --manifest tayga-nat64 --target final-nat64
 	podman manifest push --all tayga-nat64 ghcr.io/apalrd/tayga-nat64:latest
-	podman manifest rm tayga-nat64
 	podman save -o $@ tayga-nat64
-
+	podman manifest rm tayga-nat64
 
 clean:
 	rm -f $(TARGET) tayga.d version.h $(TARGET-COV) *.gcda *.gcno tayga-nat64.tar tayga-clat.tar
