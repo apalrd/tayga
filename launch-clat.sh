@@ -5,16 +5,31 @@
 echo "Enabling IPv4 and IPv6 forwarding"
 echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
 echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+echo 1 > /proc/sys/net/ipv6/conf/all/proxy_ndp
 
 # Default environment variables
 TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
-TAYGA_POOL4="${TAYGA_POOL4:-192.168.240.0/20}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
+TAYGA_MTU="${TAYGA_MTU:-65535}"
+
+# For debugging
+echo IP Addresses:
+ip a
+echo IPv6 Routes:
+ip -6 route
+echo IPv4 Routes:
+ip -4 route
+
+# Delete default route if we have one
+ip route del default || true
 
 # Auto-detect ADDR4 and ADDR6 from the container if not set
 echo Finding Addr4
 if [[ -z "${TAYGA_ADDR4}" ]]; then
-    IF4=$(ip -o -4 route show to default | awk '{print $5}')
+    IF4=$(ip -o -4 route show scope link | awk '{print $3}' | head -n 1)
+    echo Got IF4 ${IF4}
+    RT4=$(ip -o -4 route show scope link | awk '{print $1}' | head -n 1 | cut -d'/' -f2)
+    echo Got RT4 ${RT4}
     ADDR4=$(ip addr show ${IF4} | grep -E 'inet ' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
     if [[ -z "${ADDR4}" ]]; then
         echo "No IPv4 address found on iface ${IF4}, exiting"
@@ -22,9 +37,18 @@ if [[ -z "${TAYGA_ADDR4}" ]]; then
     fi
     TAYGA_ADDR4="${ADDR4}"
     echo Using Container Addr4 $TAYGA_ADDR4 from ${IF4}
+    # Get MTU of this interface
+    MTU4="$(ip link show ${IF4} | grep -E 'mtu ' | awk '{print $5}')"
+    TAYGA_MTU=$(($TAYGA_MTU > $MTU4 ? $MTU4 : $TAYGA_MTU))
+    echo MTU of IPv4 side is ${MTU4}
+    # If we don't have a subnet mask assigned, calculate it from RT4
+    TAYGA_MASK4="${TAYGA_MASK4:-$RT4}"
+    echo Route Length is $((32-$TAYGA_MASK4))
+
 fi
 echo Finding Addr6
 if [[ -z "${TAYGA_ADDR6}" ]]; then
+    # Get interface with default v6 route
     IF6=$(ip -o -6 route show to default | awk '{print $5}')
     ADDR6=$(ip addr show ${IF6} | grep -E 'inet6 ' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
     if [[ -z "${ADDR6}" ]]; then
@@ -33,17 +57,13 @@ if [[ -z "${TAYGA_ADDR6}" ]]; then
     fi
     TAYGA_ADDR6="${ADDR6}"
     echo Using Container Addr6 $TAYGA_ADDR6 from ${IF6}
+    # Get MTU of this interface
+    MTU6="$(ip link show ${IF6} | grep -E 'mtu ' | awk '{print $5}')"
+    TAYGA_MTU=$(($TAYGA_MTU > $MTU6 ? $MTU6 : $TAYGA_MTU))
+    echo MTU of IPv6 side is ${MTU6}
+    # Starting address of mapping is ????
 fi
-if [[ -z "${TAYGA_MTU}" ]]; then
-    IF6=$(ip -o -6 route show to default | awk '{print $5}')
-    MTU=$(ip link show ${IF6} | grep -E 'mtu ' | awk '{print $5}')
-    if [[ -z "${MTU}" ]]; then
-        echo "No MTU found for iface ${IF6}, exiting"
-        exit 1
-    fi
-    TAYGA_MTU="${MTU}"
-    echo Using Container MTU $TAYGA_MTU
-fi
+echo Using Container MTU $TAYGA_MTU
 
 # Generate tayga.conf file
 cat << EOF > /app/tayga.conf.gen
@@ -55,8 +75,6 @@ wkpf-strict ${TAYGA_WKPF_STRICT}
 ipv4-addr ${TAYGA_ADDR4}
 ipv6-addr ${TAYGA_ADDR6}
 prefix ${TAYGA_PREF64}
-dynamic-pool ${TAYGA_POOL4}
-data-dir /app/
 EOF
 
 # If tayga.conf does not already exist, use our new conf
@@ -74,9 +92,10 @@ echo "Creating tunnel adapter"
 # Bring up the interface
 echo "Bringing up the interface"
 ip link set dev nat64 up
+echo "Setting MTU to ${TAYGA_MTU}"
 ip link set nat64 mtu ${TAYGA_MTU}
-ip route add ${TAYGA_POOL4} dev nat64
-ip route add ${TAYGA_PREF64} dev nat64
+echo "Adding default route"
+ip -4 route add default dev nat64
 
 # Start tayga
 echo "Starting tayga"
