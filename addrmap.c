@@ -229,7 +229,20 @@ static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
 /**
  * @brief Initialize address translation cache
  *  
- * TODO Document how the cache works better
+ * This function initializes the two hash sets used
+ * for caching address translations.
+ * If it has not been done already, this function allocates
+ * `gcfg->cache_size` cache entries for the memory pool.
+ * 
+ * The address translation state is a set of IPv4-IPv6 address pairs.
+ * There is additional metada as well: see `struct cache_entry`.
+ * These pairs are stored in the linked list `gcfg->list`.
+ * The cache is two hash sets (`gcfg->hash_table4` and `gcfg->hash_table6`)
+ * that let Tayga query elements of this set using the IPv4
+ * or the IPv6 address.
+ * These hash sets use separate-chaining with a fixed bucket size
+ * (configurable as `gcfg->cache_size`),
+ * so the code here must initialize each of the buckets.
  *
  */
 void create_cache(void)
@@ -335,7 +348,7 @@ struct map6 *find_map6(const struct in6_addr *addr6)
  * @brief Insert an IPv4 entry into the cache
  *  
  * @param map4 Cache entry to add
- * @param conflict Pointer to return conflicting object
+ * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
  */
 int insert_map4(struct map4 *m, struct map4 **conflict)
@@ -363,7 +376,7 @@ conflict:
  * @brief Insert an IPv6 entry into the cache
  *  
  * @param map6 Cache entry to add
- * @param conflict Pointer to return conflicting object
+ * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
  */
 int insert_map6(struct map6 *m, struct map6 **conflict)
