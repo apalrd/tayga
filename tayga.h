@@ -202,7 +202,7 @@ struct map4 {
 	struct in_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list;
+	struct list_head list; /* gcfg->map4_list */
 };
 
 /// Mapping entry (IPv6)
@@ -211,7 +211,7 @@ struct map6 {
 	struct in6_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list;
+	struct list_head list; /* gcfg->map6_list */
 };
 
 /// Mapping entry (Static Maps)
@@ -221,10 +221,11 @@ struct map_static {
 	int conffile_lineno;
 };
 
+/// Free addresses
 struct free_addr {
 	uint32_t addr; /* in-use address (host order) */
 	uint32_t count; /* num of free addresses after addr */
-	struct list_head list;
+	struct list_head list; /* list of struct free_addr */
 };
 
 /// Mapping entry (Dynamic Map)
@@ -233,16 +234,16 @@ struct map_dynamic {
 	struct map6 map6;
 	struct cache_entry *cache_entry;
 	time_t last_use;
-	struct list_head list;
+	struct list_head list; /* referenced by struct dynamic_pool */
 	struct free_addr free;
 };
 
 /// Mapping entry (Dynamic Pool)
 struct dynamic_pool {
 	struct map4 map4;
-	struct list_head mapped_list;
-	struct list_head dormant_list;
-	struct list_head free_list;
+	struct list_head mapped_list;  /* list of struct map_dynamic */
+	struct list_head dormant_list; /* list of struct map_dynamic */
+	struct list_head free_list;    /* list of struct free_addr */
 	struct free_addr free_head;
 };
 
@@ -253,9 +254,9 @@ struct cache_entry {
 	time_t last_use;
 	uint32_t flags;
 	uint16_t ip4_ident;
-	struct list_head list;
-	struct list_head hash4;
-	struct list_head hash6;
+	struct list_head list;  /* gcfg->cache_active or gcfg->cache_pool */
+	struct list_head hash4; /* gcfg->hash_table4 */
+	struct list_head hash6; /* gcfg->hash_table6 */
 };
 
 /// Cache flag bits
