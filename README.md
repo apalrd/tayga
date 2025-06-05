@@ -1,4 +1,7 @@
-This repository contains Tayga, imported from its previous release (0.9.2) from Litech.org, plus all patches maintained by Debian applied.
+This repository contains Tayga,
+imported from its previous release (0.9.2) from Litech.org,
+plus all patches maintained by Debian applied.
+It has received futher patches from contributors here on GitHub.
 
 # Overview
 
@@ -8,7 +11,8 @@ used by OpenVPN and QEMU/KVM.  TAYGA needs no kernel patches or out-of-tree
 modules, and it is compatible with all 2.4 and 2.6 kernels.
 
 If you're impatient and you know what stateless NAT64 is, you can skip to the
-Installation & Basic Configuration section.
+[Installation & Basic Configuration](#installation-%26-basic-configuration)
+section.
 
 ## Stateless versus Stateful NAT64
 
@@ -21,13 +25,13 @@ IPv4 address on the NAT device's "external" interface.
 Stateless NAT does no such session tracking or port number rewriting.  It
 simply performs a 1:1 substitution of IP addresses using a mapping table
 provided by the network administrator.  For example, an organization whose
-global address allocation was 198.51.100.0/24 but whose hosts were using
-addresses in 192.0.2.0/24 could use a stateless NAT to rewrite 192.0.2.1 into
-198.51.100.1, 192.0.2.35 into 198.51.100.35, etc, in the outbound direction,
-and the reverse in the inbound direction.  This is commonly done when an
-organization moves to a new ISP and receives a new IPv4 address delegation of
-the same size as their old delegation but does not want to renumber their
-network.
+global address allocation was `198.51.100.0/24` but whose hosts were using
+addresses in `192.0.2.0/24` could use a stateless NAT to rewrite `192.0.2.1`
+into `198.51.100.1`, `192.0.2.35` into `198.51.100.35`, etc, in the outbound
+direction, and the reverse in the inbound direction.  This is commonly done
+when an organization moves to a new ISP and receives a new IPv4 address
+delegation of the same size as their old delegation but does not want to
+renumber their network.
 
 TAYGA and other stateless NAT64 translators operate in this fashion.  When
 translating packets between IPv4 and IPv6, the source and destination
@@ -50,14 +54,14 @@ prefix, which we call the NAT64 prefix, and the resulting IPv6 address can be
 used to contact the IPv4 host through the NAT64.
 
 The NAT64 prefix should be assigned out of a site's global IPv6 address
-allocation.  For example, if a site is allocated 2001:db8:1::/48, the prefix
-2001:db8:1:ffff::/96 could be set aside for NAT64.  (There are several options
+allocation.  For example, if a site is allocated `2001:db8:1::/48`, the prefix
+`2001:db8:1:ffff::/96` could be set aside for NAT64.  (There are several options
 for the length of the NAT64 prefix, but a /96 is recommended.)  The IPv4 host
-198.51.100.10 could then be accessed through the NAT64 using the address
-2001:db8:1:ffff::c633:640a.  Conveniently, it is possible to use the syntax
-2001:db8:1:ffff::198.51.100.10 instead.
+`198.51.100.10` could then be accessed through the NAT64 using the address
+`2001:db8:1:ffff::c633:640a`.  Conveniently, it is possible to use the syntax
+`2001:db8:1:ffff::198.51.100.10` instead.
 
-RFC 6052 also specifies a Well-Known Prefix 64:ff9b::/96 which can be used for
+RFC 6052 also specifies a Well-Known Prefix `64:ff9b::/96` which can be used for
 NAT64 service rather than allocating a prefix from the site's IPv6 address
 block.  However, this comes with several restrictions, primarily that hosts
 with private IPv4 addresses (10.x.x.x, 192.168.x.x, etc) cannot be accessed
@@ -91,20 +95,16 @@ carved out of the NAT64 prefix.)
 
 # Installation & Basic Configuration
 
-TAYGA uses the GNU Automake/Autoconf system, which requires the `configure`
-script to be run to generate the Makefile prior to building.  The --prefix
-and/or --sysconfdir options can be specified to the configure script to
-specify the top-level installation path and tayga.conf file directory,
-respectively.
-
-After unpacking the distribution tar.bz2 file, run:
+TAYGA requires GNU make to build.
 
 ```sh
-./configure && make && make install
+git clone git@github.com:apalrd/tayga.git
+cd tayga
+make
 ```
 
-This will install the tayga executable in /usr/local/sbin/tayga and the sample
-config file in /usr/local/etc/tayga.conf.example.
+This will build the `tayga` executable in the current directory.
+Installation options will be available in future releases.
 
 Next, if you would like dynamic maps to be persistent between TAYGA restarts,
 create a directory to store the dynamic.map file:
@@ -208,7 +208,7 @@ RFC6052 describes methods of encoding IPv4 addresses into IPv6 prefixes.
 ### Support for non/96 prefixes
 RFC6052 specifies several prefix lengths and mapping formats. While Tayga supports all of these, for prefixes other than /96, there are unused suffix bits in the translated addresses. RFC6052 specifies that we `SHOULD` ignore these bits, as future extensions may utilize them. Tayga will reject packets if these bits are not zero. See [Issue #10](https://github.com/apalrd/tayga/issues/10).
 ### Strict RFC6052 Well-Known Prefix Compliance
-Tayga by default will drop packets containing non-global IPv4 addresses when using the well-known prefix (`64:ff9b::/96`) as required by RFC6052. This restriction may be disabled by using the `wkpf-strict no` option in the configuration file, as may be required in testing environments or if your network will ensure RFC6052 compliance on your own. This restriction does not apply to the well-known local-use space (64:ff9b:1::/48) per RFC8215.
+Tayga by default will drop packets containing non-global IPv4 addresses when using the well-known prefix (`64:ff9b::/96`) as required by RFC6052. This restriction may be disabled by using the `wkpf-strict no` option in the configuration file, as may be required in testing environments or if your network will ensure RFC6052 compliance on your own. This restriction does not apply to the well-known local-use space (`64:ff9b:1::/48`) per RFC8215.
 ### Private Addressing (RFC5735)
 RFC6052 calls out RFC5735 as a list of non-global IPv4 prefixes which must not be translated. This reference has been obsoleted by RFC6890, and this list has been [migrated to IANA](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml). Tayga follows the IANA registry last updated 2021-02-04.
 
