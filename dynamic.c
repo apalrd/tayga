@@ -17,6 +17,8 @@
  */
 
 #include "tayga.h"
+#include <inttypes.h>
+#include <limits.h>
 
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
@@ -173,7 +175,7 @@ activate:
 }
 
 static void load_map(struct dynamic_pool *pool, const struct in6_addr *addr6,
-		const struct in_addr *addr4, long int last_use)
+		const struct in_addr *addr4, time_t last_use)
 {
 	struct list_head *entry;
 	struct free_addr *f;
@@ -240,7 +242,7 @@ void load_dynamic(struct dynamic_pool *pool)
 	char *s4, *s6, *stime, *end, *tokptr;
 	struct in_addr addr4;
 	struct in6_addr addr6;
-	long int last_use;
+	time_t last_use;
 	struct list_head *entry;
 	struct map_dynamic *d;
 	int count = 0;
@@ -274,7 +276,13 @@ void load_dynamic(struct dynamic_pool *pool)
 		if (!inet_pton(AF_INET, s4, &addr4) ||
 				!inet_pton(AF_INET6, s6, &addr6))
 			goto malformed;
+#if LONG_MAX == INT64_MAX
 		last_use = strtol(stime, &end, 10);
+#elif LLONG_MAX == INT64_MAX
+		last_use = strtoll(stime, &end, 10);
+#else
+#  error Either long or long long must be 64 bits
+#endif
 		if (last_use <= 0 || *end)
 			goto malformed;
 		load_map(pool, &addr6, &addr4, last_use);
@@ -343,7 +351,7 @@ static void write_to_file(struct dynamic_pool *pool)
 		d = list_entry(entry, struct map_dynamic, list);
 		inet_ntop(AF_INET, &d->map4.addr, addrbuf4, sizeof(addrbuf4));
 		inet_ntop(AF_INET6, &d->map6.addr, addrbuf6, sizeof(addrbuf6));
-		fprintf(out, "%s\t%s\t%ld\n", addrbuf4, addrbuf6,
+		fprintf(out, "%s\t%s\t%" PRId64 "\n", addrbuf4, addrbuf6,
 				d->cache_entry ?
 					d->cache_entry->last_use : d->last_use);
 		entry = entry->next;

@@ -238,6 +238,8 @@ struct map_dynamic {
 	struct free_addr free;
 };
 
+static_assert(sizeof(time_t) == 8, "64-bit time_t is required");
+
 /// Mapping entry (Dynamic Pool)
 struct dynamic_pool {
 	struct map4 map4;
