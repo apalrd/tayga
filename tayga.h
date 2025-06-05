@@ -211,6 +211,8 @@ struct map_entry {
 	};
 };
 
+static_assert(sizeof(time_t) == 8, "64-bit time_t is required");
+
 /// Mapping entry (Dynamic Pool)
 struct dyn_entry {
 	struct in6_addr addr6;
