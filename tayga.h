@@ -184,49 +184,66 @@ static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0);
 
 /// Type of mapping in mapping list
 enum map_type_t {
-	MAP_TYPE_INVALID,
-	MAP_TYPE_STATIC,
-	MAP_TYPE_RFC6052,
-	MAP_TYPE_DYNAMIC,
-	MAP_TYPE_MAX
+	MAP_TYPE_INVALID,	/* Map entry should be dropped */
+	MAP_TYPE_REJECT,	/* Map entry should get ICMP rejection */
+	MAP_TYPE_STATIC,	/* Static EAM map (RFC7757) */
+	MAP_TYPE_DYNAMIC,	/* Dynamic EAM entry */
+	MAP_TYPE_RFC6052,	/* Translated address (RFC6052) */
+	MAP_TYPE_MAX		/* Flag indicating the highest valid value */
 };
 
 /// Mapping entry
 /// Meaning of these fields changes when they are indexed by addr4 or addr6
 struct map_entry {
+	/* Mapping addresses */
 	struct in6_addr addr6;
+	struct in6_addr hairpin6;
 	struct in_addr addr4;
+	/* Mapping type */
 	enum map_type_t type;
-	int prefix_len4;
-	int prefix_len6;
+	/* Prefix lengths */
+	int prefix4;
+	int prefix6;
+	/* Configuration file line number */
 	int line;
-	union {
-		/* Static type has no data */
-		/* RFC6052 type has no data */
-		/* Dynamic type data*/
-		struct {
-			int offset;
-		} dyn;
-		/* AP type has no data */
-	};
+	/* Binary flags (many things) */
+	int flags;
+	/* Last time this entry was seen */
+	time_t last;
+};
+
+/// Patricia Trie Entry
+struct trie_entry {
+	/* IP address + IP Mask (v4 uses first word only) */
+	struct in6_addr addr;
+	struct in6_addr mask;
+	/* Pointer to parent */
+	struct trie_entry *parent;
+	/* Pointer to children */
+	struct trie_entry *left, *right;
+	/* Pointer to corresponding map entry */
+	struct map_entry *map;
+	/* Bit index of this entry */
+	int bit;
 };
 
 static_assert(sizeof(time_t) == 8, "64-bit time_t is required");
 
-/// Mapping entry (Dynamic Pool)
-struct dyn_entry {
-	struct in6_addr addr6;
-	struct in_addr addr4;
-	time_t created;
-	time_t last_seen;
-	int flags;
+/// Mapping entry flag bits
+enum {
+	MAP_F_SEEN_4TO6		= (1<<0),	/* Traffic seen 4to6 */
+	MAP_F_SEEN_6TO4		= (1<<1),	/* Traffic seen 6to4 */
+	MAP_F_DYN_FROM_FILE = (1<<2),	/* Dynamic map was loaded from file */
+	MAP_F_REF4 			= (1<<14),	/* Map pointer used by v4 table */
+	MAP_F_REF6 			= (1<<15)	/* Map pointer used by v6 table */
 };
 
-/// Cache flag bits
+/// Mapping insert operation flags
 enum {
-	DYN_F_SEEN_4TO6	= (1<<0),
-	DTN_F_SEEN_6TO4	= (1<<1),
-	DYN_F_FROM_FILE = (1<<2),
+	MAP_OPT_V4_CREATE	= (1<<0),	/* Add new object in mapping table */
+	MAP_OPT_V4_REPLACE	= (1<<1),	/* Replace an existing object in mapping table */
+	MAP_OPT_V6_CREATE	= (1<<2),	/* Add for v6 */
+	MAP_OPT_V6_REPLACE	= (1<<3),	/* Replace for v6 */
 };
 
 /// UDP Checksum options
@@ -242,14 +259,12 @@ struct config {
 	char data_dir[512];
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
-	/* Pointers to map4 and map6 tables */
-	struct map_entry *map4;
-	struct map_entry *map6;
-	int map_entry_size;
-	int map_entry_len;
-	/* Pointer to dynamic table */
-	struct dyn_entry *dyn;
-	int dyn_size;
+	/* Global RFC6052 translation prefix */
+	struct in6_addr pref64;
+	int pref64_len;
+	/* Pointer to map */
+	struct trie_entry *map4;
+	struct trie_entry *map6;
 	/* Dynamic timers */
 	int dyn_min_lease;
 	int dyn_max_lease;
@@ -337,6 +352,6 @@ void read_random_bytes(void *d, int len);
 
 /* mapping.c */
 void map_init(void);
-int map_insert(struct map_entry *m);
-struct map_entry *map_search4(struct in_addr a);
-struct map_entry *map_search6(struct in6_addr a);
+int map_insert(struct map_entry *m, int op);
+struct map_entry *map_search4(struct in_addr *a);
+struct map_entry *map_search6(struct in6_addr *a);
