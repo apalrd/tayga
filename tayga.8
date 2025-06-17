@@ -1,4 +1,4 @@
-.TH TAYGA "8" "Dec 2018" "TAYGA 0.9.2" ""
+.TH TAYGA "8" "Jun 2025" "TAYGA 0.9.4" ""
 
 .SH NAME
 tayga \- stateless NAT64 daemon
@@ -14,13 +14,13 @@ tayga \- stateless NAT64 daemon
 .I [OPTION]...
 
 .SH DESCRIPTION
-TAYGA is a stateless NAT64 daemon for Linux.  Using the in-kernel TUN network
-driver, TAYGA receives IPv4 and IPv6 packets from the host's network stack,
-translates them to the other protocol, and then sends the translated packets
-back to the host using the same TUN interface.
+TAYGA is a stateless NAT64 daemon for Linux and FreeBSD.  Using the in-kernel
+TUN network driver, TAYGA receives IPv4 and IPv6 packets from the host's
+network stack, translates them to the other protocol, and then sends the
+translated packets back to the host using the same TUN interface.
 .P
-Translation is compliant with IETF RFC 6145, and address mapping is
-performed in accordance with RFC 6052 or RFC 7757.  Optionally, TAYGA may be
+Translation is compliant with IETF RFC 7915, and address mapping is
+performed in accordance with RFC 6052 and RFC 7757.  Optionally, TAYGA may be
 configured to dynamically map IPv6 hosts to addresses drawn from a
 configured IPv4 address pool.
 .P
@@ -87,9 +87,10 @@ chroot() to data\-dir (specified in config file)
 Write process ID of daemon to
 .I pidfile
 .SH AUTHOR
-Written by Nathan Lutchansky <lutchann@litech.org>
+Maintained by Andrew Palardy <andrew@apalrd.net>
 .SH COPYRIGHT
 Copyright \(co 2010 Nathan Lutchansky
+Copyright \(co 2025 Andrew Palardy
 .br
 License GPLv2+: GNU GPL version 2 or later
 .br
@@ -99,4 +100,4 @@ There is NO WARRANTY, to the extent permitted by law.
 
 .BR tayga.conf (5)
 .br
-.BR <http://www.litech.org/tayga/>
+.BR <https://github.com/apalrd/tayga/>
