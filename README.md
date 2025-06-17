@@ -8,7 +8,9 @@ If you are interested in the mechanics of NAT64 and Stateles IP / ICMP Translati
 
 # Installation & Basic Configuration
 
-Pre-built statically linked binaries are available from the [Releases] for amd64 and arm64 architectures. Container images are also available. 
+Pre-built statically linked binaries are available from the [Releases] for amd64 and arm64 architectures. Container images are also available.
+
+# Compiling
 
 TAYGA requires GNU make to build. If you would like to run the test suite, see [Test Documentation](test/index.md) for additional dependencies. 
 
