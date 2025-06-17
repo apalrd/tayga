@@ -197,7 +197,6 @@ enum map_type_t {
 struct map_entry {
 	/* Mapping addresses */
 	struct in6_addr addr6;
-	struct in6_addr hairpin6;
 	struct in_addr addr4;
 	/* Mapping type */
 	enum map_type_t type;
@@ -234,16 +233,15 @@ enum {
 	MAP_F_SEEN_4TO6		= (1<<0),	/* Traffic seen 4to6 */
 	MAP_F_SEEN_6TO4		= (1<<1),	/* Traffic seen 6to4 */
 	MAP_F_DYN_FROM_FILE = (1<<2),	/* Dynamic map was loaded from file */
+	MAP_F_HAIRPIN	 	= (1<<3),	/* Map entry is a Hairpin route */
 	MAP_F_REF4 			= (1<<14),	/* Map pointer used by v4 table */
 	MAP_F_REF6 			= (1<<15)	/* Map pointer used by v6 table */
 };
 
 /// Mapping insert operation flags
 enum {
-	MAP_OPT_V4_CREATE	= (1<<0),	/* Add new object in mapping table */
-	MAP_OPT_V4_REPLACE	= (1<<1),	/* Replace an existing object in mapping table */
-	MAP_OPT_V6_CREATE	= (1<<2),	/* Add for v6 */
-	MAP_OPT_V6_REPLACE	= (1<<3),	/* Replace for v6 */
+	MAP_OPT_CREATE	= (1<<0),	/* Add new object in mapping table */
+	MAP_OPT_REPLACE	= (1<<1),	/* Replace an existing object in mapping table */
 };
 
 /// UDP Checksum options

@@ -22,33 +22,74 @@
  * Allocates space for mapping tables, exits on failure
  */
 void map_init(void) {
-    /* Malloc the tree root */
-    gcfg.map4 = malloc(sizeof(struct map_entry));
-    if(!gcfg.map4) {
-        slog(LOG_CRIT,"Failed to allocate tree root\n");
+    /* Malloc one root map and two root tries */
+    gcfg.map4 = malloc(sizeof(struct trie_entry));
+    gcfg.map6 = malloc(sizeof(struct trie_entry));
+    if(!gcfg.map4 || !gcfg.map6) {
+        slog(LOG_CRIT,"Failed to allocate tree roots\n");
         exit(-1);
     }
-    /* Zero buffer */
-    memset(gcfg.map4,0,sizeof(struct map_entry));
-
-    /* Set referenced flags */
-    gcfg.map4->flags |= MAP_F_REF4 | MAP_F_REF6;
-
-    /* Use the same entry for IPv6 */
-    gcfg.map6 = gcfg.map4;
+    /* Zero buffers */
+    memset(gcfg.map4,0,sizeof(struct trie_entry));
+    memset(gcfg.map6,0,sizeof(struct trie_entry));
 }
 
 /**
- * @brief Insert a static map entry into the static map trie(s)
+ * @brief Insert a static map entry into a trie
  * 
  * Takes a given static map entry and inserts it at the correct
- * location in the map, for both v4 and v6
+ * location in the map, internal shared with v4/v6 code paths
  *
  * @param m struct map_entry to add
- * @param op bitmask of MAP_OPT flags to perform
+ * @param op bitmask of MAP_OPT flags to perform (create and/or replace)
  * @returns Nonzero on error
  */
-int map_insert(struct map_entry *m, int op) {
+static int map_insert(struct map_entry *m) {
+    /* Bail if entry is invalid */
+    if(!m) return -1;
+    if(m->prefix4 > 32) return -1;
+    if(m->prefix4 < 0) return -1;
+    if(m->type >= MAP_TYPE_MAX) return -1;
+
+    /* TBD */
+    return 0;
+
+    /* TBD */
+    return 0;
+}
+
+/**
+ * @brief Insert a static map entry into the v6 trie(s)
+ * 
+ * Takes a given static map entry and inserts it at the correct
+ * location in the map
+ *
+ * @param m struct map_entry to add
+ * @param op bitmask of MAP_OPT flags to perform (create and/or replace)
+ * @returns Nonzero on error
+ */
+int map_insert6(struct map_entry *m, int op) {
+    /* Bail if entry is invalid */
+    if(!m) return -1;
+    if(m->prefix6 > 128) return -1;
+    if(m->prefix6 < 0) return -1;
+    if(m->type >= MAP_TYPE_MAX) return -1;
+
+    /* TBD */
+    return 0;
+}
+
+/**
+ * @brief Insert a static map entry into the v4 trie(s)
+ * 
+ * Takes a given static map entry and inserts it at the correct
+ * location in the map
+ *
+ * @param m struct map_entry to add
+ * @param op bitmask of MAP_OPT flags to perform (create and/or replace)
+ * @returns Nonzero on error
+ */
+int map_insert4(struct map_entry *m, int op) {
     /* Bail if entry is invalid */
     if(!m) return -1;
     if(m->prefix4 > 32) return -1;
