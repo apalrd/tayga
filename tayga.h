@@ -312,8 +312,16 @@ struct config {
 	int map_write_pending;
 
 	int wkpf_strict;
-
+	int log_opts;
 	enum udp_cksum_mode udp_cksum_mode;
+};
+
+/// Logging flags
+enum {
+	LOG_OPT_REJECT = (1<<0),	//Packet was rejected
+	LOG_OPT_DROP = 	 (1<<1),	//Packet was dropped
+	LOG_OPT_ICMP = 	 (1<<2),	//Packet kicked back an ICMP for any reason
+	LOG_OPT_SELF = 	 (1<<3),	//Packet was destined to ourselves
 };
 
 /// Packet error codes

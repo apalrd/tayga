@@ -1,4 +1,4 @@
-.TH TAYGA.CONF "5" "Dec 2018" "TAYGA 0.9.2" ""
+.TH TAYGA.CONF "5" "Jun 2025" "TAYGA 0.9.4" ""
 .SH NAME
 tayga.conf \- configuration file of the TAYGA stateless NAT64 daemon
 .SH DESCRIPTION
@@ -77,7 +77,7 @@ must be listed individually with the
 .B map
 directive.
 .TP
-.BI "wkpf-strict " yes/no
+.BI "wkpf-strict " yes|no
 Enable or disable strict RFC 6052 compliance. If enabled, Tayga will refuse
 with a source or destination address composed of the Well-Known Prefix and a
 non-global IPv4 address (10.x.x.x, 192.168.x.x, etc).
@@ -197,8 +197,36 @@ behavior.
 .IP
 This setting does not affect packets that arrive at TAYGA already fragmented,
 or packets that must be fragmented to fit within the IPv6 network MTU.
+.TP
+.BI "udp-cksum-mode " drop|fwd|calc
+Handling of UDP packets with zero checksum. Per RFC7915, we can either 
+.B [drop]
+the packet, or calculating
+.B [calc]
+a new checksum. Additionally, Tayga also allows the option of forwarding
+.B [fwd] 
+the packet anyway
+.TP
+.BI "log " drop|reject|self
+Configure logging of packets. By default, Tayga only logs errors within Tayga
+itself. To log errors in packet translation, list one or more log option. 
+.IP
+.I drop
+- Log packets which were dropped.
+.IP
+.I reject
+- Log packets which were rejected (ICMP returned)
+.IP
+.I icmp
+- Log packets which returned an ICMP for any reason, including packets which are
+part of 'normal' internet traffic (i.e. Packet Too Big or Time Exceeded)
+.IP
+.I self
+- Log packets which were destined for Tayga itself
+.IP 
+No packet logging is enabled by default
 
 .SH "SEE ALSO"
 .BR tayga (8)
 .br
-.BR <http://www.litech.org/tayga/>
+.BR <https://github.com/apalrd/tayga/>

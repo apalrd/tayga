@@ -128,6 +128,7 @@ class confgen:
         self.map = []
         self.map.append("172.16.0.1 2001:db8::1")
         self.map.append("172.16.0.2 2001:db8::2")
+        self.log = "drop reject icmp self"
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -146,6 +147,8 @@ class confgen:
                 conf_file.write("data-dir "+self.data_dir+"\n")
             for entry in self.map:
                 conf_file.write("map "+entry+"\n")
+            if self.log is not None:
+                conf_file.write("log "+self.log+"\n")
 
 
 

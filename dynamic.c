@@ -305,7 +305,7 @@ malformed:
 			count == 1 ? "map" : "maps",
 			gcfg->data_dir, MAP_FILE);
 	if (last_use > now) {
-		slog(LOG_DEBUG, "Note: maps in %s/%s are dated in the future\n",
+		slog(LOG_NOTICE, "Note: maps in %s/%s are dated in the future\n",
 				gcfg->data_dir, MAP_FILE);
 		list_for_each(entry, &pool->dormant_list) {
 			d = list_entry(entry, struct map_dynamic, list);

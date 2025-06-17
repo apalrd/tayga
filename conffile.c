@@ -228,7 +228,6 @@ static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 		slog(LOG_CRIT, "Error: invalid value for udp-cksum-mode on line %d\n",ln);
 		return ERROR_REJECT;
 	}
-	slog(LOG_DEBUG,"Got valid udp-cksum-mode of %d\n",gcfg->udp_cksum_mode);
 	return ERROR_NONE;
 }
 
@@ -420,6 +419,20 @@ static int config_strict_fh(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_log(int ln, int arg_count, char **args)
+{
+	/* For each arg we have */
+	for(int i = 0; i < arg_count; i++)
+	{
+		/* Check if this arg matches one of these keys, and enable that key */
+		if(!strcasecmp(args[i],"drop")) gcfg->log_opts |= LOG_OPT_DROP;
+		if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
+		if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
+		if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
+	}
+	return ERROR_NONE;
+}
+
 struct {
 	/* Long name */
 	char *name;
@@ -438,6 +451,7 @@ struct {
 	{ "dynamic-pool", 	config_dynamic_pool,	1 },
 	{ "data-dir", 		config_data_dir, 		1 },
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
+	{ "log"	,			config_log, 		   -1 },
 	{ NULL, NULL, 0 }
 };
 

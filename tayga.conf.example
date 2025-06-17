@@ -123,4 +123,19 @@ data-dir /var/spool/tayga
 #
 # Default value: drop
 # 
-#wkpf-strict drop
+#udp-cksum-mode drop
+
+
+#
+# Logging packet errors
+#
+# List each option you would like to log with a space
+# Valid options:
+#   drop - packets which were DROPPED
+#   reject - packets which were REJECTED (ICMP returned)
+#   icmp - packets which returned an ICMP for any other reason
+#   self - packets which were addressed to Tayga itself
+#
+# Default value: none
+# 
+#log drop reject icmp self

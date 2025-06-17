@@ -261,7 +261,7 @@ void create_cache(void)
 	gcfg->hash_table6 = (struct list_head *)
 				malloc(hash_size * sizeof(struct list_head));
 	if (!gcfg->hash_table4 || !gcfg->hash_table6) {
-		slog(LOG_CRIT, "unable to allocate %d bytes for hash table\n",
+		slog(LOG_CRIT, "Unable to allocate %d bytes for hash table\n",
 				hash_size * sizeof(struct list_head));
 		exit(1);
 	}
@@ -519,7 +519,6 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	map4 = find_map4(addr4);
 
 	if (!map4) {
-		slog(LOG_DEBUG,"Invalid map4 at %s:%d\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	}
 
@@ -534,13 +533,10 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	case MAP_TYPE_RFC6052:
 		s = container_of(map4, struct map_static, map4);
 		ret = append_to_prefix(addr6, addr4, &s->map6.addr,s->map6.prefix_len);
-		if (ret < 0) {
-			slog(LOG_DEBUG,"Append_to_prefix failed at %s:%d\n",__FUNCTION__,__LINE__);
-			return ret;
-		}
+		if (ret < 0) return ret;
 		break;
 	case MAP_TYPE_DYNAMIC_POOL:
-		slog(LOG_DEBUG,"Address map is dynamic pool at %s:%d\n",__FUNCTION__,__LINE__);
+		slog(LOG_DEBUG,"%s:%d Address map is dynamic pool\n",__FUNCTION__,__LINE__);
 		return ERROR_REJECT;
 	case MAP_TYPE_DYNAMIC_HOST:
 		d = container_of(map4, struct map_dynamic, map4);
@@ -548,7 +544,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		d->last_use = now;
 		break;
 	default:
-		slog(LOG_DEBUG,"Hit default case in %s:%d\n",__FUNCTION__,__LINE__);
+		slog(LOG_DEBUG,"%s:%d Hit default case\n",__FUNCTION__,__LINE__);
 		return ERROR_DROP;
 	}
 
@@ -682,7 +678,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 			return ERROR_REJECT;
 		s = container_of(map6, struct map_static, map6);
 		if (find_map4(addr4) != &s->map4){
-			slog(LOG_DEBUG,"Dropping packet due to find_map4 %s:%d",__FUNCTION__,__LINE__);
+			slog(LOG_DEBUG,"%s:%d Dropping packet due to hairpin condition",__FUNCTION__,__LINE__);
 			return ERROR_DROP;
 		}
 		break;
@@ -692,7 +688,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		d->last_use = now;
 		break;
 	default:
-		slog(LOG_DEBUG,"Dropping packet due to default case %s:%d",__FUNCTION__,__LINE__);
+		slog(LOG_DEBUG,"%s:%d Dropping packet due to default case",__FUNCTION__,__LINE__);
 		return ERROR_DROP;
 	}
 
@@ -744,10 +740,3 @@ void addrmap_maint(void)
 		}
 	}
 }
-
-/*
-Local Variables:
-c-basic-offset: 8
-indent-tabs-mode: t
-End:
-*/

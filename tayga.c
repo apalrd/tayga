@@ -366,7 +366,7 @@ static void read_from_signalfd(void)
 		}
 		if (gcfg->dynamic_pool)
 			dynamic_maint(gcfg->dynamic_pool, 1);
-		slog(LOG_NOTICE, "exiting on signal %d\n", sig);
+		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		exit(0);
 	}
 }
@@ -392,7 +392,7 @@ static void print_op_info(void)
 			&& !m6->addr.s6_addr32[1]
 			&& !m6->addr.s6_addr32[2]
 			&& gcfg->wkpf_strict)
-			slog(LOG_INFO, "Note: traffic between IPv6 hosts and "
+			slog(LOG_NOTICE, "Note: traffic between IPv6 hosts and "
 					"private IPv4 addresses (i.e. to/from "
 					"64:ff9b::10.0.0.0/104, "
 					"64:ff9b::192.168.0.0/112, etc) "
@@ -411,7 +411,7 @@ static void print_op_info(void)
 		if (gcfg->data_dir[0])
 			load_dynamic(gcfg->dynamic_pool);
 		else
-			slog(LOG_INFO, "Note: dynamically-assigned mappings "
+			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
 					"will not be saved across restarts.  "
 					"Specify data-dir in config if you would "
 					"like dynamic mappings to be "
