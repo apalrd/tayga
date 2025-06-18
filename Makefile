@@ -4,6 +4,16 @@ CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 
+#Default installation paths (may be overridden by environment variables)
+prefix ?= /usr/local
+exec_prefix ?= $(prefix)
+DESTDIR ?= /tmp
+sbindir ?= $(exec_prefix)/sbin
+datarootdir ?= $(prefix)/share
+mandir ?= $(datarootdir)/man
+INSTALL_DATA ?= install -m 644
+INSTALL_PROGRAM ?= install -m 755
+
 # Compile Tayga
 .PHONY: all
 all:
@@ -29,7 +39,7 @@ clean:
 	$(RM) tayga version.h
 
 install: $(TARGET)
-	# TODO
-
-uninstall:
-	# TODO
+	-mkdir -p $(DESTDIR)$(sbindir) $(DESTDIR)$(mandir)/man5 $(DESTDIR)$(mandir)/man8
+	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
+	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8
+	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
