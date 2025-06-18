@@ -252,6 +252,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 
 static void host_handle_icmp4(struct pkt *p)
 {
+	char temp[32];
 	p->data += sizeof(struct icmp);
 	p->data_len -= sizeof(struct icmp);
 
@@ -263,7 +264,6 @@ static void host_handle_icmp4(struct pkt *p)
 				p->icmp, p->data, p->data_len);
 		break;
 	default:
-		char temp[32];
 		sprintf(temp,"ICMP Unknown Type %d",p->icmp->type);
 		log_pkt4(LOG_OPT_SELF | LOG_OPT_DROP,p,temp);
 	}
@@ -555,6 +555,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	uint32_t mtu;
 	uint16_t em_len;
 	struct cache_entry *orig_dest = NULL;
+	char temp[64];
 
 	memset(&p_em, 0, sizeof(p_em));
 	p_em.data = p->data + sizeof(struct icmp);
@@ -651,7 +652,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 			header.icmp.code = 1; /* Administratively prohibited */
 			break;
 		default:
-			char temp[64];
 			sprintf(temp,"ICMP Unknown Dest Unreach Code %d",p->icmp->code);
 			log_pkt4(LOG_OPT_DROP,p,temp);
 			return;
@@ -682,7 +682,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		header.icmp.word = htonl(new_ptr_tbl[old_ptr]);
 		break;
 	default:
-		char temp[64];
 		sprintf(temp,"ICMP Unknown Type %d",p->icmp->type);
 		log_pkt4(LOG_OPT_DROP,p,temp);
 		return;
@@ -819,6 +818,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 
 static void host_handle_icmp6(struct pkt *p)
 {
+	char temp[32];
 	p->data += sizeof(struct icmp);
 	p->data_len -= sizeof(struct icmp);
 
@@ -831,7 +831,6 @@ static void host_handle_icmp6(struct pkt *p)
 				p->icmp, p->data, p->data_len);
 		break;
 	default:
-		char temp[32];
 		sprintf(temp,"ICMP Unknown Type %d",p->icmp->type);
 		log_pkt6(LOG_OPT_SELF | LOG_OPT_DROP,p,temp);
 		break;

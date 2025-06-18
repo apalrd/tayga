@@ -115,8 +115,8 @@ struct ip4 {
 	struct in_addr dest;
 };
 
-static_assert(alignof(struct ip4) <= 4);
-static_assert(sizeof(struct ip4) == 20);
+static_assert(alignof(struct ip4) <= 4,"Struct IP4 must be 4-byte aligned");
+static_assert(sizeof(struct ip4) == 20,"Struct IP4 must be 20 bytes long");
 
 #define IP4_F_DF	0x4000
 #define IP4_F_MF	0x2000
@@ -131,8 +131,8 @@ struct ip6 {
 	struct in6_addr dest;
 };
 
-static_assert(alignof(struct ip6) <= 4);
-static_assert(sizeof(struct ip6) == 40);
+static_assert(alignof(struct ip6) <= 4,"Struct IP6 must be 4-byte aligned");
+static_assert(sizeof(struct ip6) == 40,"Struct IP6 must be 40 bytes long");
 
 struct ip6_frag {
 	uint8_t next_header;
@@ -141,8 +141,8 @@ struct ip6_frag {
 	uint32_t ident;
 };
 
-static_assert(alignof(struct ip6_frag) <= 4);
-static_assert(sizeof(struct ip6_frag) == 8);
+static_assert(alignof(struct ip6_frag) <= 4,"Struct ip6_frag must be 4-byte aligned");
+static_assert(sizeof(struct ip6_frag) == 8,"Struct ip6_frag must be 8 bytes long");
 
 #define IP6_F_MF	0x0001
 #define IP6_F_MASK	0xfff8
@@ -154,8 +154,8 @@ struct icmp {
 	uint32_t word;
 };
 
-static_assert(alignof(struct icmp) <= 4);
-static_assert(sizeof(struct icmp) == 8);
+static_assert(alignof(struct icmp) <= 4,"Struct ICMP must be 4-byte aligned");
+static_assert(sizeof(struct icmp) == 8,"Struct ICMP must be 8 bytes long");
 
 #define	WKPF	(htonl(0x0064ff9b))
 
@@ -185,8 +185,8 @@ struct pkt {
 };
 
 // Ensure that the data field has enough alignment for ip4 and ip6 structs
-static_assert((offsetof(struct pkt, data) & (alignof(struct ip4) - 1)) == 0);
-static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0);
+static_assert((offsetof(struct pkt, data) & (alignof(struct ip4) - 1)) == 0,"Packet data must be aligned for IP4");
+static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0,"Packet data must be aligned for IP6");
 
 /// Type of mapping in mapping list
 enum {
