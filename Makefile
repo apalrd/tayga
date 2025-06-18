@@ -1,7 +1,7 @@
 # Default compiler flags
-CC := gcc
-CFLAGS := -Wall -O2
-LDFLAGS := -flto=auto
+CC ?= gcc
+CFLAGS ?= -Wall -O2
+LDFLAGS ?= -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 
 # Compile Tayga
