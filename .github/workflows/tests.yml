@@ -1,0 +1,33 @@
+# This is a basic workflow that is manually triggered
+
+name: Run Test Suite
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+    test:
+        runs-on: ubuntu-latest  
+        steps:
+          - uses: actions/checkout@v4
+          - uses: jirutka/setup-alpine@v1
+            with:
+                branch: v3.19
+          - name: Install tools
+            run: apk add gcc make
+            shell: alpine.sh --root {0}
+          - name: run build
+            run: make
+            shell: alpine.sh {0}
+          - name: install scapy
+            run: sudo pip3 install scapy
+          - name: run test
+            run: sudo test/fullsuite.sh
+          - uses: actions/upload-artifact@v4
+            with:
+                name: results
+                path: test/*.rpt test/*.log
+                if-no-files-found: error

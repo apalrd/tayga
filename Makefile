@@ -7,12 +7,7 @@ SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 # Compile Tayga
 .PHONY: all
 all:
-ifdef $(RELEASE)
-#Generate version.h from RELEASE info
-	@echo "#define TAYGA_VERSION \"$(RELEASE)\"" > version.h
-	@echo "#define TAYGA_BRANCH \"main\"" > version.h
-	@echo "#define TAYGA_COMMIT \"RELEASE\"" > version.h
-else
+ifndef $(RELEASE)
 #Generate version.h from git
 	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --dirty)\"" > $@
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> $@
@@ -23,12 +18,7 @@ endif
 # Compile Tayga (static)
 .PHONY: static
 static:
-ifdef $(RELEASE)
-#Generate version.h from RELEASE info
-	@echo "#define TAYGA_VERSION \"$(RELEASE)\"" > version.h
-	@echo "#define TAYGA_BRANCH \"main\"" > version.h
-	@echo "#define TAYGA_COMMIT \"RELEASE\"" > version.h
-else
+ifndef $(RELEASE)
 #Generate version.h from git
 	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --dirty)\"" > $@
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> $@
