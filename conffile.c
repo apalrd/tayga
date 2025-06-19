@@ -582,7 +582,18 @@ void config_validate(void)
 	if (insert_map4(&m->map4, &m4) < 0)
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
 
-	if (gcfg->local_addr6.s6_addr32[0]) {
+	/* ipv6-addr is configured and is within the well known prefix */
+	if (gcfg->local_addr6.s6_addr32[0] == WKPF &&
+		gcfg->local_addr6.s6_addr32[1] == 0 &&
+		gcfg->local_addr6.s6_addr32[2] == 0 &&
+		gcfg->wkpf_strict)
+	{
+		slog(LOG_CRIT, "Error: ipv6-addr directive cannot contain an "
+				"address in the Well-Known Prefix "
+				"(64:ff9b::/96)\n");
+		exit(1);
+	/* ipv6-addr is configured but not within the well known prefix */
+	} else if (gcfg->local_addr6.s6_addr32[0]) {
 		m->map6.addr = gcfg->local_addr6;
 		if (insert_map6(&m->map6, &m6) < 0) {
 			if (m6->type == MAP_TYPE_RFC6052) {
@@ -596,7 +607,8 @@ void config_validate(void)
 			} else {
 				abort_on_conflict6("Error: ipv6-addr", 0, m6);
 			}
-		}
+		}	
+	/* ipv6-addr is zero (not set), generate from ipv4-addr and prefix */
 	} else {
 		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
 		if (m6->type != MAP_TYPE_RFC6052) {
@@ -617,17 +629,6 @@ void config_validate(void)
 			}
 		}
 		m->map6.addr = gcfg->local_addr6;
-	}
-	
-	if (gcfg->local_addr6.s6_addr32[0] == WKPF &&
-		gcfg->local_addr6.s6_addr32[1] == 0 &&
-		gcfg->local_addr6.s6_addr32[2] == 0 &&
-		gcfg->wkpf_strict)
-	{
-		slog(LOG_CRIT, "Error: ipv6-addr directive cannot contain an "
-				"address in the Well-Known Prefix "
-				"(64:ff9b::/96)\n");
-		exit(1);
 	}
 	return;
 }
