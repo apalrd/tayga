@@ -5,6 +5,7 @@ After=network.target
 [Service]
 # To set up an extra tayga service instance, create a new tayga config in
 # /etc/tayga/instancename.conf
+# /etc/tayga/instancename.conf
 # systemctl enable tayga@instancename.service
 ProtectSystem=full
 ProtectHome=true
@@ -14,10 +15,11 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
+ReadWritePaths=/var/lib/tayga
 DynamicUser=true
 PrivateTmp=true
 Type=forking
-ExecStart=/usr/sbin/tayga --config /etc/tayga/%i.conf
+ExecStart=tayga --config /etc/tayga/%i.conf
 
 [Install]
 WantedBy=multi-user.target

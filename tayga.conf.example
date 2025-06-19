@@ -93,7 +93,7 @@ dynamic-pool 192.168.255.0/24
 #
 # Optional.
 #
-data-dir /var/spool/tayga
+data-dir /var/lib/tayga
 
 #
 # Establishes a single-host map.  If an IPv6 host should be consistently
