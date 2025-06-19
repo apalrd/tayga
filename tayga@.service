@@ -7,6 +7,7 @@ After=network.target
 # /etc/tayga/instancename.conf
 # /etc/tayga/instancename.conf
 # systemctl enable tayga@instancename.service
+NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
 ProtectHostname=true
@@ -16,7 +17,6 @@ ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
 ReadWritePaths=/var/lib/tayga
-DynamicUser=true
 PrivateTmp=true
 Type=forking
 ExecStart=tayga --config /etc/tayga/%i.conf

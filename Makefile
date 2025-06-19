@@ -15,6 +15,7 @@ INSTALL_DATA ?= install -m 644
 INSTALL_PROGRAM ?= install -m 755
 SYSTEMCTL ?= /bin/systemctl
 sysconfdir ?= /etc
+localstatedir ?= /var
 
 # Compile Tayga
 .PHONY: all
@@ -47,4 +48,4 @@ install: $(TARGET)
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
 	setcap CAP_NET_ADMIN+ep $(DESTDIR)$(sbindir)/tayga
 	if test -x "$(SYSTEMCTL)" && test -d "$(DESTDIR)$(sysconfdir)/systemd/system"; then $(INSTALL_DATA) tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
-	if test -x "$(SYSTEMCTL)"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(SYSCONFDIR)/tayga/default.conf; fi
+	if test -x "$(SYSTEMCTL)"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga $(DESTDIR)$(localstatedir)/lib/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
