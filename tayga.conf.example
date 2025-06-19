@@ -5,7 +5,7 @@
 #
 
 #
-# TUN device that TAYGA will use to exchaxnge IPv4 and IPv6 packets with the
+# TUN device that TAYGA will use to exchange IPv4 and IPv6 packets with the
 # kernel.  You may use any name you like, but `nat64' is recommended.
 #
 # This device may be created before starting the tayga daemon by running
