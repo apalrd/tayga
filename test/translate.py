@@ -549,6 +549,16 @@ def sec_4_1():
     expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=128+20,ttl=4,flags="MF",id=6) / Raw(expect_data)
     test.send_and_check(expect_ref,ip6_val, "More Fragments")
 
+    # IPv4 with higher Offlink MTU than 1280
+    # Send a packet which translates to 1500 bytes
+    test.tayga_conf.offlink_mtu = 1500
+    test.reload()
+    expect_frag = False
+    expect_data = randbytes(1460)
+    expect_len = 1460
+    expect_ref = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),proto=16,len=1460+20,ttl=4) / Raw(expect_data)
+    test.send_and_check(expect_ref,ip6_val, "Higher Offlink MTU")
+
     #Clear expected
     expect_id = -1
     expect_len = -1

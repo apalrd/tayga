@@ -1,4 +1,4 @@
-.TH TAYGA.CONF "5" "Jun 2025" "TAYGA 0.9.4" ""
+.TH TAYGA.CONF "5" "Jun 2025" "TAYGA 0.9.6" ""
 .SH NAME
 tayga.conf \- configuration file of the TAYGA stateless NAT64 daemon
 .SH DESCRIPTION
@@ -218,13 +218,22 @@ itself. To log errors in packet translation, list one or more log option.
 - Log packets which were rejected (ICMP returned)
 .IP
 .I icmp
-- Log packets which returned an ICMP for any reason, including packets which are
-part of 'normal' internet traffic (i.e. Packet Too Big or Time Exceeded)
+- Log packets which returned an ICMP for any reason, including packets which are part of 'normal' internet traffic (i.e. Packet Too Big or Time Exceeded)
 .IP
 .I self
 - Log packets which were destined for Tayga itself
 .IP 
 No packet logging is enabled by default
+.TP
+.BI "offlink-mtu " bytes
+Tayga will fragment IPv4->IPv6 packets which are larger than this size, unless the Don't Fragment bit is set. 
+.IP
+IPv6 guarantees delivery of packets which are 1280 bytes or less. This behavior ensures that IPv4 packets will be delivered regardless of the MTU on subsequent links. IPv6 routers do not fragment packets which are too large, and IPv4 does not require Path MTU Discovery be used. 
+.IP
+Increasing this limit will allow Tayga to translate packets which are larger than 1280 bytes, which may increase performance if you can guarantee that your network can transport packets up to this MTU end to end.
+.IP
+.B Incorrectly setting this parameter may cause IPv4-translated packets to be dropped by IPv6 routers, in violation of expected IPv4 behavior. 
+.IP
 
 .SH "SEE ALSO"
 .BR tayga (8)

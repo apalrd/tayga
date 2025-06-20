@@ -139,3 +139,24 @@ data-dir /var/spool/tayga
 # Default value: none
 # 
 #log drop reject icmp self
+
+#
+# Off-Link MTU
+#
+# Tayga will fragment IPv4->IPv6 packets which are larger than this size,
+# unless the Don't Fragment bit is set. 
+#
+# IPv6 guarantees delivery of packets which are 1280 bytes or less. This
+# behavior ensures that IPv4 packets will be delivered regardless of the
+# MTU on subsequent links. IPv6 routers do not fragment packets which are
+# too large, and IPv4 does not require Path MTU Discovery be used. 
+#
+# Increasing this limit will allow Tayga to translate packets which are larger
+# than 1280 bytes, which may increase performance if you can guarantee that
+# your network can transport packets up to this MTU end to end.
+#
+# Incorrectly setting this parameter may cause IPv4-translated packets to be
+# dropped by IPv6 routers, in violation of expected IPv4 behavior. 
+#
+# Default value: 1280
+#offlink-mtu 1492

@@ -433,6 +433,37 @@ static int config_log(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+
+static int config_offlink_mtu(int ln, int arg_count, char **args)
+{
+	/* Offlink MTU alreadys et */
+	if (gcfg->ipv6_offlink_mtu) {
+		slog(LOG_CRIT, "Error: duplicate offlink-mtu directive on "
+				"line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	/* Try to convert the argument to an integer */
+	char *endptr;
+	long int mtu = strtol(args[0], &endptr, 10);
+	if (*endptr != '\0') {
+		slog(LOG_CRIT, "Error: unable to parse offlink-mtu on line %d\n", ln);
+		return ERROR_REJECT;
+	} else if(mtu < MTU_MIN) {
+		slog(LOG_CRIT, "Error: invalid value for offlink-mtu on line (must be"
+			" at least %d) on line %d\n", MTU_MIN, ln);
+		return ERROR_REJECT;
+
+	} else if(mtu > UINT16_MAX) {
+		slog(LOG_CRIT, "Error: invalid value for offlink-mtu on line (must be"
+			" at most %d) on line %d\n", UINT16_MAX, ln);
+		return ERROR_REJECT;
+	}
+	/* Set the offlink MTU */
+	gcfg->ipv6_offlink_mtu = mtu;
+	return ERROR_NONE;
+}
+
+
 struct {
 	/* Long name */
 	char *name;
@@ -452,6 +483,7 @@ struct {
 	{ "data-dir", 		config_data_dir, 		1 },
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
+	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
 	{ NULL, NULL, 0 }
 };
 
@@ -472,7 +504,6 @@ void config_init(void)
 	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
 	gcfg->hash_bits = 7;
 	gcfg->cache_size = 8192;
-	gcfg->ipv6_offlink_mtu = MTU_MIN;
 	gcfg->lazy_frag_hdr = 1;
 	INIT_LIST_HEAD(&gcfg->cache_pool);
 	INIT_LIST_HEAD(&gcfg->cache_active);
@@ -630,5 +661,8 @@ void config_validate(void)
 		}
 		m->map6.addr = gcfg->local_addr6;
 	}
+
+	/* Offlink MTU defaults to 1280 if not set */
+	if (gcfg->ipv6_offlink_mtu <= MTU_MIN) gcfg->ipv6_offlink_mtu = MTU_MIN;
 	return;
 }
