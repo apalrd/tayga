@@ -162,7 +162,9 @@ command-line option.
 .IP
 The
 .B data-dir
-directive is optional, but without it, dynamic mappings will be lost when the
+directive is optional. If not configured, TAYGA will check the environment variable 
+.B STATE_DIRECTORY.
+If neither is provided, dynamic mappings will be lost when the
 TAYGA daemon is stopped.  Also, use of the
 .B \-\-chroot
 command-line option will not be possible.

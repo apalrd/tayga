@@ -564,6 +564,36 @@ void config_validate(void)
 		exit(1);
 	}
 
+	/* Check if the env var STATE_DIRECTORY exists to use as data_dir
+	 * This env var is set by systemd
+	 * And it can still be overridden by the conf file
+	 */
+	char * sd = getenv("STATE_DIRECTORY");
+	if(sd && !gcfg->data_dir[0]) {
+		if (sd[0] != '/') {
+			slog(LOG_CRIT, "Error: STATE_DIRECTORY must be an "
+				"absolute path\n");
+			exit(1);
+		}
+		/* Copy env var into data_dir */
+		if(strlen(sd) + 1 > sizeof(gcfg->data_dir)) {
+			slog(LOG_CRIT, "STATE_DIRECTORY env var is too long, "
+					"aborting...\n");
+			exit(1);
+		}
+		/* Check for a : which signifies that we have multiple dirs */
+		for(int i = 0; sd[i]; i++) {
+			if(sd[i] == ':') {
+				slog(LOG_WARNING, "STATE_DIRECTORY env var contains "
+						"multiple directories, using first one\n");
+				sd[i] = 0;
+				break;
+			}
+		}
+		/* Copy state directory */
+		strcpy(gcfg->data_dir, sd);
+	}
+
 	m4 = list_entry(gcfg->map4_list.next, struct map4, list);
 	m6 = list_entry(gcfg->map6_list.next, struct map6, list);
 

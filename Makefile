@@ -38,9 +38,15 @@ ifndef RELEASE
 endif
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -static
 
+.PHONY: clean
 clean:
 	$(RM) tayga version.h
 
+# Install will create sbindir and mandir(s)
+# Install tayga and man pages
+# If systemd is detected, copy systemd service file
+# If systemd is detected and conf does not already exist, copy example conf file
+.PHONY: install
 install: $(TARGET)
 	-mkdir -p $(DESTDIR)$(sbindir) $(DESTDIR)$(mandir)/man5 $(DESTDIR)$(mandir)/man8
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
@@ -48,4 +54,4 @@ install: $(TARGET)
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
 	setcap CAP_NET_ADMIN+ep $(DESTDIR)$(sbindir)/tayga
 	if test -x "$(SYSTEMCTL)" && test -d "$(DESTDIR)$(sysconfdir)/systemd/system"; then $(INSTALL_DATA) tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
-	if test -x "$(SYSTEMCTL)"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga $(DESTDIR)$(localstatedir)/lib/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
+	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga/default.conf"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
