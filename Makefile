@@ -53,5 +53,5 @@ install: $(TARGET)
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
 	setcap CAP_NET_ADMIN+ep $(DESTDIR)$(sbindir)/tayga
-	if test -x "$(SYSTEMCTL)" && test -d "$(DESTDIR)$(sysconfdir)/systemd/system"; then $(INSTALL_DATA) tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
+	if test -x "$(SYSTEMCTL)" && test -d "$(DESTDIR)$(sysconfdir)/systemd/system"; then $(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
 	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga/default.conf"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
