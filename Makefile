@@ -13,7 +13,7 @@ datarootdir ?= $(prefix)/share
 mandir ?= $(datarootdir)/man
 INSTALL_DATA ?= install -m 644
 INSTALL_PROGRAM ?= install -m 755
-OPENRC ?= openrc-run
+OPENRC ?= rc-service
 sysconfdir ?= /etc
 localstatedir ?= /var
 
@@ -46,5 +46,5 @@ install: $(TARGET)
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
-	if test -x "$(OPENRC)" && test -d "$(DESTDIR)$(sysconfdir)/init.d/"; then $(INSTALL_DATA) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga ; fi
+	if test -x "$(OPENRC)" && test -d "$(DESTDIR)$(sysconfdir)/init.d/"; then $(INSTALL_DATA) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga && $(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga ; fi
 	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga.conf"; then $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf ; fi
