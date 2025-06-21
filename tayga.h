@@ -332,6 +332,7 @@ enum {
 	ERROR_NONE = 0,
 	ERROR_REJECT = -1,
 	ERROR_DROP = -2,
+	ERROR_LOCAL = -3,
 };
 
 
