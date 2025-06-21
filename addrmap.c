@@ -26,7 +26,6 @@
 # error Unsupported byte order
 #endif
 
-extern struct config *gcfg;
 extern time_t now;
 
 /**

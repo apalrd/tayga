@@ -16,3 +16,4 @@ latex/*
 version.h
 .vscode/*
 callgrind*
+unit_*
