@@ -413,7 +413,7 @@ static int config_strict_fh(int ln, int arg_count, char **args)
 			!strcasecmp(args[0], "0")) {
 		gcfg->lazy_frag_hdr = 1;
 	} else {
-		slog(LOG_CRIT, "Error: invalid value for strict-frag-hdr\n");
+		slog(LOG_CRIT, "Error: invalid value for strict-frag-hdr on line %d\n",ln);
 		return ERROR_REJECT;
 	}
 	return ERROR_NONE;
@@ -421,18 +421,28 @@ static int config_strict_fh(int ln, int arg_count, char **args)
 
 static int config_log(int ln, int arg_count, char **args)
 {
+	if(gcfg->log_opts) {
+		slog(LOG_CRIT, "Error: duplicate log directive on line "
+				"%d\n", ln);
+		return ERROR_REJECT;
+	}
+	/* Set this flag to detect duplicate entries */
+	gcfg->log_opts |= LOG_OPT_CONFIG;
 	/* For each arg we have */
 	for(int i = 0; i < arg_count; i++)
 	{
 		/* Check if this arg matches one of these keys, and enable that key */
 		if(!strcasecmp(args[i],"drop")) gcfg->log_opts |= LOG_OPT_DROP;
-		if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
-		if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
-		if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
+		else if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
+		else if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
+		else if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
+		else {
+			slog(LOG_CRIT, "Error: invalid value for log on line %d\n",ln);
+			return ERROR_REJECT;
+		}
 	}
 	return ERROR_NONE;
 }
-
 
 static int config_offlink_mtu(int ln, int arg_count, char **args)
 {
