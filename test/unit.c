@@ -50,6 +50,7 @@ void exit(int status) {
 
 /* Expect a function to call exit */
 int expect_exit(void) {
+    memset(&ecall,0,sizeof(jmp_buf));
     /* Setjmp to come back here */
     if(setjmp(ecall)) {
         /* Came back since we got 1 */

@@ -149,6 +149,16 @@ void test_config_read(void) {
     char * conffile;
     char * testcase;
 
+    /* conf file pointer is null */
+    printf("TEST CASE: conffile is null\n");
+    if(expect_exit()) config_read(conffile);
+    expect(has_exit,"exit()");
+
+    /* conf file does not exist */
+    printf("TEST CASE: conffile does not exist\n");
+    if(expect_exit()) config_read("empty.conf");
+    expect(has_exit,"exit()");
+
     /* Example config */
     conffile = "tayga.conf.example";
     printf("TEST CASE: example conf file\n");
@@ -237,7 +247,7 @@ void test_config_read(void) {
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
-    testcase = "ipv4-addr 169.254.69.1\n";
+    testcase = "ipv4-addr 127.0.1.1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -420,7 +430,7 @@ void test_config_read(void) {
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
-    testcase = "map 169.254.0.0/24 2001:db8::/120\n";
+    testcase = "map 233.0.1.1/24 2001:db8::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -458,11 +468,25 @@ void test_config_read(void) {
     //test_config_compare(); //do not compare on exit
 
     /* Test Case - conflict */
-    printf("TEST CASE: map overlaps\n");
+    printf("TEST CASE: map4 overlaps\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "map 192.168.254.0/24 2001:db8::/120\nmap 192.168.254.0/24 2001:db8::/120\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    if(expect_exit()) config_read(conffile);
+    expect(has_exit,"exit()");
+    //test_config_compare(); //do not compare on exit
+
+    /* Test Case - conflict */
+    printf("TEST CASE: map6 overlaps\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "map 192.168.253.0/24 2001:db8::/120\nmap 192.168.254.0/24 2001:db8::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -504,7 +528,7 @@ void test_config_read(void) {
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
-    testcase = "dynamic-pool 169.254.0.0/16\n";
+    testcase = "dynamic-pool 225.0.0.1/16\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -568,6 +592,20 @@ void test_config_read(void) {
     if(expect_exit()) config_read(conffile);
     expect(has_exit,"exit()");
     //test_config_compare(); //do not compare on exit
+    
+    /* Test Case - offlink mtu  */
+    printf("TEST CASE: offlink mtu duplicate\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "offlink-mtu 1500\nofflink-mtu 1440\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    if(expect_exit()) config_read(conffile);
+    expect(has_exit,"exit()");
+    //test_config_compare(); //do not compare on exit
 
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu too low\n");
@@ -598,7 +636,7 @@ void test_config_read(void) {
     //test_config_compare(); //do not compare on exit
 
     /* Test Case - offlink mtu  */
-    printf("TEST CASE: offlink mtu not anumber\n");
+    printf("TEST CASE: offlink mtu not a number\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -716,12 +754,36 @@ void test_config_read(void) {
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
     tmap4[2] = "192.168.6.0/24 type 0 mask 255.255.255.0";
     tmap4[3] = "0.0.0.0/0 type 1 mask 0.0.0.0";
-    tmap4[5] = 0;
+    tmap4[4] = 0;
     tmap6[0] = "2001:db8:1:4444::1/128 type 0 mask ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff";
     tmap6[1] = "2001:db8:1:4445::/120 type 0 mask ffff:ffff:ffff:ffff:ffff:ffff:ffff:ff00";
     tmap6[2] = "64:ff9b::/96 type 1 mask ffff:ffff:ffff:ffff:ffff:ffff::";
     tmap6[3] = 0;
     test_config_compare();    
+}
+
+void test_config_validate() {
+    char * conffile = "unit_conffile.conf";
+    FILE * fd;
+    char * testcase;
+    tmap4[0] = 0;
+    tmap6[0] = 0;
+
+    /* Validate no translation maps or nat64 prefix*/
+    printf("TEST CASE: read an empty conf file\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "#hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    if(expect_exit()) config_read(conffile);
+    expect(!has_exit,"read exit()");
+    if(expect_exit()) config_validate();
+    expect(has_exit,"exit()");
+    //test_config_compare(); //do not compare on exit
 }
 
 int main(void) {
@@ -732,6 +794,7 @@ int main(void) {
     test_config_read();
 
     /* Test function for config_validate */
+    test_config_validate();
     
     /* Return final status */
     return overall();

@@ -124,7 +124,11 @@ static int config_ipv4_addr(int ln, int arg_count, char **args)
 				"line %d\n", args[0], ln);
 		return ERROR_REJECT;
 	}
-	if (validate_ip4_addr(&gcfg->local_addr4) < 0) {
+	int ret = validate_ip4_addr(&gcfg->local_addr4);
+	if (ret == ERROR_LOCAL) {
+		slog(LOG_WARNING, "Using link local address %s in ipv4-addr "
+			"directive, use with caution\n", args[0]);
+	} else if(ret < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv4-addr "
 				"directive, aborting...\n", args[0]);
 		return ERROR_REJECT;
@@ -291,8 +295,11 @@ static int config_map(int ln, int arg_count, char **args)
 	}
 	m->map6.prefix_len = prefix6;
 	calc_ip6_mask(&m->map6.mask, NULL, prefix6);
-        
-	if (validate_ip4_addr(&m->map4.addr) < 0) {
+    int ret = validate_ip4_addr(&m->map4.addr);
+	if (ret == ERROR_LOCAL) {
+		slog(LOG_WARNING, "Using link-local address %s in map "
+			"directive, use with caution\n", args[0]);
+	} else if (ret < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[0]);
 		return ERROR_REJECT;
@@ -363,7 +370,11 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 				"line %d\n", args[0], ln);
 		return ERROR_REJECT;
 	}
-	if (validate_ip4_addr(&m4->addr) < 0) {
+	int ret = validate_ip4_addr(&m4->addr);
+	if (ret == ERROR_LOCAL) {
+		slog(LOG_WARNING, "Using link-local address %s in dynamic-pool "
+			"directive, use with caution\n", args[0]);
+	} else if (ret < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in dynamic-pool "
 				"directive, aborting...\n", args[0]);
 		return ERROR_REJECT;
@@ -682,6 +693,7 @@ void config_validate(void)
 	/* ipv6-addr is zero (not set), generate from ipv4-addr and prefix */
 	} else {
 		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+		printf("Here 4\n");
 		if (m6->type != MAP_TYPE_RFC6052) {
 			slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 					"specified if no NAT64 prefix is "

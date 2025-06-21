@@ -48,7 +48,7 @@ int validate_ip4_addr(const struct in_addr *a)
 
 	/* Link-local block 169.254.0.0/16 */
 	if ((a->s_addr & htonl(0xffff0000)) == htonl(0xa9fe0000))
-		return ERROR_DROP;
+		return ERROR_LOCAL;
 
 	/* Class D */
 	if ((a->s_addr & htonl(0xf0000000)) == htonl(0xe0000000))
@@ -608,6 +608,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 	default:
 		return ERROR_DROP;
 	}
+	/* This function may return ERROR_LOCAL or ERROR_DROP */
 	return validate_ip4_addr(addr4);
 }
 /**
@@ -668,7 +669,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	case MAP_TYPE_RFC6052:
 		ret = extract_from_prefix(addr4, addr6, map6->prefix_len);
 		if (ret < 0)
-			return ret;
+			return ERROR_DROP;
 		if (map6->addr.s6_addr32[0] == WKPF &&
 			map6->addr.s6_addr32[1] == 0 &&
 			map6->addr.s6_addr32[2] == 0 &&
