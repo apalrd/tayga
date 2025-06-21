@@ -39,6 +39,12 @@ ifndef RELEASE
 endif
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -static
 
+# Test suite
+.PHONY: test
+test:
+	$(CC) $(CFLAGS) -I. -o unit_conffile test/unit.c test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
+	./unit_conffile
+
 .PHONY: clean
 clean:
 	$(RM) tayga version.h
