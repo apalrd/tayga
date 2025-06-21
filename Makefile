@@ -57,6 +57,6 @@ install: $(TARGET)
 	if test -x "$(SYSTEMCTL)" ; then mkdir -p $(DESTDIR)$(sysconfdir)/systemd/system && $(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
 	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga/default.conf"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
 	if test -x "$(OPENRC)"; then mkdir -p $(DESTDIR)$(sysconfdir)/init.d && $(INSTALL_PROGRAM) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga ; fi
-	if test -x "$(OPENRC)" && test ! -e "$(DESTDIR)$(sysconfdir)/conf.d/tayga"; then $(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga  ; fi
+	if test -x "$(OPENRC)" && test ! -e "$(DESTDIR)$(sysconfdir)/conf.d/tayga"; then mkdir -p $(DESTDIR)$(sysconfdir)/conf.d &&$(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga  ; fi
 	if test -x "$(OPENRC)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga.conf"; then $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf ; fi
   
