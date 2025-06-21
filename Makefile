@@ -14,6 +14,7 @@ mandir ?= $(datarootdir)/man
 INSTALL_DATA ?= install -m 644
 INSTALL_PROGRAM ?= install -m 755
 SYSTEMCTL ?= /bin/systemctl
+OPENRC ?= /sbin/rc-service
 sysconfdir ?= /etc
 localstatedir ?= /var
 
@@ -55,3 +56,6 @@ install: $(TARGET)
 	setcap CAP_NET_ADMIN+ep $(DESTDIR)$(sbindir)/tayga
 	if test -x "$(SYSTEMCTL)" && test -d "$(DESTDIR)$(sysconfdir)/systemd/system"; then $(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service && $(SYSTEMCTL) daemon-reload; fi
 	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga/default.conf"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
+	if test -x "$(OPENRC)" && test -d "$(DESTDIR)$(sysconfdir)/init.d/"; then $(INSTALL_PROGRAM) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga && $(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga ; fi
+	if test -x "$(OPENRC)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga.conf"; then $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf ; fi
+  

@@ -129,6 +129,7 @@ class confgen:
         self.map.append("172.16.0.1 2001:db8::1")
         self.map.append("172.16.0.2 2001:db8::2")
         self.log = "drop reject icmp self"
+        self.offlink_mtu = 0
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -149,6 +150,9 @@ class confgen:
                 conf_file.write("map "+entry+"\n")
             if self.log is not None:
                 conf_file.write("log "+self.log+"\n")
+            if self.offlink_mtu > 0:
+                print("Setting offlink MTU to "+str(self.offlink_mtu))
+                conf_file.write("offlink-mtu "+str(self.offlink_mtu)+"\n")
 
 
 

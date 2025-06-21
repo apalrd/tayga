@@ -97,7 +97,9 @@ struct tun_pi {
 #define DELIM		" \t\r\n"
 
 /// Default configuration path
+#ifndef TAYGA_CONF_PATH
 #define TAYGA_CONF_PATH "/etc/tayga.conf"
+#endif
 
 
 /* Protocol structures */

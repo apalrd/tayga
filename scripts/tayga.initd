@@ -1,0 +1,28 @@
+#!/sbin/openrc-run
+description='Simple, no-fuss NAT64 for Linux'
+pidfile=${pidfile:=/run/${RC_SVCNAME}pid}
+datadir=${datadir:=/var/lib/tayga}
+user=${user:=nobody}
+group=${group:=nogroup}
+
+command='/usr/sbin/tayga'
+command_args="-p ${pidfile} -u ${user} -g ${group}"
+
+start_pre() {
+	checkpath --directory --owner ${user}:${group} ${datadir}  
+    # Only initialize the tun adapter on first start
+    if [ "${RC_CMD}" != "restart" ] ; then
+        # Create tun adapter
+        ${command} --mktun
+        # Run custom pre-start script if it exists
+        type tayga_pre &>/dev/null && tayga_pre
+    fi
+}
+
+stop_post() {
+    # Only teardown the tun adapter on full stop
+    if [ "${RC_CMD}" != "restart" ] ; then
+        # remove tun adapter
+        ${command} --rmtun
+    fi
+}

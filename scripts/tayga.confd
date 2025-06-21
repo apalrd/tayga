@@ -1,0 +1,13 @@
+# This file is sourced by tayga's init.d script
+# You may use it to custom configure the tun device
+# At this point, the tun device has been created by tayga
+# but Tayga has not yet started
+
+tayga_pre() {
+    #ip link set up dev nat64
+    #ip addr add 192.168.255.0/24 dev nat64
+    #ip route add 64:ff9b::/96 dev nat64
+
+    # Function must contain * something*
+    :
+}
