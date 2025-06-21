@@ -4,7 +4,7 @@
 # but Tayga has not yet started
 
 tayga_pre() {
-    #ip link nat64 set up
+    #ip link set up dev nat64
     #ip addr add 192.168.255.0/24 dev nat64
     #ip route add 64:ff9b::/96 dev nat64
 
