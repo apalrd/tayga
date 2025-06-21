@@ -610,6 +610,33 @@ void test_config_read(void) {
     if(expect_exit()) config_read(conffile);
     expect(has_exit,"exit()");
     //test_config_compare(); //do not compare on exit
+    /* Test Case - log duplicate*/
+    printf("TEST CASE: log duplicate\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "log drop\nlog reject\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    if(expect_exit()) config_read(conffile);
+    expect(has_exit,"exit()");
+    //test_config_compare(); //do not compare on exit
+
+    /* Test Case - log invalid arg*/
+    printf("TEST CASE: log invalid arg\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "log something\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    if(expect_exit()) config_read(conffile);
+    expect(has_exit,"exit()");
+    //test_config_compare(); //do not compare on exit
 
     /* Test Case - unknown option  */
     printf("TEST CASE: unknown option\n");
@@ -684,7 +711,7 @@ void test_config_read(void) {
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);
     tcfg.local_addr6.s6_addr32[3] = htonl(0x00000002);
     tcfg.ipv6_offlink_mtu = 1492;
-    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF);
+    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_CONFIG);
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
     tmap4[2] = "192.168.6.0/24 type 0 mask 255.255.255.0";
