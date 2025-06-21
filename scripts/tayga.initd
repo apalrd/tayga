@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+description='Simple, no-fuss NAT64 for Linux'
+pidfile=${pidfile:=/run/${RC_SVCNAME}pid}
+datadir=${datadir:=/var/lib/tayga}
+user=${user:=nobody}
+group=${group:=nogroup}
+
+command='/usr/sbin/tayga'
+command_args="-p ${pidfile} -u ${user} -g ${group}"
+
+start_pre() {
+	checkpath --directory --owner ${user}:${group} ${datadir}
+}
