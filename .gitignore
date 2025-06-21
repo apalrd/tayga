@@ -16,4 +16,5 @@ latex/*
 version.h
 .vscode/*
 callgrind*
-unit_*
+unit_conffile
+unit_conffile.conf
