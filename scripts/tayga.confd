@@ -7,4 +7,7 @@ tayga_pre() {
     #ip link nat64 set up
     #ip addr add 192.168.255.0/24 dev nat64
     #ip route add 64:ff9b::/96 dev nat64
+
+    # Function must contain * something*
+    :
 }
