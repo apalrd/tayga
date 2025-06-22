@@ -17,6 +17,7 @@ SYSTEMCTL ?= /bin/systemctl
 OPENRC ?= /sbin/rc-service
 sysconfdir ?= /etc
 localstatedir ?= /var
+SUDO ?= /usr/bin/sudo
 
 # Compile Tayga
 .PHONY: all
@@ -50,9 +51,20 @@ test:
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 	./unit_conffile
 
+# Fullsuite runs both make test (unit tests) + integration test
+# must be run as root / with sudo permissions
+.PHONY: fullsuite
+fullsuite: test all
+	$(SUDO) ip netns add tayga-test || true
+	$(SUDO) ip netns exec tayga-test python3 test/addressing.py
+	$(SUDO) ip netns exec tayga-test python3 test/mapping.py
+	$(SUDO) ip netns exec tayga-test python3 test/translate.py
+	$(SUDO) ip netns del tayga-test
+
 .PHONY: clean
 clean:
 	$(RM) tayga version.h
+
 
 # Install will create sbindir and mandir(s)
 # Install tayga and man pages

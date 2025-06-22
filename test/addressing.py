@@ -331,5 +331,5 @@ invalid_ranges()
 time.sleep(1)
 test.cleanup()
 #Print test report
-test.report()
+test.report(472,0)
 

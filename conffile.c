@@ -610,25 +610,25 @@ int config_validate(void)
 		if (sd[0] != '/') {
 			slog(LOG_CRIT, "Error: STATE_DIRECTORY must be an "
 				"absolute path\n");
-			exit(1);
+			return ERROR_REJECT;
 		}
 		/* Copy env var into data_dir */
 		if(strlen(sd) + 1 > sizeof(gcfg->data_dir)) {
-			slog(LOG_CRIT, "STATE_DIRECTORY env var is too long, "
+			slog(LOG_CRIT, "Error: STATE_DIRECTORY is too long, "
 					"aborting...\n");
-			exit(1);
-		}
-		/* Check for a : which signifies that we have multiple dirs */
-		for(int i = 0; sd[i]; i++) {
-			if(sd[i] == ':') {
-				slog(LOG_WARNING, "STATE_DIRECTORY env var contains "
-						"multiple directories, using first one\n");
-				sd[i] = 0;
-				break;
-			}
+			return ERROR_REJECT;
 		}
 		/* Copy state directory */
 		strcpy(gcfg->data_dir, sd);
+		/* Check for a : which signifies that we have multiple dirs */
+		for(int i = 0; gcfg->data_dir[i]; i++) {
+			if(gcfg->data_dir[i] == ':') {
+				slog(LOG_WARNING, "STATE_DIRECTORY env var contains "
+						"multiple directories, using first one\n");
+				gcfg->data_dir[i] = 0;
+				break;
+			}
+		}
 	}
 
 	m4 = list_entry(gcfg->map4_list.next, struct map4, list);

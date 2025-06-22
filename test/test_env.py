@@ -404,7 +404,7 @@ class test_env:
         self.test_results = []
 
 
-    def report(self):
+    def report(self,expect_pass,expect_fail):
         # If we have any test results, finish this section
         if len(self.test_results) > 0:
             self.section("General")
@@ -417,6 +417,14 @@ class test_env:
             print(f"Total Tests: {self.test_passed+self.test_failed}")
             print(f"Passed: {self.test_passed}")
             print(f"Failed: {self.test_failed}")
+        overall = 0
+        if self.test_passed != expect_pass:
+            print(f"Expected {expect_pass} passes, only got {self.test_passed}")
+            overall = 1
+        if self.test_failed != expect_fail:
+            print(f"Expected {expect_fail} failures, only got {self.test_failed}")
+            overall = 1
+        exit(overall)
 
     def _val_snd_check(self,pkt):
         # Toss link-local packets since we shouldn't see them on our

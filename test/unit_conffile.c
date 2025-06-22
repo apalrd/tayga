@@ -25,6 +25,40 @@ static struct config tcfg;
 static char *tmap4[100] = {0};
 static char *tmap6[100] = {0};
 
+
+/* Function to simulate getenv 
+ * set getenv_case to a nonzero number to change the return
+ * Then verify that it is zero and has been read
+ */
+static int getenv_case = 0;
+char * getenv(const char * var) {
+    if(strcmp(var,"STATE_DIRECTORY")) return NULL;
+    int temp = getenv_case;
+    getenv_case = 0;
+    switch(temp) {
+    case 1: /* Correct value */
+        return "/var/lib/tayga";
+    case 2: /* relative path */
+        return "var/lib/tayga";
+    case 3: /* way too long */
+        return  "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var"
+        "/var/var/var/var/var/var/var/var/var/var/var/var/var/var/var";
+    case 4: /* Multiple directories */
+        return "/var/lib/tayga:/var/db/tayga";
+    default:
+        expect(0,"Unknown Getenv Call");
+        return NULL;
+    }
+
+}
+
 /* Function to compare tcfg to gcfg */
 void test_config_compare(void) {
     /* Check pointer */
@@ -165,7 +199,6 @@ void test_config_read(void) {
     config_init();
     expect(!config_read(conffile),"Passed");
     tcfg.wkpf_strict = 0;
-    strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
     tcfg.local_addr4.s_addr = htonl(0xc0a8ff01);
     /* Two map4 entries */
@@ -711,8 +744,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
     
     /* ipv4-addr */
     printf("TEST CASE: prefix, ipv4\n");
@@ -726,8 +761,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
     
     /* ipv4-addr overlaps with map */
     printf("TEST CASE: ipv4 overlaps with map\n");
@@ -742,8 +779,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
 
     
     /* ipv6-addr is within well known prefix */
@@ -759,8 +798,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
 
     /* ipv6-addr is within configured prefix */
     printf("TEST CASE: ipv6 within prefix\n");
@@ -775,8 +816,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
 
     /* ipv6-addr overlap */
     printf("TEST CASE: ipv6 within prefix\n");
@@ -792,8 +835,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
     
     /* prefix not specified */
     printf("TEST CASE: no prefix no ipv6-addr\n");
@@ -807,8 +852,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
 
     /* no tun device */
     printf("TEST CASE: no tun-device\n");
@@ -822,8 +869,10 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
     
     /* wkfp not strict and non global addr */
     printf("TEST CASE: no prefix no ipv6-addr\n");
@@ -838,11 +887,70 @@ void test_config_validate() {
     fclose(fd);
     free(gcfg);
     config_init();
+    getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     /* Combined with offlink MTU test*/
     gcfg->ipv6_offlink_mtu = 0;
     expect(!config_validate(),"Validate Passed");
     expectl(gcfg->ipv6_offlink_mtu,MTU_MIN,"Min MTU");
+    expectl(getenv_case,0,"Getenv Called");
+    /* Combined with STATE_DIRECTORY test */
+    expects(gcfg->data_dir,"/var/lib/tayga",15,"data_dir");
+
+    /* state directory not absolute */
+    printf("TEST CASE: state dir not absolute\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "prefix 64:ff9b::/96\n"
+        "ipv4-addr 192.168.255.0\n"
+        "wkpf-strict no\n"
+        "tun-device nat64\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    getenv_case = 2;
+    expect(!config_read(conffile),"Read Passed");
+    expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");
+    
+    /* state directory too long */
+    printf("TEST CASE: state dir too long\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "prefix 64:ff9b::/96\n"
+        "ipv4-addr 192.168.255.0\n"
+        "wkpf-strict no\n"
+        "tun-device nat64\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    getenv_case = 3;
+    expect(!config_read(conffile),"Read Passed");
+    expect(config_validate(),"Validate Failed");
+    expectl(getenv_case,0,"Getenv Called");   
+
+    /* state directory multiple paths */
+    printf("TEST CASE: state dir multiple paths\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "prefix 64:ff9b::/96\n"
+        "ipv4-addr 192.168.255.0\n"
+        "wkpf-strict no\n"
+        "tun-device nat64\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    getenv_case = 4;
+    expect(!config_read(conffile),"Read Passed");
+    expect(!config_validate(),"Validate Passed");
+    expectl(getenv_case,0,"Getenv Called");
+    expects(gcfg->data_dir,"/var/lib/tayga",15,"data_dir");
 }
 
 int main(void) {

@@ -1800,6 +1800,6 @@ sec_5_5()
 time.sleep(1)
 
 test.cleanup()
-#Print test report
-test.report()
+#Print test report (expected pass/fail count)
+test.report(232,14)
 
