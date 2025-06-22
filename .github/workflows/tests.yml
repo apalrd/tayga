@@ -20,10 +20,29 @@ jobs:
           - name: install deps
             run: sudo apt-get install -y python3-pyroute2 python3-scapy
           - name: run test
-            run: sudo test/fullsuite.sh
+            run: make fullsuite
           - uses: actions/upload-artifact@v4
             with:
-                name: results
+                name: results-amd64
+                path: |
+                    test/*.rpt
+                    test/*.log
+                if-no-files-found: error
+    test-arm:
+        runs-on: ubuntu-24.04-arm 
+        steps:
+          - uses: actions/checkout@v4
+            with:
+                fetch-depth: 0
+          - name: run build
+            run: make
+          - name: install deps
+            run: sudo apt-get install -y python3-pyroute2 python3-scapy
+          - name: run test
+            run: make fullsuite
+          - uses: actions/upload-artifact@v4
+            with:
+                name: results-arm64
                 path: |
                     test/*.rpt
                     test/*.log

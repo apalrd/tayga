@@ -4,6 +4,12 @@ CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
 
+#Check for release file / variable
+-include release
+ifdef RELEASE
+$(info Using RELEASE $(RELEASE))
+endif
+
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
 exec_prefix ?= $(prefix)

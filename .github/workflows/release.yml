@@ -27,7 +27,8 @@ jobs:
             echo "#define TAYGA_VERSION \"${{ inputs.ver }}\"" > version.h
             echo "#define TAYGA_BRANCH \"main\"" >> version.h
             echo "#define TAYGA_COMMIT \"RELEASE\"" >> version.h
-            git add -f version.h
+            echo "RELEASE=${{ inputs.ver }}" > release
+            git add -f version.h release
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "autogenerate release version file"
@@ -46,7 +47,7 @@ jobs:
             branch: v3.19
             packages: gcc make libc-dev linux-headers
       - name: run build x86-64
-        run: make static RELEASE=${{ inputs.ver }}
+        run: make static
         shell: alpine.sh {0}
       - uses: actions/upload-artifact@v4
         with:
