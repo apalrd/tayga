@@ -189,7 +189,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(!config_read(conffile),"Passed");
-    
     tcfg.data_dir[0] = 0;
     tcfg.tundev[0] = 0;
     tcfg.local_addr4.s_addr = 0;
@@ -209,8 +208,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - duplicate ipv4-addr's */
     printf("TEST CASE: duplicate ipv4-addr\n");
@@ -223,8 +220,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - ipv4-addr is not a v4-addr */
     printf("TEST CASE: invalid ipv4-addr\n");
@@ -237,8 +232,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - ipv4-addr is reserved */
     printf("TEST CASE: reserved v4-addr\n");
@@ -251,8 +244,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - ipv6-addr duplicate */
     printf("TEST CASE: duplicate ipv6-addr\n");
@@ -265,8 +256,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - invalid ipv6-addr */
     printf("TEST CASE: invalid ipv6-addr\n");
@@ -279,8 +268,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - ipv4-6-addr reserved */
     printf("TEST CASE: reserved ipv6-addr\n");
@@ -293,9 +280,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
-
 
     /* Test Case - prefix has host bits set */
     printf("TEST CASE: prefix has host bits set\n");
@@ -308,8 +292,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - prefix reserved */
     printf("TEST CASE: prefix reserved\n");
@@ -322,8 +304,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - prefix invalid length */
     printf("TEST CASE: prefix invalid length\n");
@@ -336,8 +316,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - prefix duplicate */
     printf("TEST CASE: prefix duplicate\n");
@@ -350,8 +328,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - wkpf strict not a known string */
     printf("TEST CASE: wkpf invalid\n");
@@ -364,8 +340,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - udp cksum mode invalid */
     printf("TEST CASE: udp cksum mode invalid\n");
@@ -379,8 +353,6 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
     
-    //test_config_compare(); //do not compare on exit
-    
     /* Test Case - map invalid v4 addr */
     printf("TEST CASE: map invalid v4\n");
     fd = fopen(conffile,"w");
@@ -392,8 +364,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - map invalid v6 addr */
     printf("TEST CASE: map invalid v6\n");
@@ -406,8 +376,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - map non-matching mask */
     printf("TEST CASE: map non-matching mask\n");
@@ -421,8 +389,6 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
     
-    //test_config_compare(); //do not compare on exit
-    
     /* Test Case - v4 has reserved addr */
     printf("TEST CASE: map reserved 4\n");
     fd = fopen(conffile,"w");
@@ -434,8 +400,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - v6 has reserved addr */
     printf("TEST CASE: map reserved 6\n");
@@ -448,22 +412,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
-
-    /* Test Case - within wkpf */
-    printf("TEST CASE: map wkpf strict\n");
-    fd = fopen(conffile,"w");
-    expect((long)fd,"fopen");
-    if(!fd) return;
-    testcase = "map 192.168.0.0/24 64:ff9b::a00/120\n";
-    fwrite(testcase,strlen(testcase),1,fd);
-    fclose(fd);
-    free(gcfg);
-    config_init();
-    expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - conflict */
     printf("TEST CASE: map4 overlaps\n");
@@ -476,8 +424,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - conflict */
     printf("TEST CASE: map6 overlaps\n");
@@ -490,8 +436,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - dyn pool duplicate */
     printf("TEST CASE: dynamic pool duplicate\n");
@@ -504,8 +448,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - dyn pool invalid v4 */
     printf("TEST CASE: dynamic pool duplicate\n");
@@ -518,8 +460,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - dyn pool reserved */
     printf("TEST CASE: dynamic pool reserved\n");
@@ -532,8 +472,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - dyn pool /32 */
     printf("TEST CASE: dynamic pool /32\n");
@@ -546,8 +484,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - data dir duplicate */
     printf("TEST CASE: data dir duplicate\n");
@@ -560,8 +496,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - data dir invalid */
     printf("TEST CASE: data dir relative\n");
@@ -574,8 +508,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - strict frag header value */
     printf("TEST CASE: strict frag header invalid\n");
@@ -589,8 +521,6 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
     
-    //test_config_compare(); //do not compare on exit
-    
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu duplicate\n");
     fd = fopen(conffile,"w");
@@ -602,8 +532,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu too low\n");
@@ -616,8 +544,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu too high\n");
@@ -630,8 +556,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu not a number\n");
@@ -645,7 +569,6 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
     
-    //test_config_compare(); //do not compare on exit
     /* Test Case - log duplicate*/
     printf("TEST CASE: log duplicate\n");
     fd = fopen(conffile,"w");
@@ -657,8 +580,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - log invalid arg*/
     printf("TEST CASE: log invalid arg\n");
@@ -671,8 +592,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - unknown option  */
     printf("TEST CASE: unknown option\n");
@@ -685,8 +604,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - unknown option  */
     printf("TEST CASE: too many tokens\n");
@@ -699,8 +616,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Test Case - unknown option  */
     printf("TEST CASE: wrong number of args\n");
@@ -713,8 +628,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
-    //test_config_compare(); //do not compare on exit
 
     /* Parse all config options */
     testcase = "#config for tayga\n"
@@ -739,7 +652,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(!config_read(conffile),"Passed");
-    
     strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
     tcfg.local_addr4.s_addr = htonl(0xc0a8ff01);
@@ -793,7 +705,8 @@ void test_config_validate() {
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
-    testcase = "prefix 64:ff9b::/96\n";
+    testcase = "prefix 64:ff9b::/96\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -807,14 +720,14 @@ void test_config_validate() {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "prefix 64:ff9b::/96\n"
-        "ipv4-addr 192.168.255.0\n";
+        "ipv4-addr 192.168.255.0\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
     config_init();
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
-
     
     /* ipv4-addr overlaps with map */
     printf("TEST CASE: ipv4 overlaps with map\n");
@@ -823,7 +736,8 @@ void test_config_validate() {
     if(!fd) return;
     testcase = "prefix 64:ff9b::/96\n"
         "ipv4-addr 192.168.255.0\n"
-        "map 192.168.255.0 2001:db8::1\n";
+        "map 192.168.255.0 2001:db8::1\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -839,7 +753,8 @@ void test_config_validate() {
     if(!fd) return;
     testcase = "prefix 64:ff9b::/96\n"
         "ipv4-addr 192.168.255.0\n"
-        "ipv6-addr 64:ff9b::1\n";
+        "ipv6-addr 64:ff9b::1\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -854,7 +769,8 @@ void test_config_validate() {
     if(!fd) return;
     testcase = "prefix 3fff:6464::/96\n"
         "ipv4-addr 192.168.255.0\n"
-        "ipv6-addr 3fff:6464::1\n";
+        "ipv6-addr 3fff:6464::1\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -870,7 +786,8 @@ void test_config_validate() {
     testcase = "prefix 64:ff9b::/96\n"
         "ipv4-addr 192.168.255.0\n"
         "ipv6-addr 2001:db8::1\n"
-        "map 192.168.255.1 2001:db8::1\n";
+        "map 192.168.255.1 2001:db8::1\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -884,15 +801,29 @@ void test_config_validate() {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "ipv4-addr 192.168.255.0\n"
-        "map 192.168.255.1 2001:db8::1\n";
+        "map 192.168.255.1 2001:db8::1\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
     config_init();
-    print_slog = 1;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
 
+    /* no tun device */
+    printf("TEST CASE: no tun-device\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "prefix 64:ff9b::/96\n"
+        "ipv4-addr 192.168.255.0\n"
+        "ipv6-addr 2001:db8::1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(!config_read(conffile),"Read Passed");
+    expect(config_validate(),"Validate Failed");
     
     /* wkfp not strict and non global addr */
     printf("TEST CASE: no prefix no ipv6-addr\n");
@@ -901,7 +832,8 @@ void test_config_validate() {
     if(!fd) return;
     testcase = "prefix 64:ff9b::/96\n"
         "ipv4-addr 192.168.255.0\n"
-        "wkpf-strict no\n";
+        "wkpf-strict no\n"
+        "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);

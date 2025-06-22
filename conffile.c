@@ -309,23 +309,6 @@ static int config_map(int ln, int arg_count, char **args)
 				"directive, aborting...\n", args[1]);
 		return ERROR_REJECT;
 	}
-	if (m->map6.addr.s6_addr32[0] == WKPF &&
-	    m->map6.addr.s6_addr32[1] == 0 &&
-	    m->map6.addr.s6_addr32[2] == 0) {
-		/* This validation must happen later, since we don't know wkpf_strict yet */
-		if(gcfg->wkpf_strict)
-		{
-			slog(LOG_CRIT, "Cannot create single-host maps inside "
-					"64:ff9b::/96, aborting...\n");
-			return ERROR_REJECT;
-		}
-		else 
-		{
-			slog(LOG_INFO, "Should not create single-host maps inside "
-					"64:ff9b::/96, however strict RFC60252"
-					" compliance is disabled\n");
-		}
-	}
 	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: IPv4 address in map directive",
 				ln, m4);
@@ -722,5 +705,11 @@ int config_validate(void)
 	/* Offlink MTU defaults to 1280 if not set */
 	if (gcfg->ipv6_offlink_mtu <= MTU_MIN) gcfg->ipv6_offlink_mtu = MTU_MIN;
 	
+	/* Tundev must be provided */
+	if(strlen(gcfg->tundev) < 1) {
+		slog(LOG_CRIT, "Error: no tun-device directive found\n");
+		return ERROR_REJECT;
+	}
+
 	return ERROR_NONE;
 }

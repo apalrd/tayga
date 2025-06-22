@@ -17,6 +17,7 @@
  
 /* Overall test status (1 on failure, 0 on pass) */
 extern int test_stat;
+extern int print_fail_only;
 
 /* Capture slog to the output */
 extern int has_slogged;

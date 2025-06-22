@@ -21,6 +21,7 @@
  
 /* Overall test status (1 on failure, 0 on pass) */
 int test_stat = 0;
+int print_fail_only = 0;
 
 /* Capture slog to the output */
 int has_slogged = 0;
@@ -53,7 +54,7 @@ void expectl(long a, long b, const char *res) {
         printf("FAIL: %s (%ld != %ld)\n",res,a,b);
         test_stat = 1;
     } else {
-        printf("PASS: %s\n",res);
+        if(!print_fail_only) printf("PASS: %s\n",res);
     }
 }
 
@@ -61,7 +62,7 @@ void expectl(long a, long b, const char *res) {
 void expects(const char * a, const char * b, int n, const char * res) {
     if(a == NULL && b == NULL) {
         /* Both strings are null */
-        printf("PASS: %s (both null)\n",res);
+        if(!print_fail_only) printf("PASS: %s (both null)\n",res);
     } else if(a == NULL) {
         /* Only one string is null */
         printf("FAIL: %s (a null)\n",res);
@@ -72,18 +73,18 @@ void expects(const char * a, const char * b, int n, const char * res) {
         test_stat = 1;
     } else if(a[0] == 0 && b[0] == 0) {
         /* Both are empty */
-        printf("PASS: %s (both empty)\n",res);
+        if(!print_fail_only) printf("PASS: %s (both empty)\n",res);
     } else if(strncmp(a,b,n)) {
         /* Both do not compare to each other */
         printf("FAIL: %s (%s != %s)\n",res,a,b);
         test_stat = 1;
-    } else printf("PASS: %s (both equal)\n",res);
+    } else if(!print_fail_only) printf("PASS: %s (both equal)\n",res);
 }
 
 /* Generic expect for booleans */
 void expect(int check,const char *res) {
     if(check) {
-        printf("PASS: %s\n",res);
+        if(!print_fail_only) printf("PASS: %s\n",res);
     }
     else {
         printf("FAIL: %s\n",res);
