@@ -48,8 +48,12 @@ endif
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test
-# TODO these are only valid for GCC
+# these are only valid for GCC
+ifeq ($(CC),gcc)
 TEST_CFLAGS := $(CFLAGS) -Werror -coverage -fcondition-coverage -DCOVERAGE_TESTING
+else
+TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
+endif
 TEST_FILES := test/unit.c
 test:
 	@$(RM) *.gcda || true
