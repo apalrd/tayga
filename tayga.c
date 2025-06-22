@@ -283,7 +283,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 static void signal_handler(int signal)
 {
-	write(signalfds[1], &signal, sizeof(signal));
+	(void)!write(signalfds[1], &signal, sizeof(signal));
 }
 
 static void signal_setup(void)
