@@ -294,7 +294,6 @@ struct config {
 	int hash_bits;
 	int cache_size;
 	int ipv6_offlink_mtu;
-	int lazy_frag_hdr;
 
 	int urandom_fd;
 	int tun_fd;

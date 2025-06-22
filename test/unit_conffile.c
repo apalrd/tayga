@@ -80,7 +80,6 @@ void test_config_compare(void) {
     expectl(gcfg->hash_bits,tcfg.hash_bits, "hash_bits");
     expectl(gcfg->cache_size,tcfg.cache_size, "cache_size");
     expectl(gcfg->ipv6_offlink_mtu,tcfg.ipv6_offlink_mtu, "ipv6_offlink_mtu");
-    expectl(gcfg->lazy_frag_hdr,tcfg.lazy_frag_hdr, "lazy_frag_hdr");
     expectl(gcfg->mtu,tcfg.mtu, "mtu");
     expectl(gcfg->wkpf_strict, tcfg.wkpf_strict, "wkpf_strict");
     expectl(gcfg->log_opts, tcfg.log_opts, "log_opts");
@@ -170,7 +169,6 @@ void test_config_init(void) {
     tcfg.max_commit_delay = 302400;
     tcfg.hash_bits = 7;
     tcfg.cache_size = 1<<13;
-    tcfg.lazy_frag_hdr = 1;
     tcfg.wkpf_strict = 1;
 
     /* Compare to our initialized tcfg */
@@ -536,18 +534,6 @@ void test_config_read(void) {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "data-dir var/spool/tayga\n";
-    fwrite(testcase,strlen(testcase),1,fd);
-    fclose(fd);
-    free(gcfg);
-    config_init();
-    expect(config_read(conffile),"Failed");
-
-    /* Test Case - strict frag header value */
-    printf("TEST CASE: strict frag header invalid\n");
-    fd = fopen(conffile,"w");
-    expect((long)fd,"fopen");
-    if(!fd) return;
-    testcase = "strict-frag-hdr none\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);

@@ -399,17 +399,7 @@ static int config_data_dir(int ln, int arg_count, char **args)
 
 static int config_strict_fh(int ln, int arg_count, char **args)
 {
-	if (!strcasecmp(args[0], "true") || !strcasecmp(args[0], "on") ||
-			!strcasecmp(args[0], "1")) {
-		gcfg->lazy_frag_hdr = 0;
-	} else if (!strcasecmp(args[0], "false") ||
-			!strcasecmp(args[0], "off") ||
-			!strcasecmp(args[0], "0")) {
-		gcfg->lazy_frag_hdr = 1;
-	} else {
-		slog(LOG_CRIT, "Error: invalid value for strict-frag-hdr on line %d\n",ln);
-		return ERROR_REJECT;
-	}
+	slog(LOG_WARNING,"Warning: strict-frag-hdr deprecated on line %d\n",ln);
 	return ERROR_NONE;
 }
 
@@ -508,7 +498,6 @@ int config_init(void)
 	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
 	gcfg->hash_bits = 7;
 	gcfg->cache_size = 8192;
-	gcfg->lazy_frag_hdr = 1;
 	INIT_LIST_HEAD(&gcfg->cache_pool);
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;

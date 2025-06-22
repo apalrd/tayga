@@ -400,7 +400,7 @@ static void xlate_4to6_data(struct pkt *p)
 				return;
 			}
 			no_frag_hdr = 1;
-		} else if (gcfg->lazy_frag_hdr && p->data_len <= frag_size) {
+		} else if (p->data_len <= frag_size) {
 			no_frag_hdr = 1;
 		}
 	}
