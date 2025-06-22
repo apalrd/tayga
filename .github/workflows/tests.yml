@@ -6,6 +6,11 @@ name: Run Test Suite
 # or API.
 on:
   workflow_dispatch:
+    inputs:
+      ver:
+        description: 'Version tag'
+        default: "main"
+        type: string
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -14,7 +19,7 @@ jobs:
         steps:
           - uses: actions/checkout@v4
             with:
-                fetch-depth: 0
+              ref: ${{ inputs.ver }}
           - name: run build
             run: make
           - name: install deps
@@ -33,7 +38,7 @@ jobs:
         steps:
           - uses: actions/checkout@v4
             with:
-                fetch-depth: 0
+              ref: ${{ inputs.ver }}
           - name: run build
             run: make
           - name: install deps
