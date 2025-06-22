@@ -49,6 +49,9 @@ jobs:
       - name: run build x86-64
         run: make static
         shell: alpine.sh {0}
+      - name: run unit tests
+        run: make test
+        shell: alpine.sh {0}
       - uses: actions/upload-artifact@v4
         with:
             name: build-amd64
