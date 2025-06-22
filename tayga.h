@@ -356,6 +356,7 @@ enum {
 
 /* TAYGA function prototypes */
 extern struct config *gcfg;
+extern time_t now;
 
 /* addrmap.c */
 int validate_ip4_addr(const struct in_addr *a);

@@ -18,7 +18,11 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <string.h>
+#include <time.h>
  
+/* Global vars */
+time_t now;
+
 /* Overall test status (1 on failure, 0 on pass) */
 int test_stat = 0;
 int print_fail_only = 0;

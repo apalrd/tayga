@@ -56,8 +56,6 @@ struct ip4_error {
     struct ip4 ip4_em;
 };
 
-extern struct config *gcfg;
-
 /**
  * @brief Print an IPv4 packet to the log
  *

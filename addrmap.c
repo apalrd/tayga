@@ -26,8 +26,6 @@
 # error Unsupported byte order
 #endif
 
-extern time_t now;
-
 /**
  * @brief Check if an IPv4 address is valid
  * 

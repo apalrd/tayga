@@ -25,6 +25,15 @@ static struct config tcfg;
 static char *tmap4[100] = {0};
 static char *tmap6[100] = {0};
 
+/* assign_dynamic 
+ * required for addrmap.c to link
+ * we need addrmap.c for this test
+ * but do not need dyanmic
+ */
+struct map6 *assign_dynamic(const struct in6_addr *addr6) {
+    return NULL;
+}
+
 
 /* Function to simulate getenv 
  * set getenv_case to a nonzero number to change the return

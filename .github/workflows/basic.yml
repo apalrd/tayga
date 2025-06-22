@@ -21,13 +21,21 @@ jobs:
             with:
               ref: ${{ inputs.ver }}
           - name: run build gcc
-            run: make CC=gcc
+            run: make CC=gcc CFLAGS="-Werror -Wall -O2"
           - name: run test gcc
             run: make test CC=gcc
           - name: run build clang
-            run: make CC=clang
+            run: make CC=clang  FLAGS="-Werror -Wall -O2"
           - name: run test clang
             run: make test CC=clang
+          - name: run build gcc w/o LTO
+            run: make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+          - name: run test gcc w/o LTO
+            run: make test CC=gcc LDFLAGS=""
+          - name: run build clang w/o LTO
+            run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+          - name: run test clang w/o LTO
+            run: make test CC=clang LDFLAGS=""
     test-arm64:
         runs-on: ubuntu-24.04-arm 
         steps:
@@ -42,3 +50,11 @@ jobs:
             run: make CC=clang CFLAGS="-Werror -Wall -O2"
           - name: run test clang
             run: make test CC=clang
+          - name: run build gcc w/o LTO
+            run: make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+          - name: run test gcc w/o LTO
+            run: make test CC=gcc LDFLAGS=""
+          - name: run build clang w/o LTO
+            run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+          - name: run test clang w/o LTO
+            run: make test CC=clang LDFLAGS=""

@@ -23,9 +23,6 @@
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
 
-extern struct config *gcfg;
-extern time_t now;
-
 static struct map_dynamic *alloc_map_dynamic(const struct in6_addr *addr6,
 		const struct in_addr *addr4, struct free_addr *f)
 {
