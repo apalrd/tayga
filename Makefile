@@ -50,7 +50,7 @@ endif
 .PHONY: test
 # these are only valid for GCC
 ifeq ($(CC),gcc)
-TEST_CFLAGS := $(CFLAGS) -Werror -coverage -fcondition-coverage -DCOVERAGE_TESTING
+TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
 else
 TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
 endif
