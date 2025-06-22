@@ -492,7 +492,7 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		struct cache_entry **c_ptr)
 {
-	uint32_t hash;
+	uint32_t hash = 0;
 	int ret;
 	struct list_head *entry;
 	struct cache_entry *c;
@@ -623,7 +623,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		struct cache_entry **c_ptr, int dyn_alloc)
 {
-	uint32_t hash;
+	uint32_t hash = 0;
 	int ret = 0;
 	struct list_head *entry;
 	struct cache_entry *c;
