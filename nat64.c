@@ -485,8 +485,8 @@ static int parse_ip4(struct pkt *p)
 	if ((p->ip4->ver_ihl >> 4) != 4 || p->header_len < sizeof(struct ip4) ||
 			p->data_len < p->header_len ||
 			ntohs(p->ip4->length) < p->header_len ||
-			validate_ip4_addr(&p->ip4->src) ||
-			validate_ip4_addr(&p->ip4->dest)) {		
+			(validate_ip4_addr(&p->ip4->src) == ERROR_DROP) ||
+			(validate_ip4_addr(&p->ip4->dest) == ERROR_DROP)) {		
 		log_pkt4(LOG_OPT_DROP,p,"IP Header Invalid");
 		return ERROR_DROP;
 	}

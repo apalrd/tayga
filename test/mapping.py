@@ -602,6 +602,8 @@ def dynamic_pool():
 
     # Default configuration for this test
     test.tayga_conf.default()
+    # Use IPv4 Link-Locals for this test to demonstrate that functionality
+    test.tayga_conf.dynamic_pool = "169.254.0.0/24"
     test.reload()
 
     # Send a v4->v6 without the mapping established (should kick back ICMP)
@@ -614,7 +616,7 @@ def dynamic_pool():
     test.send_and_check(send_pkt,ip_val, "send packet to map range without mapping")
 
     # Send a packet to establish the mapping
-    expect_sa = "172.16.0.80" #This depends on Tayga's hashing algorithm
+    expect_sa = "169.254.0.80" #This depends on Tayga's hashing algorithm
     expect_da = test.public_ipv4
     expect_data = randbytes(128)
     expect_len = 128+20
@@ -627,9 +629,11 @@ def dynamic_pool():
     expect_sa = test.public_ipv4_xlate
     expect_data = randbytes(128)
     expect_len = 128
-    send_pkt = IP(dst=str("172.16.0.80"),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
+    rt = router(f"169.254.0.0/16")
+    rt.apply()
+    send_pkt = IP(dst=str("169.254.0.80"),src=str(test.public_ipv4),proto=16) / Raw(expect_data)
     test.send_and_check(send_pkt,ip6_val, "send packet to map range with mapping")
-
+    rt.remove()
     
     test.section("Dynamic Pool Mapping (not specified by RFCs)")
 

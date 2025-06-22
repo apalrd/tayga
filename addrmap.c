@@ -415,6 +415,8 @@ conflict:
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len)
 {
+	/* Do not allow invalid addresses to be appended to prefix */
+	if(validate_ip4_addr(addr4)) return ERROR_DROP;
 	switch (prefix_len) {
 	case 32:
 		addr6->s6_addr32[0] = prefix->s6_addr32[0];
