@@ -22,10 +22,6 @@ extern int test_stat;
 extern int has_slogged;
 extern int print_slog;
 void slog(int priority, const char *format, ...);
-/* Capture exit events */
-extern int has_exit;
-/* Expect a function to call exit */
-int expect_exit();
 /* Expect for long ints */
 void expectl(long a, long b, const char *res);
 /* Expect for strings */

@@ -456,7 +456,7 @@ int main(int argc, char **argv)
 	struct group *gr = NULL;
 
 	/* Init config structure */
-	config_init();
+	if(config_init() < 0) return 1;
 
 	static struct option longopts[] = {
 		{ "mktun", 0, 0, 0 },
@@ -526,10 +526,10 @@ int main(int argc, char **argv)
 	}
 
 	/* Parse config file options */
-	config_read(conffile);
+	if(config_read(conffile) < 0) return 1;
 
 	/* Validate config */
-	config_validate();
+	if(config_validate() < 0) return 1;
 
 	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {

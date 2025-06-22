@@ -49,7 +49,7 @@ static struct map_static *alloc_map_static(int ln)
 	m = (struct map_static *)malloc(sizeof(struct map_static));
 	if (!m) {
 		slog(LOG_CRIT, "Unable to allocate config memory\n");
-		exit(1);
+		return NULL;
 	}
 	memset(m, 0, sizeof(struct map_static));
 	m->map4.type = MAP_TYPE_STATIC;
@@ -85,7 +85,6 @@ static void abort_on_conflict4(char *msg, int ln, struct map4 *old)
 		slog(LOG_CRIT, "%s conflicts with earlier "
 				"definition of %s/%d%s\n", msg,
 				oldaddr, old->prefix_len, oldline);
-	exit(1);
 }
 
 static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
@@ -109,7 +108,6 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 		slog(LOG_CRIT, "%s overlaps with earlier "
 				"definition of %s/%d%s\n", msg,
 				oldaddr, old->prefix_len, oldline);
-	exit(1);
 }
 
 static int config_ipv4_addr(int ln, int arg_count, char **args)
@@ -162,6 +160,7 @@ static int config_prefix(int ln, int arg_count, char **args)
 	struct map6 *m6;
 
 	m = alloc_map_static(ln);
+	if(!m) return ERROR_REJECT;
 	m->map4.prefix_len = 0;
 	m->map4.mask.s_addr = 0;
 	m->map4.type = MAP_TYPE_RFC6052;
@@ -258,6 +257,7 @@ static int config_map(int ln, int arg_count, char **args)
 	struct map6 *m6;
 
 	m = alloc_map_static(ln);
+	if(!m) return ERROR_REJECT;
 
 	char *slash;
 	slash = strchr(args[0], '/');
@@ -508,13 +508,13 @@ struct {
 	{ NULL, NULL, 0 }
 };
 
-void config_init(void)
+int config_init(void)
 {
 	/* Initialize configuration structure to defaults */
 	gcfg = (struct config *)malloc(sizeof(struct config));
 	if (!gcfg) {
 		slog(LOG_CRIT, "Unable to allocate config memory\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 	memset(gcfg, 0, sizeof(struct config));
 	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi);
@@ -530,9 +530,10 @@ void config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	return ERROR_NONE;
 }
 
-void config_read(char *conffile)
+int config_read(char *conffile)
 {
 	FILE *in;
 	int ln = 0;
@@ -551,7 +552,7 @@ void config_read(char *conffile)
 	if (!in) {
 		slog(LOG_CRIT, "unable to open %s, aborting: %s\n", conffile,
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 	/* Parse each line of conf file */
 	while (fgets(line, sizeof(line), in)) {
@@ -599,10 +600,11 @@ void config_read(char *conffile)
 	fclose(in);
 
 	/* At this point, exit if we had parsing errors */
-	if(willexit) exit(1);
+	if(willexit) return ERROR_REJECT;
+	return ERROR_NONE;
 }
 
-void config_validate(void)
+int config_validate(void)
 {
 	struct map_static *m;
 	struct map4 *m4;
@@ -613,7 +615,7 @@ void config_validate(void)
 	if (list_empty(&gcfg->map6_list)) {
 		slog(LOG_CRIT, "Error: no translation maps or NAT64 prefix "
 				"configured\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	/* Check if the env var STATE_DIRECTORY exists to use as data_dir
@@ -656,13 +658,16 @@ void config_validate(void)
 	
 	if (!gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: no ipv4-addr directive found\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	m = alloc_map_static(0);
+	if(!m) return ERROR_REJECT;
 	m->map4.addr = gcfg->local_addr4;
-	if (insert_map4(&m->map4, &m4) < 0)
+	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
+		return ERROR_REJECT;
+	}
 
 	/* ipv6-addr is configured and is within the well known prefix */
 	if (gcfg->local_addr6.s6_addr32[0] == WKPF &&
@@ -673,7 +678,7 @@ void config_validate(void)
 		slog(LOG_CRIT, "Error: ipv6-addr directive cannot contain an "
 				"address in the Well-Known Prefix "
 				"(64:ff9b::/96)\n");
-		exit(1);
+		return ERROR_REJECT;
 	/* ipv6-addr is configured but not within the well known prefix */
 	} else if (gcfg->local_addr6.s6_addr32[0]) {
 		m->map6.addr = gcfg->local_addr6;
@@ -685,20 +690,20 @@ void config_validate(void)
 						"within configured prefix "
 						"%s/%d\n", addrbuf,
 						m6->prefix_len);
-				exit(1);
+				return ERROR_REJECT;
 			} else {
 				abort_on_conflict6("Error: ipv6-addr", 0, m6);
+				return ERROR_REJECT;
 			}
 		}	
 	/* ipv6-addr is zero (not set), generate from ipv4-addr and prefix */
 	} else {
 		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
-		printf("Here 4\n");
 		if (m6->type != MAP_TYPE_RFC6052) {
 			slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 					"specified if no NAT64 prefix is "
 					"configured\n");
-			exit(1);
+			return ERROR_REJECT;
 		}
 		if (append_to_prefix(&gcfg->local_addr6, &gcfg->local_addr4,
 					&m6->addr, m6->prefix_len)) {
@@ -708,7 +713,7 @@ void config_validate(void)
 						"specified if prefix is 64:ff9b::/96 "
 						"and ipv4-addr is a non-global "
 						"(RFC 1918) address\n");
-				exit(1);
+				return ERROR_REJECT;
 			}
 		}
 		m->map6.addr = gcfg->local_addr6;
@@ -716,5 +721,6 @@ void config_validate(void)
 
 	/* Offlink MTU defaults to 1280 if not set */
 	if (gcfg->ipv6_offlink_mtu <= MTU_MIN) gcfg->ipv6_offlink_mtu = MTU_MIN;
-	return;
+	
+	return ERROR_NONE;
 }

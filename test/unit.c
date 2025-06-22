@@ -40,25 +40,11 @@ void slog(int priority, const char *format, ...)
 }
 
 /* Capture exit events */
-static jmp_buf ecall;
-int has_exit = 0;
+void _exit(int status);
 void exit(int status) {
-    /* Longjmp our way back*/
-    has_exit = 1;
-    longjmp(ecall,1);
-}
-
-/* Expect a function to call exit */
-int expect_exit(void) {
-    memset(&ecall,0,sizeof(jmp_buf));
-    /* Setjmp to come back here */
-    if(setjmp(ecall)) {
-        /* Came back since we got 1 */
-        return 0;
-    }
-    /* First call, return 1 so if is processed */
-    has_exit = 0;
-    return 1;
+    /* oh no, bad things have happened here */
+    printf("FAIL: UNEXPECTED CALL TO EXIT\n");
+    _exit(1);
 }
 
 /* Expect for long ints */
