@@ -15,6 +15,8 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  */
+#ifndef __TAYGA_H__
+#define __TAYGA_H__
 
 #include <stdio.h>
 #include <assert.h>
@@ -394,3 +396,5 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
+
+#endif /* #ifndef __TAYGA_H__ */
