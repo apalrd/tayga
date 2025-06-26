@@ -34,6 +34,13 @@ TAYGA_VERSION = $(shell $(GIT) describe --tags --dirty)
 TAYGA_BRANCH = $(shell $(GIT) describe --all --dirty)
 TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 
+USE_SYSTEMD ?=
+
+ifneq ($(USE_SYSTEMD),)
+CFLAGS += -DUSE_SYSTEMD=1
+LDLIBS += -lsystemd
+endif
+
 .DEFAULT: help
 help:
 	@echo 'Targets:'
@@ -44,6 +51,9 @@ help:
 	@echo 'install         - Installs tayga and manpages'
 	@echo 'install-systemd - Installs the tayga@.service template and the example configuration file'
 	@echo 'install-openrc  - Installs the tayga.initd script and the example configuration file'
+	@echo
+	@echo 'Configuration:'
+	@echo 'USE_SYSTEMD     - Link to libsystemd: output structured logs to the journal and support socket-activation'
 	@echo
 	@echo 'Installation Variables:'
 	@echo 'prefix          - Installation prefix [/usr/local]'
@@ -63,7 +73,7 @@ all: tayga
 
 # Compile Tayga
 tayga: version.h $(SOURCES)
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Compile Tayga (statically link)
 .PHONY: static

@@ -25,33 +25,83 @@
 #include <pwd.h>
 #include <grp.h>
 
-#define USAGE_TEXT	\
-"TAYGA version %s\n" \
-"Usage: %s [-c|--config CONFIGFILE] [-d] [-n|--nodetach] [-u|--user USERID]\n" \
-"             [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n" \
-"--config FILE      : Read configuration options from FILE\n" \
-"-d                 : Enable debug messages (implies --nodetach)\n" \
-"--nodetach         : Do not detach from terminal\n" \
-"--user USERID      : Set uid to USERID after initialization\n" \
-"--group GROUPID    : Set gid to GROUPID after initialization\n" \
-"--chroot           : chroot() to data-dir (specified in config file)\n\n" \
-"--pidfile FILE     : Write process ID of daemon to FILE\n"
-
 extern struct config *gcfg;
 time_t now;
-
+static const char *progname;
 static int signalfds[2];
-static int use_stdout;
+static enum {
+    LOG_TO_SYSLOG = 0,
+    LOG_TO_STDOUT = 1,
+    LOG_TO_JOURNAL = 2,
+} logger_output;
 
-void slog(int priority, const char *format, ...)
+void usage(int code) {
+    fprintf(stderr,
+        "TAYGA version %s\n"
+        "Usage:\n"
+        "%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
+        "       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
+#ifdef USE_SYSTEMD
+        "       [--syslog|--stdout|--journal]\n"
+#else
+        "       [--syslog|--stdout]\n"
+#endif
+        "%s --mktun [-c|--config CONFIGFILE]\n"
+        "%s --rmtun [-c|--config CONFIGFILE]\n"
+        "       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
+        "--config FILE      : Read configuration options from FILE\n"
+        "--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
+        "--nodetach         : Do not fork the process\n"
+        "--syslog           : Log messages to syslog (default)\n"
+        "--stdout           : Log messages to stdout\n"
+#ifdef USE_SYSTEMD
+        "--journal          : Log messages to the systemd journal\n"
+#endif
+        "--user USERID      : Set uid to USERID after initialization\n"
+        "--group GROUPID    : Set gid to GROUPID after initialization\n"
+        "--chroot           : chroot() to data-dir (specified in config file)\n"
+        "--pidfile FILE     : Write process ID of daemon to FILE\n"
+        "--mktun            : Create the persistent TUN interface\n"
+        "--rmtun            : Remove the persistent TUN interface\n"
+        "--help, -h         : Show this help message\n",
+        TAYGA_VERSION, progname, progname, progname);
+    exit(code);
+}
+
+/* Used during argument parsing, before logging is setup */
+void die(const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    vfprintf(stderr, format, ap);
+    va_end(ap);
+    putc('\n', stderr);
+    exit(1);
+}
+
+/* Log the message to the configured logger */
+void slog_impl(const char *file, const char *line, const char *func, int priority, const char *format, ...)
 {
 	va_list ap;
+    (void)file;
+    (void)line;
+    (void)func;
 
 	va_start(ap, format);
-	if (use_stdout)
-		vprintf(format, ap);
-	else if (priority != LOG_DEBUG)
-		vsyslog(priority, format, ap);
+    switch (logger_output) {
+        case LOG_TO_STDOUT:
+            vprintf(format, ap);
+            break;
+        case LOG_TO_SYSLOG:
+            vsyslog(priority, format, ap);
+            break;
+#ifdef USE_SYSTEMD
+        case LOG_TO_JOURNAL:
+            sd_journal_printv_with_location(priority, file, line, func, format, ap);
+            break;
+#endif
+        default:
+            die("Invalid logger_output value %d", logger_output);
+    }
 	va_end(ap);
 }
 
@@ -455,52 +505,73 @@ int main(int argc, char **argv)
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
 
+	progname = argv[0];
+
 	/* Init config structure */
 	if(config_init() < 0) return 1;
 
 	static struct option longopts[] = {
 		{ "mktun", 0, 0, 0 },
 		{ "rmtun", 0, 0, 0 },
-		{ "help", 0, 0, 0 },
+		{ "syslog", 0, 0, 0 },
+		{ "stdout", 0, 0, 0 },
+		{ "journal", 0, 0, 0 },
+		{ "help", 0, 0, 'h' },
 		{ "config", 1, 0, 'c' },
 		{ "nodetach", 0, 0, 'n' },
 		{ "user", 1, 0, 'u' },
 		{ "group", 1, 0, 'g' },
 		{ "chroot", 0, 0, 'r' },
 		{ "pidfile", 1, 0, 'p' },
+		{ "debug", 0, 0, 'd' },
 		{ 0, 0, 0, 0 }
 	};
 
 	for (;;) {
-		c = getopt_long(argc, argv, "c:dnu:g:rp:", longopts, &longind);
+		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
 		if (c == -1)
 			break;
 		switch (c) {
 		case 0:
-			if (longind == 0) {
-				if (do_rmtun) {
-					fprintf(stderr, "Error: both --mktun "
-						"and --rmtun specified.\n");
-					exit(1);
-				}
-				do_mktun = 1;
-			} else if (longind == 1) {
-				if (do_mktun) {
-					fprintf(stderr, "Error: both --mktun "
-						"and --rmtun specified.\n");
-					exit(1);
-				}
-				do_rmtun = 1;
-			} else if (longind == 2) {
-				fprintf(stderr, USAGE_TEXT, TAYGA_VERSION, argv[0]);
-				exit(0);
+			switch (longind) {
+				case 0: /* --mktun */
+					if (do_rmtun) {
+						die("Error: both --mktun and --rmtun specified");
+					}
+					do_mktun = 1;
+					break;
+				case 1: /* --rmtun */
+					if (do_mktun) {
+						die("Error: both --mktun and --rmtun specified");
+						exit(1);
+					}
+					do_rmtun = 1;
+					break;
+				case 2: /* --syslog */
+					logger_output = LOG_TO_SYSLOG;
+					break;
+				case 3: /* --stdout */
+					logger_output = LOG_TO_STDOUT;
+					break;
+				case 4: /* --journal */
+#ifdef USE_SYSTEMD
+					logger_output = LOG_TO_JOURNAL;
+#else
+					die("Tayga is not compiled with systemd support");
+#endif
+					break;
+				default:
+					usage(1);
 			}
+			break;
+		case 'h':
+			usage(0);
 			break;
 		case 'c':
 			conffile = optarg;
 			break;
 		case 'd':
-			use_stdout = 1;
+			logger_output = LOG_TO_STDOUT;
 			detach = 0;
 			break;
 		case 'n':
@@ -519,8 +590,7 @@ int main(int argc, char **argv)
 			pidfile = optarg;
 			break;
 		default:
-			fprintf(stderr, "Try `%s --help' for more "
-					"information (got %c)\n", argv[0],c);
+			die("Try `%s --help' for more information (got %c)", argv[0],c);
 			exit(1);
 		}
 	}
@@ -533,29 +603,27 @@ int main(int argc, char **argv)
 
 	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {
-		use_stdout = 1;
+		logger_output = LOG_TO_STDOUT;
 		if (user) {
-			fprintf(stderr, "Error: cannot specify -u or --user "
-					"with mktun/rmtun operation\n");
-			exit(1);
+			die("Error: cannot specify -u or --user "
+					"with mktun/rmtun operation");
 		}
 		if (group) {
-			fprintf(stderr, "Error: cannot specify -g or --group "
+			die("Error: cannot specify -g or --group "
 					"with mktun/rmtun operation\n");
-			exit(1);
 		}
 		if (do_chroot) {
-			fprintf(stderr, "Error: cannot specify -r or --chroot "
+			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
-			exit(1);
 		}
 		tun_setup(do_mktun, do_rmtun);
 		return 0;
 	}
 
 	/* Setup logging */
-	if (!use_stdout)
+	if (logger_output == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	}
 
 	/* Change user */
 	if (user) {
@@ -710,6 +778,10 @@ int main(int argc, char **argv)
 	pollfds[0].events = POLLIN;
 	pollfds[1].fd = gcfg->tun_fd;
 	pollfds[1].events = POLLIN;
+
+#ifdef USE_SYSTEMD
+	sd_notify(/* unset_environment */ 1, "READY=1");
+#endif
 
 	/* Main loop */
 	for (;;) {
