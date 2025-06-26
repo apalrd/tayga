@@ -41,6 +41,10 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
+# if defined(USE_SYSTEMD)
+# include <systemd/sd-daemon.h>
+# include <systemd/sd-journal.h>
+# endif
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
@@ -394,7 +398,10 @@ void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
 
 /* tayga.c */
-void slog(int priority, const char *format, ...);
+#define STRINGIFY_IMPL(x) #x
+#define STRINGIFY(x) STRINGIFY_IMPL(x)
+#define slog(prio, ...) slog_impl("CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, prio, __VA_ARGS__)
+void slog_impl(const char *file, const char *line, const char *func, int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
 
 #endif /* #ifndef __TAYGA_H__ */
