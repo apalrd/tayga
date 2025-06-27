@@ -16,10 +16,13 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
-StateDirectory=tayga
+StateDirectory="tayga-%I"
 PrivateTmp=true
-Type=forking
-ExecStart=tayga --config /etc/tayga/%i.conf
+DynamicUser=true
+Type=simple
+AmbientCapabilities=CAP_NET_ADMIN
+ExecStart=tayga --config /etc/tayga/%i.conf -n
+ExecStartPost=-/bin/sh /etc/tayga/%i.sh
 
 [Install]
 WantedBy=multi-user.target
