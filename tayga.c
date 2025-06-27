@@ -42,6 +42,8 @@ time_t now;
 
 static int signalfds[2];
 static int use_stdout;
+static struct passwd *pw = NULL;
+static struct group *gr = NULL;
 
 void slog(int priority, const char *format, ...)
 {
@@ -116,15 +118,28 @@ static void tun_setup(int do_mktun, int do_rmtun)
 					strerror(errno));
 			exit(1);
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETOWNER, 0) < 0) {
-			slog(LOG_CRIT, "Unable to set owner on %s, "
-					"aborting: %s\n", gcfg->tundev,
+		/* Owner user */
+		int own = 0;
+		if(pw) own=pw->pw_uid;
+		if(own) printf("Setting tun owner user to %d\n",own);
+		if (ioctl(gcfg->tun_fd, TUNSETOWNER, own) < 0) {
+			slog(LOG_CRIT, "Unable to set owner %d on %s, "
+					"aborting: %s\n",
+					own,
+					gcfg->tundev,
 					strerror(errno));
 			exit(1);
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETGROUP, 0) < 0) {
-			slog(LOG_CRIT, "Unable to set group on %s, "
-					"aborting: %s\n", gcfg->tundev,
+		/* Owner group */
+		own = 0;
+		if(pw) own=pw->pw_gid;
+		if(gr) own=gr->gr_gid;
+		if(own) printf("Setting tun owner group to %d\n",own);
+		if (ioctl(gcfg->tun_fd, TUNSETGROUP, own) < 0) {
+			slog(LOG_CRIT, "Unable to set group %d on %s, "
+					"aborting: %s\n", 
+					own,
+					gcfg->tundev,
 					strerror(errno));
 			exit(1);
 		}
@@ -452,8 +467,6 @@ int main(int argc, char **argv)
 	int detach = 1;
 	int do_mktun = 0;
 	int do_rmtun = 0;
-	struct passwd *pw = NULL;
-	struct group *gr = NULL;
 
 	/* Init config structure */
 	if(config_init() < 0) return 1;
@@ -525,6 +538,66 @@ int main(int argc, char **argv)
 		}
 	}
 
+	{
+		/* Print current user / group */
+		uid_t uid = getuid();
+		gid_t gid = getgid();
+		gid_t sup[32];
+		int n_sup = getgroups(32, sup);
+		printf("Running as user %d and group %d with sup groups [ ", uid, gid);
+		for(int i = 0; i < n_sup; i++) printf("%d ", sup[i]);
+		printf("]\n");
+	}
+
+	/* Read user */
+	if (user) {
+		/* Buffer to use later */
+		static struct passwd uid;
+		/* Try as an integer */
+		errno = 0;
+		char * endp = NULL;
+		uid.pw_uid = strtoul(user, &endp, 10);
+		if (errno || (endp == user)) {
+			printf("Trying to get user %s\n", user);
+			/* Not an integer, try as a name */
+			pw = getpwnam(user);
+			if (!pw) {
+				slog(LOG_CRIT, "Error: user %s does not exist\n", user);
+				return 1;
+			}
+		} else {
+			/* Return our static buffer */
+			pw = &uid;
+			
+		}
+		printf("Configured user is %d\n",pw->pw_uid);
+	}
+
+	/* Read group */
+	if (group) {		
+		/* Buffer to use later */
+		static struct group gid;
+		/* Try as an integer */
+		errno = 0;
+		char * endp = NULL;
+		gid.gr_gid = strtoul(group, &endp, 10);
+		if (errno || (endp == group)) {
+			/* Not an integer, try as a name */
+			printf("Trying to get group %s\n", group);
+			gr = getgrnam(group);
+			if (!gr) {
+				slog(LOG_CRIT, "Error: group %s does not exist\n",
+						group);
+				return 1;
+			}
+		} else {
+			/* Return our static buffer */
+			gr= &gid;
+		}
+		printf("Configured group is %d\n",gr->gr_gid);
+	}
+
+
 	/* Parse config file options */
 	if(config_read(conffile) < 0) return 1;
 
@@ -534,16 +607,6 @@ int main(int argc, char **argv)
 	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {
 		use_stdout = 1;
-		if (user) {
-			fprintf(stderr, "Error: cannot specify -u or --user "
-					"with mktun/rmtun operation\n");
-			exit(1);
-		}
-		if (group) {
-			fprintf(stderr, "Error: cannot specify -g or --group "
-					"with mktun/rmtun operation\n");
-			exit(1);
-		}
 		if (do_chroot) {
 			fprintf(stderr, "Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
@@ -556,25 +619,6 @@ int main(int argc, char **argv)
 	/* Setup logging */
 	if (!use_stdout)
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-
-	/* Change user */
-	if (user) {
-		pw = getpwnam(user);
-		if (!pw) {
-			slog(LOG_CRIT, "Error: user %s does not exist\n", user);
-			exit(1);
-		}
-	}
-
-	/* Change group */
-	if (group) {
-		gr = getgrnam(group);
-		if (!gr) {
-			slog(LOG_CRIT, "Error: group %s does not exist\n",
-					group);
-			exit(1);
-		}
-	}
 
 	/* Chroot */
 	if (!gcfg->data_dir[0]) {
