@@ -71,15 +71,6 @@ help:
 .PHONY: all
 all: tayga
 
-# Compile Tayga
-tayga: version.h $(SOURCES)
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
-
-# Compile Tayga (statically link)
-.PHONY: static
-static: LDFLAGS += -static
-static: tayga
-
 # Synthesize the version.h header from Git
 ifndef RELEASE
 define VERSION_HEADER
@@ -93,15 +84,21 @@ define VERSION_HEADER
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
 
-version.h:
-	$(file > $@,$(VERSION_HEADER))
 endif
+
+# Compile Tayga
+tayga: $(SOURCES)
+	$(if $(RELEASE),,$(file > version.h,$(VERSION_HEADER)))
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
+
+# Compile Tayga (statically link)
+.PHONY: static
+static: LDFLAGS += -static
+static: tayga
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test
 test: unit_conffile
-	@$(RM) *.gcda
-	@$(RM) *.gcno
 	./unit_conffile
 
 # these are only valid for GCC
@@ -125,6 +122,7 @@ integration: tayga
 .PHONY: clean
 clean:
 	$(RM) tayga version.h
+	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
 .PHONY: install
