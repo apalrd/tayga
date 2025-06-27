@@ -7,6 +7,16 @@ After=network.target
 # /etc/tayga/instancename.conf
 # /etc/tayga/instancename.conf
 # systemctl enable tayga@instancename.service
+#
+# These options require Tayga to be linked against libsystemd
+# If you want to run Tayga as a systemd service without this support,
+# remove the `--journal` flag, and replace `Type=notify` with `Type=simple`.
+Type=notify
+ExecStart=tayga --config /etc/tayga/%i.conf --journal --nodetach
+
+# Hardening options
+PrivateTmp=true
+StateDirectory=tayga
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
@@ -16,10 +26,6 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
-StateDirectory=tayga
-PrivateTmp=true
-Type=forking
-ExecStart=tayga --config /etc/tayga/%i.conf
 
 [Install]
 WantedBy=multi-user.target
