@@ -112,34 +112,38 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	if (do_mktun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 1) < 0) {
-			slog(LOG_CRIT, "Unable to set persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
 		/* Owner user */
 		int own = 0;
 		if(pw) own=pw->pw_uid;
-		if(own) printf("Setting tun owner user to %d\n",own);
-		if (ioctl(gcfg->tun_fd, TUNSETOWNER, own) < 0) {
-			slog(LOG_CRIT, "Unable to set owner %d on %s, "
-					"aborting: %s\n",
-					own,
-					gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
+        if(own) {
+            printf("Setting tun owner user to %d\n",own);
+            if (ioctl(gcfg->tun_fd, TUNSETOWNER, own) < 0) {
+                slog(LOG_CRIT, "Unable to set owner %d on %s, "
+                        "aborting: %s\n",
+                        own,
+                        gcfg->tundev,
+                        strerror(errno));
+                exit(1);
+            }
+        }
 		/* Owner group */
 		own = 0;
 		if(pw) own=pw->pw_gid;
 		if(gr) own=gr->gr_gid;
-		if(own) printf("Setting tun owner group to %d\n",own);
-		if (ioctl(gcfg->tun_fd, TUNSETGROUP, own) < 0) {
-			slog(LOG_CRIT, "Unable to set group %d on %s, "
-					"aborting: %s\n", 
-					own,
-					gcfg->tundev,
+        if(own) {
+            printf("Setting tun owner group to %d\n",own);
+            if (ioctl(gcfg->tun_fd, TUNSETGROUP, own) < 0) {
+                slog(LOG_CRIT, "Unable to set group %d on %s, "
+                        "aborting: %s\n", 
+                        own,
+                        gcfg->tundev,
+                        strerror(errno));
+                exit(1);
+            }
+        }
+		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 1) < 0) {
+			slog(LOG_CRIT, "Unable to set persist flag on %s, "
+					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
 			exit(1);
 		}
