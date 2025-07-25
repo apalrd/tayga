@@ -2,7 +2,7 @@
 
 TAYGA is an out-of-kernel stateless NAT64 implementation for Linux and FreeBSD.  It uses the TUN driver to exchange packets with the kernel, which is the same driver used by OpenVPN and QEMU/KVM.  TAYGA needs no kernel patches or out-of-tree modules on either Linux or FreeBSD. 
 
-Tayga waas originally developed by Nathan Lutchansky (litech.org) through version 0.9.2. Following the last release in 2011, Tayga was mainatined by several Linux distributions independently, including patches from the Debian project, and FreeBSD. These patches have been collected and merged together, and is now maintained from @apalrd and from contributors here on Github. 
+Tayga was originally developed by Nathan Lutchansky (litech.org) through version 0.9.2. Following the last release in 2011, Tayga was mainatined by several Linux distributions independently, including patches from the Debian project, and FreeBSD. These patches have been collected and merged together, and is now maintained from @apalrd and from contributors here on Github. 
 
 If you are interested in the mechanics of NAT64 and Stateles IP / ICMP Translation, see the [overview on the docs page](docs/index.md). 
 
