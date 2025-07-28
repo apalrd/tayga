@@ -112,30 +112,38 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	if (do_mktun) {
+        /* TUN owner/group settings work additively (unlike file owner/group).
+         * To be safe, we do not allow creating an interface with no perms.
+         *
+         * args                   | TUNSETOWNER | TUNSETGROUP |
+         *                        |        root |        root |
+         * --user foo             |         foo |             |
+         * --group bar            |             |         bar |
+         * --user foo --group bar |         foo |         bar |
+         */
+		int user_own = pw ? pw->pw_uid : 0;
+        int group_own = gr ? gr->gr_gid : 0;
+
 		/* Owner user */
-		int own = 0;
-		if(pw) own=pw->pw_uid;
-        if(own) {
-            printf("Setting tun owner user to %d\n",own);
-            if (ioctl(gcfg->tun_fd, TUNSETOWNER, own) < 0) {
+        if(pw != NULL || gr == NULL) {
+            printf("Setting tun owner user to %d\n",user_own);
+            if (ioctl(gcfg->tun_fd, TUNSETOWNER, user_own) < 0) {
                 slog(LOG_CRIT, "Unable to set owner %d on %s, "
                         "aborting: %s\n",
-                        own,
+                        user_own,
                         gcfg->tundev,
                         strerror(errno));
                 exit(1);
             }
         }
+
 		/* Owner group */
-		own = 0;
-		if(pw) own=pw->pw_gid;
-		if(gr) own=gr->gr_gid;
-        if(own) {
-            printf("Setting tun owner group to %d\n",own);
-            if (ioctl(gcfg->tun_fd, TUNSETGROUP, own) < 0) {
+        if(gr == NULL || pw != NULL) {
+            printf("Setting tun owner group to %d\n",group_own);
+            if (ioctl(gcfg->tun_fd, TUNSETGROUP, group_own) < 0) {
                 slog(LOG_CRIT, "Unable to set group %d on %s, "
                         "aborting: %s\n", 
-                        own,
+                        group_own,
                         gcfg->tundev,
                         strerror(errno));
                 exit(1);
