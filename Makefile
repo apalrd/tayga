@@ -24,6 +24,7 @@ OPENRC ?= /sbin/rc-service
 sysconfdir ?= /etc
 localstatedir ?= /var
 SUDO ?= /usr/bin/sudo
+systemdsystemunitdir ?= $(sysconfdir)/systemd/system
 
 # Compile Tayga
 .PHONY: all
@@ -86,7 +87,7 @@ install: $(TARGET)
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5
-	if test -x "$(SYSTEMCTL)" ; then mkdir -p $(DESTDIR)$(sysconfdir)/systemd/system && $(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(sysconfdir)/systemd/system/tayga@.service; fi
+	if test -x "$(SYSTEMCTL)" ; then mkdir -p $(DESTDIR)$(systemdsystemunitdir) && $(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(systemdsystemunitdir)/tayga@.service; fi
 	if test -x "$(SYSTEMCTL)" && test ! -e "$(DESTDIR)$(sysconfdir)/tayga/default.conf"; then mkdir -p $(DESTDIR)$(sysconfdir)/tayga && $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf ; fi
 	if test -x "$(OPENRC)"; then mkdir -p $(DESTDIR)$(sysconfdir)/init.d && $(INSTALL_PROGRAM) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga ; fi
 	if test -x "$(OPENRC)" && test ! -e "$(DESTDIR)$(sysconfdir)/conf.d/tayga"; then mkdir -p $(DESTDIR)$(sysconfdir)/conf.d &&$(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga  ; fi
