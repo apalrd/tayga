@@ -617,7 +617,7 @@ int main(int argc, char **argv)
 	}
 
 	if (pidfile) {
-		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (pidfd < 0) {
 			slog(LOG_CRIT, "Error, unable to open %s for "
 					"writing: %s\n", pidfile,
