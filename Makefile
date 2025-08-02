@@ -82,7 +82,7 @@ clean:
 # If systemd is detected, copy systemd service file
 # If systemd is detected and conf does not already exist, copy example conf file
 .PHONY: install install-live
-install: $(TARGET)
+install:
 	-mkdir -p $(DESTDIR)$(sbindir) $(DESTDIR)$(mandir)/man5 $(DESTDIR)$(mandir)/man8
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8
