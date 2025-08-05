@@ -30,8 +30,11 @@ int print_fail_only = 0;
 /* Capture slog to the output */
 int has_slogged = 0;
 int print_slog = 0;
-void slog(int priority, const char *format, ...)
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
 {
+    (void)file;
+    (void)line;
+    (void)func;
     //Observe that slog was called
     has_slogged++;
     //Optionally, print it to the log

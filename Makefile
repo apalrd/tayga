@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c sd-util.c
 
 #Check for release file / variable
 -include release
@@ -34,13 +34,6 @@ TAYGA_VERSION = $(shell $(GIT) describe --tags --dirty)
 TAYGA_BRANCH = $(shell $(GIT) describe --all --dirty)
 TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 
-USE_SYSTEMD ?=
-
-ifneq ($(USE_SYSTEMD),)
-CFLAGS += -DUSE_SYSTEMD=1
-LDLIBS += -lsystemd
-endif
-
 .DEFAULT: help
 help:
 	@echo 'Targets:'
@@ -52,9 +45,6 @@ help:
 	@echo 'install-systemd - Installs the tayga@.service template and the example configuration file'
 	@echo 'install-openrc  - Installs the tayga.initd script and the example configuration file'
 	@echo
-	@echo 'Configuration:'
-	@echo 'USE_SYSTEMD     - Link to libsystemd: output structured logs to the journal and support socket-activation'
-	@echo
 	@echo 'Installation Variables:'
 	@echo 'prefix          - Installation prefix [/usr/local]'
 	@echo 'exec_prefix     - Executable installation prefix [$$(prefix)]'
@@ -63,7 +53,7 @@ help:
 	@echo 'mandir          - Manpage directory [$$(datarootdir)/man]'
 	@echo 'man5dir man8dir - Manpage section directories [$$(mandir)/man5 $$(mandir)/man8]'
 	@echo 'sysconfdir      - System configuration directory [/etc]'
-	@echo 'servicedir      - SystemD service file location [$$(sysconfdir)/systemd/system]'
+	@echo 'servicedir      - systemd service file location [$$(sysconfdir)/systemd/system]'
 	@echo 'DESTDIR         - Prepended to each installed file'
 	@echo 'INSTALL_DATA    - Script to install non-executable files [$$(INSTALL) -m 644]'
 	@echo 'INSTALL_PROGRAM - Script to install executable files [$$(INSTALL)]'
@@ -138,7 +128,7 @@ install-systemd:
 	-mkdir -p $(DESTDIR)$(servicedir) $(DESTDIR)$(sysconfdir)/tayga
 	$(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(servicedir)/tayga@.service
 	test -e $(DESTDIR)$(sysconfdir)/tayga/default.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf
-	@echo "Run 'systemctl daemon-reload' to have SystemD recognize the newly installed service"
+	@echo "Run 'systemctl daemon-reload' to have systemd recognize the newly installed service"
 
 # Install openrc init script
 .PHONY: install-openrc

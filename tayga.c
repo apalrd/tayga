@@ -30,78 +30,70 @@ time_t now;
 static const char *progname;
 static int signalfds[2];
 static enum {
-    LOG_TO_SYSLOG = 0,
-    LOG_TO_STDOUT = 1,
-    LOG_TO_JOURNAL = 2,
+	LOG_TO_SYSLOG = 0,
+	LOG_TO_STDOUT = 1,
+	LOG_TO_JOURNAL = 2,
 } logger_output;
 
 void usage(int code) {
-    fprintf(stderr,
-        "TAYGA version %s\n"
-        "Usage:\n"
-        "%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
-        "       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
-#ifdef USE_SYSTEMD
-        "       [--syslog|--stdout|--journal]\n"
-#else
-        "       [--syslog|--stdout]\n"
-#endif
-        "%s --mktun [-c|--config CONFIGFILE]\n"
-        "%s --rmtun [-c|--config CONFIGFILE]\n"
-        "       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
-        "--config FILE      : Read configuration options from FILE\n"
-        "--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
-        "--nodetach         : Do not fork the process\n"
-        "--syslog           : Log messages to syslog (default)\n"
-        "--stdout           : Log messages to stdout\n"
-#ifdef USE_SYSTEMD
-        "--journal          : Log messages to the systemd journal\n"
-#endif
-        "--user USERID      : Set uid to USERID after initialization\n"
-        "--group GROUPID    : Set gid to GROUPID after initialization\n"
-        "--chroot           : chroot() to data-dir (specified in config file)\n"
-        "--pidfile FILE     : Write process ID of daemon to FILE\n"
-        "--mktun            : Create the persistent TUN interface\n"
-        "--rmtun            : Remove the persistent TUN interface\n"
-        "--help, -h         : Show this help message\n",
-        TAYGA_VERSION, progname, progname, progname);
-    exit(code);
+	fprintf(stderr,
+			"TAYGA version %s\n"
+			"Usage:\n"
+			"%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
+			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
+			"       [--syslog|--stdout|--journal]\n"
+			"%s --mktun [-c|--config CONFIGFILE]\n"
+			"%s --rmtun [-c|--config CONFIGFILE]\n"
+			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
+			"--config FILE      : Read configuration options from FILE\n"
+			"--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
+			"--nodetach         : Do not fork the process\n"
+			"--syslog           : Log messages to syslog (default)\n"
+			"--stdout           : Log messages to stdout\n"
+			"--journal          : Log messages to the systemd journal\n"
+			"--user USERID      : Set uid to USERID after initialization\n"
+			"--group GROUPID    : Set gid to GROUPID after initialization\n"
+			"--chroot           : chroot() to data-dir (specified in config file)\n"
+			"--pidfile FILE     : Write process ID of daemon to FILE\n"
+			"--mktun            : Create the persistent TUN interface\n"
+			"--rmtun            : Remove the persistent TUN interface\n"
+			"--help, -h         : Show this help message\n",
+		TAYGA_VERSION, progname, progname, progname);
+	exit(code);
 }
 
 /* Used during argument parsing, before logging is setup */
 void die(const char *format, ...) {
-    va_list ap;
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-    putc('\n', stderr);
-    exit(1);
+	va_list ap;
+	va_start(ap, format);
+	vfprintf(stderr, format, ap);
+	va_end(ap);
+	putc('\n', stderr);
+	exit(1);
 }
 
 /* Log the message to the configured logger */
-void slog_impl(const char *file, const char *line, const char *func, int priority, const char *format, ...)
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
 {
 	va_list ap;
-    (void)file;
-    (void)line;
-    (void)func;
+	(void)file;
+	(void)line;
+	(void)func;
 
 	va_start(ap, format);
-    switch (logger_output) {
-        case LOG_TO_STDOUT:
-            vprintf(format, ap);
-            break;
-        case LOG_TO_SYSLOG:
-            vsyslog(priority, format, ap);
-            break;
-#ifdef USE_SYSTEMD
-        case LOG_TO_JOURNAL:
-            sd_journal_printv_with_location(priority, file, line, func, format, ap);
-            break;
-#endif
-        default:
-            die("Invalid logger_output value %d", logger_output);
-    }
+	switch (logger_output) {
+		case LOG_TO_STDOUT:
+			vprintf(format, ap);
+			break;
+		case LOG_TO_SYSLOG:
+			vsyslog(priority, format, ap);
+			break;
+		case LOG_TO_JOURNAL:
+			journal_printv_with_location(priority, file, line, func, format, ap);
+			break;
+		default:
+			die("Invalid logger_output value %d", logger_output);
+	}
 	va_end(ap);
 }
 
@@ -554,18 +546,11 @@ int main(int argc, char **argv)
 					logger_output = LOG_TO_STDOUT;
 					break;
 				case 4: /* --journal */
-#ifdef USE_SYSTEMD
 					logger_output = LOG_TO_JOURNAL;
-#else
-					die("Tayga is not compiled with systemd support");
-#endif
 					break;
 				default:
 					usage(1);
 			}
-			break;
-		case 'h':
-			usage(0);
 			break;
 		case 'c':
 			conffile = optarg;
@@ -623,6 +608,10 @@ int main(int argc, char **argv)
 	/* Setup logging */
 	if (logger_output == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	} else if (logger_output == LOG_TO_JOURNAL) {
+		int r = journal_init("tayga");
+		if (r < 0)
+			die("Error: Unable to initialize journal: %s\n", strerror(-r));
 	}
 
 	/* Change user */
@@ -779,9 +768,11 @@ int main(int argc, char **argv)
 	pollfds[1].fd = gcfg->tun_fd;
 	pollfds[1].events = POLLIN;
 
-#ifdef USE_SYSTEMD
-	sd_notify(/* unset_environment */ 1, "READY=1");
-#endif
+	int r = notify("READY=1");
+	if (r < 0) {
+		slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
+		exit(1);
+	}
 
 	/* Main loop */
 	for (;;) {
@@ -812,5 +803,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (logger_output == LOG_TO_SYSLOG) {
+		closelog();
+	} else if (logger_output == LOG_TO_JOURNAL) {
+		journal_cleanup();
+	}
 	return 0;
 }

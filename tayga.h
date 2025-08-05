@@ -37,14 +37,11 @@
 #include <syslog.h>
 #include <errno.h>
 #include <time.h>
+#include <stdarg.h>
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
-# if defined(USE_SYSTEMD)
-# include <systemd/sd-daemon.h>
-# include <systemd/sd-journal.h>
-# endif
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
@@ -400,8 +397,17 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
-#define slog(prio, ...) slog_impl("CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, prio, __VA_ARGS__)
-void slog_impl(const char *file, const char *line, const char *func, int priority, const char *format, ...);
+#define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
 void read_random_bytes(void *d, int len);
+
+/* sd-util.c */
+int notify(const char *msg);
+int journal_init(const char *progname);
+void journal_cleanup(void);
+int journal_printv_with_location(
+        int priority, const char *file, const char *line, const char *func,
+        const char *format, va_list ap);
+
 
 #endif /* #ifndef __TAYGA_H__ */
