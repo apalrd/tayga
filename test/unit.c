@@ -19,7 +19,7 @@
 #include <setjmp.h>
 #include <string.h>
 #include <time.h>
- 
+
 /* Global vars */
 time_t now;
 

@@ -25,7 +25,7 @@ static struct config tcfg;
 static char *tmap4[100] = {0};
 static char *tmap6[100] = {0};
 
-/* assign_dynamic 
+/* assign_dynamic
  * required for addrmap.c to link
  * we need addrmap.c for this test
  * but do not need dyanmic
@@ -35,7 +35,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6) {
 }
 
 
-/* Function to simulate getenv 
+/* Function to simulate getenv
  * set getenv_case to a nonzero number to change the return
  * Then verify that it is zero and has been read
  */
@@ -113,7 +113,7 @@ void test_config_compare(void) {
     /* If the lengths are equal, compare contents */
     if(count == expect_count) {
         count = 0;
-        /* Compare contents of lists as strings */	
+        /* Compare contents of lists as strings */
         list_for_each(entry, &gcfg->map4_list) {
             struct map4 *s4;
             sprintf(namebuf,"map4[%d]",count);
@@ -138,7 +138,7 @@ void test_config_compare(void) {
     /* If the lengths are equal, compare contents */
     if(count == expect_count) {
         count = 0;
-        /* Compare contents of lists as strings */	
+        /* Compare contents of lists as strings */
         list_for_each(entry, &gcfg->map6_list) {
             struct map6 *s6;
             sprintf(namebuf,"map6[%d]",count);
@@ -197,7 +197,7 @@ void test_config_read(void) {
     /* conf file does not exist */
     printf("TEST CASE: conffile does not exist\n");
     expect(config_read("empty.conf"),"Failed");
-    
+
 
     /* Example config */
     conffile = "tayga.conf.example";
@@ -215,7 +215,7 @@ void test_config_read(void) {
     tmap6[0] = "2001:db8:1:ffff::/96 type 1 mask ffff:ffff:ffff:ffff:ffff:ffff::";
     tmap6[1] = 0;
     test_config_compare();
-    
+
 
     /* Test Case 1 - blank conf file */
     conffile = "unit_conffile.conf";
@@ -392,7 +392,7 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
+
     /* Test Case - map invalid v4 addr */
     printf("TEST CASE: map invalid v4\n");
     fd = fopen(conffile,"w");
@@ -428,7 +428,7 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
+
     /* Test Case - v4 has reserved addr */
     printf("TEST CASE: map reserved 4\n");
     fd = fopen(conffile,"w");
@@ -548,7 +548,7 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
+
     /* Test Case - offlink mtu  */
     printf("TEST CASE: offlink mtu duplicate\n");
     fd = fopen(conffile,"w");
@@ -596,7 +596,7 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-    
+
     /* Test Case - log duplicate*/
     printf("TEST CASE: log duplicate\n");
     fd = fopen(conffile,"w");
@@ -697,7 +697,7 @@ void test_config_read(void) {
     tmap6[1] = "2001:db8:1:4445::/120 type 0 mask ffff:ffff:ffff:ffff:ffff:ffff:ffff:ff00";
     tmap6[2] = "64:ff9b::/96 type 1 mask ffff:ffff:ffff:ffff:ffff:ffff::";
     tmap6[3] = 0;
-    test_config_compare();    
+    test_config_compare();
 }
 
 void test_config_validate() {
@@ -707,7 +707,7 @@ void test_config_validate() {
     tmap4[0] = 0;
     tmap6[0] = 0;
 
-    
+
     /* No config loading has been done */
     printf("TEST CASE: no config loaded\n");
     free(gcfg);
@@ -727,7 +727,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
 
-    
+
     /* Only a prefix */
     printf("TEST CASE: prefix only\n");
     fd = fopen(conffile,"w");
@@ -743,7 +743,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
-    
+
     /* ipv4-addr */
     printf("TEST CASE: prefix, ipv4\n");
     fd = fopen(conffile,"w");
@@ -760,7 +760,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
-    
+
     /* ipv4-addr overlaps with map */
     printf("TEST CASE: ipv4 overlaps with map\n");
     fd = fopen(conffile,"w");
@@ -779,7 +779,7 @@ void test_config_validate() {
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
 
-    
+
     /* ipv6-addr is within well known prefix */
     printf("TEST CASE: ipv6 within wkpf\n");
     fd = fopen(conffile,"w");
@@ -834,7 +834,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
-    
+
     /* prefix not specified */
     printf("TEST CASE: no prefix no ipv6-addr\n");
     fd = fopen(conffile,"w");
@@ -868,7 +868,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
-    
+
     /* wkfp not strict and non global addr */
     printf("TEST CASE: no prefix no ipv6-addr\n");
     fd = fopen(conffile,"w");
@@ -909,7 +909,7 @@ void test_config_validate() {
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
     expectl(getenv_case,0,"Getenv Called");
-    
+
     /* state directory too long */
     printf("TEST CASE: state dir too long\n");
     fd = fopen(conffile,"w");
@@ -926,7 +926,7 @@ void test_config_validate() {
     getenv_case = 3;
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
-    expectl(getenv_case,0,"Getenv Called");   
+    expectl(getenv_case,0,"Getenv Called");
 
     /* state directory multiple paths */
     printf("TEST CASE: state dir multiple paths\n");
@@ -957,7 +957,7 @@ int main(void) {
 
     /* Test function for config_validate */
     test_config_validate();
-    
+
     /* Return final status */
     return overall();
 }
