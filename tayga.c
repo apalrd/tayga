@@ -19,6 +19,7 @@
 #include "tayga.h"
 #include "version.h"
 
+#include <sys/file.h>
 #include <stdarg.h>
 #include <signal.h>
 #include <getopt.h>
@@ -281,6 +282,105 @@ static void tun_setup(int do_mktun, int do_rmtun)
 }
 #endif
 
+/* Read and parse a PID from a pidfile opened for reading.
+ * Returns the PID if read successfully.
+ * Returns 0 if fails to read pidfile, or if
+ * no valid number in pidfile.
+ */
+static int read_pidfile_d(int pfd)
+{
+	int ret;
+	char* endptr = NULL;
+	char repr[24] = {0};
+
+	do {
+		ret = read(pfd, repr, sizeof(repr) - 1);
+	} while (ret < 0 && errno == EINTR);
+	if (ret <= 0) {
+		return 0;
+	}
+	if ((size_t)ret != strlen(repr)) {
+		return 0;
+	}
+
+	errno = 0;
+	ret = strtol(repr, &endptr, 10);
+	if (errno || (endptr && *endptr))
+		ret = 0;
+	if (ret < 0)
+		ret = 0;
+	return ret;
+}
+
+/* Open, read and parse a PID from a pidfile.
+ * Returns the PID if read successfully.
+ * Returns 0 if no pidfile, or if no valid number in pidfile.
+ */
+static int read_pidfile(const char* pidfile)
+{
+	int pid;
+	int pfd;
+
+	pfd = open(pidfile, O_RDONLY | O_CLOEXEC);
+	if (pfd < 0)
+		return 0;
+
+	pid = read_pidfile_d(pfd);
+
+	close(pfd);
+	return pid;
+}
+
+/* Returns 0 if no pidfile, or no process with the corresponding PID.
+ * If such a process exists, return its PID.
+ */
+static int check_pidfile(const char* pidfile)
+{
+	int pid;
+
+	pid = read_pidfile(pidfile);
+	if (!pid || getpid() == pid)
+		return 0;
+
+	if (kill(pid, 0) && errno == ESRCH)
+		return 0;
+
+	return pid;
+}
+
+/* Write the PID to specified pidfile.
+ * If that fails, returns 0; otherwise, returns the PID.
+ */
+static int store_pidfile(const char* pidfile)
+{
+	int ret, fd, pid;
+	char repr[24] = {0};
+
+	fd = open(pidfile, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+	if (fd < 0)
+		return 0;
+
+	if (flock(fd, LOCK_EX | LOCK_NB)) {
+		ret = read_pidfile_d(fd);
+		slog(LOG_INFO, "PID file locked by pid %d\n", ret);
+		ret = 0;
+		goto close;
+	}
+
+	pid = getpid();
+	snprintf(repr, sizeof(repr), "%ld\n", (long)pid);
+	do {
+		ret = write(fd, repr, strlen(repr));
+	} while (ret < 0 && errno == EINTR);
+	if (ret < 0 || (size_t)ret != strlen(repr))
+		return 0;
+	ret = pid;
+
+close:
+	close(fd);
+	return ret;
+}
+
 static void signal_handler(int signal)
 {
 	(void)!write(signalfds[1], &signal, sizeof(signal));
@@ -440,9 +540,8 @@ static void print_op_info(void)
 int main(int argc, char **argv)
 {
 	int c, ret, longind;
-	int pidfd;
+	int pid;
 	struct pollfd pollfds[2];
-	char addrbuf[INET6_ADDRSTRLEN];
 
 	char *conffile = TAYGA_CONF_PATH;
 	char *user = NULL;
@@ -616,14 +715,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (pidfile) {
-		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-		if (pidfd < 0) {
-			slog(LOG_CRIT, "Error, unable to open %s for "
-					"writing: %s\n", pidfile,
-					strerror(errno));
-			exit(1);
-		}
+	if (pidfile && (pid = check_pidfile(pidfile))) {
+		slog(LOG_CRIT, "Error, PID %d already active.\n", pid);
+		exit(1);
 	}
 
 	if (detach && daemon(1, 0) < 0) {
@@ -632,13 +726,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (pidfile) {
-		snprintf(addrbuf, sizeof(addrbuf), "%ld\n", (long)getpid());
-		if (write(pidfd, addrbuf, strlen(addrbuf)) != strlen(addrbuf)) {
-			slog(LOG_CRIT, "Error, unable to write PID file.\n");
-			exit(1);
-		}
-		close(pidfd);
+	if (pidfile && !store_pidfile(pidfile)) {
+		slog(LOG_CRIT, "Error, unable to write PID file.\n");
+		exit(1);
 	}
 
 	slog(LOG_INFO, "Starting TAYGA " TAYGA_VERSION "\n");
@@ -738,6 +828,12 @@ int main(int argc, char **argv)
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
 		}
+	}
+
+	if (pidfile && unlink(pidfile)) {
+		slog(LOG_CRIT, "Error: unlink %s: %s",
+				pidfile, strerror(errno));
+		exit(1);
 	}
 
 	return 0;
