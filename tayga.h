@@ -50,6 +50,8 @@
 #endif
 #include "list.h"
 
+#define _U_ __attribute__((unused))
+
 #ifdef COVERAGE_TESTING
 //for coverage testing
 inline static void dummy()
@@ -166,7 +168,7 @@ static_assert(sizeof(struct icmp) == 8,"Struct ICMP must be 8 bytes long");
 
    (See http://www.ietf.org/mail-archive/web/behave/current/msg08499.html)
  */
-#define MTU_ADJ		20
+#define MTU_ADJ		20u
 
 /* Minimum MTU allowed by IPv6 */
 #define MTU_MIN 1280
@@ -293,7 +295,7 @@ struct config {
 	struct dynamic_pool *dynamic_pool;
 	int hash_bits;
 	int cache_size;
-	int ipv6_offlink_mtu;
+	uint32_t ipv6_offlink_mtu;
 
 	int urandom_fd;
 	int tun_fd;

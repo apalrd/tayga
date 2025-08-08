@@ -321,12 +321,12 @@ static void read_from_tun(void)
 				"device: %s\n", strerror(errno));
 		return;
 	}
-	if (ret < sizeof(struct tun_pi)) {
+	if ((size_t)ret < sizeof(struct tun_pi)) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
 		return;
 	}
-	if (ret == gcfg->recv_buf_size) {
+	if ((uint32_t)ret == gcfg->recv_buf_size) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
