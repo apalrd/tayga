@@ -8,47 +8,44 @@ on:
   workflow_dispatch:
     inputs:
       ver:
-        description: 'Version tag'
-        default: "main"
+        description: 'Any valid git ref'
+        required: false
         type: string
+
+# permissions are set per job
+permissions: { }
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-    test:
-        runs-on: ubuntu-latest  
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              ref: ${{ inputs.ver }}
-          - name: run build
-            run: make
-          - name: install deps
-            run: sudo apt-get install -y python3-pyroute2 python3-scapy
-          - name: run test
-            run: make fullsuite
-          - uses: actions/upload-artifact@v4
-            with:
-                name: results-amd64
-                path: |
-                    test/*.rpt
-                    test/*.log
-                if-no-files-found: error
-    test-arm:
-        runs-on: ubuntu-24.04-arm 
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              ref: ${{ inputs.ver }}
-          - name: run build
-            run: make
-          - name: install deps
-            run: sudo apt-get install -y python3-pyroute2 python3-scapy
-          - name: run test
-            run: make fullsuite
-          - uses: actions/upload-artifact@v4
-            with:
-                name: results-arm64
-                path: |
-                    test/*.rpt
-                    test/*.log
-                if-no-files-found: error
+  test:
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ver || github.ref }}
+      - name: run build
+        run: make
+      - name: install deps
+        run: sudo apt-get install -y python3-pyroute2 python3-scapy
+      - name: run test
+        run: make fullsuite
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.arch }}
+          path: |
+            test/*.rpt
+            test/*.log
+          if-no-files-found: error
