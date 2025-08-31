@@ -8,53 +8,47 @@ on:
   workflow_dispatch:
     inputs:
       ver:
-        description: 'Branch'
-        default: "main"
+        description: 'Any valid git ref'
+        required: false
         type: string
+
+# permissions are set per job
+permissions: { }
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-    test-amd64:
-        runs-on: ubuntu-24.04
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              ref: ${{ inputs.ver }}
-          - name: run build gcc
-            run: make CC=gcc CFLAGS="-Werror -Wall -O2"
-          - name: run test gcc
-            run: make test CC=gcc
-          - name: run build clang
-            run: make CC=clang  FLAGS="-Werror -Wall -O2"
-          - name: run test clang
-            run: make test CC=clang
-          - name: run build gcc w/o LTO
-            run: make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-          - name: run test gcc w/o LTO
-            run: make test CC=gcc LDFLAGS=""
-          - name: run build clang w/o LTO
-            run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-          - name: run test clang w/o LTO
-            run: make test CC=clang LDFLAGS=""
-    test-arm64:
-        runs-on: ubuntu-24.04-arm 
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              ref: ${{ inputs.ver }}
-          - name: run build gcc
-            run: make CC=gcc CFLAGS="-Werror -Wall -O2"
-          - name: run test gcc
-            run: make test CC=gcc
-          - name: run build clang
-            run: make CC=clang CFLAGS="-Werror -Wall -O2"
-          - name: run test clang
-            run: make test CC=clang
-          - name: run build gcc w/o LTO
-            run: make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-          - name: run test gcc w/o LTO
-            run: make test CC=gcc LDFLAGS=""
-          - name: run build clang w/o LTO
-            run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-          - name: run test clang w/o LTO
-            run: make test CC=clang LDFLAGS=""
+  test:
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ver || github.ref }}
+      - name: run build gcc
+        run: make CC=gcc CFLAGS="-Werror -Wall -O2"
+      - name: run test gcc
+        run: make test CC=gcc
+      - name: run build clang
+        run: make CC=clang CFLAGS="-Werror -Wall -O2"
+      - name: run test clang
+        run: make test CC=clang
+      - name: run build gcc w/o LTO
+        run: make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+      - name: run test gcc w/o LTO
+        run: make test CC=gcc LDFLAGS=""
+      - name: run build clang w/o LTO
+        run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+      - name: run test clang w/o LTO
+        run: make test CC=clang LDFLAGS=""

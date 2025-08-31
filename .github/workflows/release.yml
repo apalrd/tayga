@@ -10,42 +10,45 @@ on:
         required: true
         type: string
 
+# permissions are set per job
+permissions: { }
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # Create version.h and tag release
   tag-rel:
     permissions:
-        contents: write
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-            # Fetch all
-            fetch-depth: 0
+          # Fetch all
+          fetch-depth: 0
       - name: Tag release
-        run: |        
-            echo "#define TAYGA_VERSION \"${{ inputs.ver }}\"" > version.h
-            echo "#define TAYGA_BRANCH \"main\"" >> version.h
-            echo "#define TAYGA_COMMIT \"RELEASE\"" >> version.h
-            echo "RELEASE=${{ inputs.ver }}" > release
-            git add -f version.h release
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "autogenerate release version file"
-            git tag ${{ inputs.ver }}
-            git push origin ${{ inputs.ver }}
+        run: |
+          echo "#define TAYGA_VERSION \"${{ inputs.ver }}\"" > version.h
+          echo "#define TAYGA_BRANCH \"main\"" >> version.h
+          echo "#define TAYGA_COMMIT \"RELEASE\"" >> version.h
+          echo "RELEASE=${{ inputs.ver }}" > release
+          git add -f version.h release
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "autogenerate release version file"
+          git tag ${{ inputs.ver }}
+          git push origin ${{ inputs.ver }}
   #Build binaries
   build-rel:
     needs: tag-rel
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with: 
-            ref: ${{ inputs.ver }}
+        with:
+          ref: ${{ inputs.ver }}
       - uses: jirutka/setup-alpine@v1
         with:
-            branch: v3.19
-            packages: gcc make libc-dev linux-headers
+          branch: v3.19
+          packages: gcc make libc-dev linux-headers
       - name: run build x86-64
         run: make static
         shell: alpine.sh {0}
@@ -54,6 +57,6 @@ jobs:
         shell: alpine.sh {0}
       - uses: actions/upload-artifact@v4
         with:
-            name: build-amd64
-            path: tayga
-            if-no-files-found: error
+          name: build-amd64
+          path: tayga
+          if-no-files-found: error
