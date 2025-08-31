@@ -122,7 +122,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 	list_for_each(entry, &pool->dormant_list) {
 		d = list_entry(entry, struct map_dynamic, list);
 		if (IN6_ARE_ADDR_EQUAL(addr6, &d->map6.addr)) {
-			print_dyn_change("reactivated dormant", d);
+			print_dyn_change("reactivated", d);
 			goto activate;
 		}
 	}
@@ -155,7 +155,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 			d = alloc_map_dynamic(addr6, &addr4, f);
 			if (!d)
 				return NULL;
-			print_dyn_change("assigned new", d);
+			print_dyn_change("assigned", d);
 			gcfg->map_write_pending = 1;
 			goto activate;
 		}
@@ -166,7 +166,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 
 	d = list_entry(pool->dormant_list.prev, struct map_dynamic, list);
 	d->map6.addr = *addr6;
-	print_dyn_change("reassigned dormant", d);
+	print_dyn_change("reassigned", d);
 	gcfg->map_write_pending = 1;
 
 activate:
@@ -299,6 +299,7 @@ malformed:
 		d = list_entry(entry, struct map_dynamic, list);
 		if (d->last_use > last_use)
 			last_use = d->last_use;
+		print_dyn_change("loaded",d);
 		++count;
 	}
 	slog(LOG_INFO, "Loaded %d dynamic %s from %s/%s\n", count,
@@ -377,7 +378,7 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 		if (d->cache_entry)
 			continue;
 		if (d->last_use + gcfg->dyn_min_lease < now) {
-			print_dyn_change("unmapped dormant", d);
+			print_dyn_change("dormant", d);
 			move_to_dormant(d, pool);
 		}
 	}
