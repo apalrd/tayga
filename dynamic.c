@@ -99,7 +99,10 @@ static void print_dyn_change(char *str, struct map_dynamic *d)
 
 	inet_ntop(AF_INET, &d->map4.addr, addrbuf4, sizeof(addrbuf4));
 	inet_ntop(AF_INET6, &d->map6.addr, addrbuf6, sizeof(addrbuf6));
-	slog(LOG_DEBUG, "%s pool address %s (%s)\n", str, addrbuf4, addrbuf6);
+	/* Log dynamic assignment changes */
+	if(gcfg->log_opts & LOG_OPT_DYN) {
+		slog(LOG_INFO, "DYN: [%s] [%s]->[%s]\n",str,addrbuf4, addrbuf6);
+	}
 }
 
 struct map6 *assign_dynamic(const struct in6_addr *addr6)
