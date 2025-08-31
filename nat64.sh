@@ -7,21 +7,16 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 iptables -t nat -A POSTROUTING -s 192.168.240.0/20 -o eth0 -j MASQUERADE
 
 # Bring up tun interface w/ tayga
-tayga -c nat64-dynpool.conf --mktun
-# If you are using systemd, the path is in /etc/tayga
-#tayga -c /etc/tayga/nat64-dynpool.conf --mktun
+tayga -c /etc/tayga/nat64.conf --mktun
 
 # Bring up interface
 ip link set dev nat64 up
 # Add IPv4 IP (implicitly adds /20 route)
 ip addr add 192.168.240.0/20 dev nat64
 # Add IPv6 address (implicitly adds /64 route)
-# Not required if your IPv6 address is within the pool, not required to be /64
-ip addr add 2001:db8:beef:6464::/64 dev nat64
-# Add pref64 route (distribute this via your routing protocol)
+#ip addr add 64:ff/64 dev nat64
+# Add pref64 route (distribute this via your routing protocol))
 ip route add 64:ff9b::/96 dev nat64
 
 # Start Tayga
-tayga -c nat64-dynpool.conf 
-# Alternatively, start the service with systmed
-#systemctl start tayga@nat64-dynpool
+systemctl start tayga@nat64
