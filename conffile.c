@@ -627,7 +627,7 @@ int config_validate(void)
 		slog(LOG_DEBUG,"Disabling cache, not required\n");
 		gcfg->cache_size = 0;
 	}
-	
+
 	if (!gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: no ipv4-addr directive found\n");
 		return ERROR_REJECT;
@@ -667,7 +667,7 @@ int config_validate(void)
 				abort_on_conflict6("Error: ipv6-addr", 0, m6);
 				return ERROR_REJECT;
 			}
-		}	
+		}
 	/* ipv6-addr is zero (not set), generate from ipv4-addr and prefix */
 	} else {
 		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
@@ -693,7 +693,7 @@ int config_validate(void)
 
 	/* Offlink MTU defaults to 1280 if not set */
 	if (gcfg->ipv6_offlink_mtu <= MTU_MIN) gcfg->ipv6_offlink_mtu = MTU_MIN;
-	
+
 	/* Tundev must be provided */
 	if(strlen(gcfg->tundev) < 1) {
 		slog(LOG_CRIT, "Error: no tun-device directive found\n");

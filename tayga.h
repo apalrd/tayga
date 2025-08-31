@@ -337,7 +337,7 @@ enum {
 
 /* Macros and static functions */
 
-/* Get a pointer to the object containing x, which is of type "type" and 
+/* Get a pointer to the object containing x, which is of type "type" and
  * embeds x as a field called "field" */
 #define container_of(x, type, field) ({ \
 		const typeof( ((type *)0)->field ) *__mptr = (x); \

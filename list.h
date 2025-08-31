@@ -63,7 +63,7 @@ static inline int list_empty(const struct list_head *x)
 	return x->next == x;
 }
 
-/* Get a pointer to the object containing x, which is of type "type" and 
+/* Get a pointer to the object containing x, which is of type "type" and
  * embeds x as a field called "field" */
 #define list_entry(x, type, field) ({ \
 		const typeof( ((type *)0)->field ) *__mptr = (x); \

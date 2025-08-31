@@ -14,7 +14,7 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  */
- 
+
 /* Overall test status (1 on failure, 0 on pass) */
 extern int test_stat;
 extern int print_fail_only;
