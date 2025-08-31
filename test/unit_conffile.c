@@ -669,7 +669,7 @@ void test_config_read(void) {
         "map 192.168.5.42 2001:db8:1:4444::1\n"
         "map 192.168.6.0/24 2001:db8:1:4445::/120\n"
         "udp-cksum-mode drop\n"
-        "log drop reject icmp self\n"
+        "log drop reject icmp self dyn \n"
         "offlink-mtu 1492\n";
     printf("TEST CASE: all config options\n");
     fd = fopen(conffile,"w");
@@ -687,7 +687,7 @@ void test_config_read(void) {
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);
     tcfg.local_addr6.s6_addr32[3] = htonl(0x00000002);
     tcfg.ipv6_offlink_mtu = 1492;
-    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_CONFIG);
+    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
     tmap4[2] = "192.168.6.0/24 type 0 mask 255.255.255.0";

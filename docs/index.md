@@ -77,6 +77,9 @@ daemon, allowing existing TCP and UDP sessions to continue uninterrupted.
 6052 in which IPv6 hosts are numbered with "IPv4-translatable IPv6 addresses"
 carved out of the NAT64 prefix.)
 
+The `log dyn` option allows the dynamic mapping assignments to be printed to the
+service log, if your network requires this information
+
 # Installation & Basic Configuration
 
 TAYGA requires GNU make to build.

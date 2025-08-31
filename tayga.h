@@ -320,9 +320,10 @@ struct config {
 /// Logging flags
 enum {
 	LOG_OPT_REJECT = (1<<0),	//Packet was rejected
-	LOG_OPT_DROP = 	 (1<<1),	//Packet was dropped
-	LOG_OPT_ICMP = 	 (1<<2),	//Packet kicked back an ICMP for any reason
-	LOG_OPT_SELF = 	 (1<<3),	//Packet was destined to ourselves
+	LOG_OPT_DROP   = (1<<1),	//Packet was dropped
+	LOG_OPT_ICMP   = (1<<2),	//Packet kicked back an ICMP for any reason
+	LOG_OPT_SELF   = (1<<3),	//Packet was destined to ourselves
+	LOG_OPT_DYN    = (1<<4),	//Events involving dynamic pool
 	LOG_OPT_CONFIG = (1<<15),	//Log has been configured (used in conf file validation)
 };
 

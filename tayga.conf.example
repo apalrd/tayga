@@ -130,7 +130,7 @@ dynamic-pool 192.168.255.0/24
 
 
 #
-# Logging packet errors
+# Logging packet errors and events
 #
 # List each option you would like to log with a space
 # Valid options:
@@ -138,10 +138,11 @@ dynamic-pool 192.168.255.0/24
 #   reject - packets which were REJECTED (ICMP returned)
 #   icmp - packets which returned an ICMP for any other reason
 #   self - packets which were addressed to Tayga itself
+#   dyn - log dynamic pool mapping events
 #
 # Default value: none
 # 
-#log drop reject icmp self
+#log drop reject icmp self dyn
 
 #
 # Off-Link MTU

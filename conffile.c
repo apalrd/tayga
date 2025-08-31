@@ -420,6 +420,7 @@ static int config_log(int ln, int arg_count, char **args)
 		else if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
 		else if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
 		else if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
+		else if(!strcasecmp(args[i],"dyn")) gcfg->log_opts |= LOG_OPT_DYN;
 		else {
 			slog(LOG_CRIT, "Error: invalid value for log on line %d\n",ln);
 			return ERROR_REJECT;
