@@ -174,7 +174,7 @@ static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
 static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 {
 	uint64_t sum = 0;
-	
+
 	sum += ~ip4->src.s_addr;
 	sum += ~ip4->dest.s_addr;
 	sum += ip6->src.s6_addr32[0];
@@ -362,7 +362,7 @@ static void xlate_4to6_data(struct pkt *p)
 	if (ret == ERROR_REJECT) {
 		log_pkt4(LOG_OPT_REJECT,p,"Unable to map destination address");
 		host_send_icmp4_error(3, 1, 0, p);
-		
+
 		return;
 	}
 	else if(ret == ERROR_DROP) {
@@ -484,7 +484,7 @@ static int parse_ip4(struct pkt *p)
 			p->data_len < p->header_len ||
 			ntohs(p->ip4->length) < p->header_len ||
 			(validate_ip4_addr(&p->ip4->src) == ERROR_DROP) ||
-			(validate_ip4_addr(&p->ip4->dest) == ERROR_DROP)) {		
+			(validate_ip4_addr(&p->ip4->dest) == ERROR_DROP)) {
 		log_pkt4(LOG_OPT_DROP,p,"IP Header Invalid");
 		return ERROR_DROP;
 	}
@@ -1037,7 +1037,7 @@ static int parse_ip6(struct pkt *p,int em)
 			if(!em) log_pkt6(LOG_OPT_DROP,p,"Extension Header Invalid Length");
 			return ERROR_DROP;
 		}
-		/* If it's a routing header, extract segments left 
+		/* If it's a routing header, extract segments left
 		 * We will drop the packet, but need to finish parsing it first
 		 */
 		if(p->data_proto == 43) seg_left = p->data[3];
@@ -1076,7 +1076,7 @@ static int parse_ip6(struct pkt *p,int em)
 
 	if (p->data_proto == 58) {
 		if (p->ip6_frag && (p->ip6_frag->offset_flags &
-					htons(IP6_F_MASK | IP6_F_MF))) {		
+					htons(IP6_F_MASK | IP6_F_MF))) {
 			if(!em) log_pkt6(LOG_OPT_DROP,p,"Fragmented ICMP");
 			return ERROR_DROP;
 		}
@@ -1235,7 +1235,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	header.ip4_em.cksum =
 		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
 
-	//As this is an ICMP error packet, we will not further 
+	//As this is an ICMP error packet, we will not further
 	//send errors, so treat return of REJECT = DROP
 	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
 		log_pkt6(LOG_OPT_ICMP,p,"Need to rely on fake source");
@@ -1277,13 +1277,13 @@ void handle_ip6(struct pkt *p)
 	if (parse_ip6(p,0)) return;
 	if (p->ip6->hop_limit == 0 ||
 			p->header_len + p->data_len !=
-				ntohs(p->ip6->payload_length)) {		
+				ntohs(p->ip6->payload_length)) {
 		log_pkt6(LOG_OPT_DROP,p,"Insufficient Length");
 		return;
 	}
 
 	if (p->icmp && ones_add(ip_checksum(p->data, p->data_len),
-				ip6_checksum(p->ip6, p->data_len, 58))) {		
+				ip6_checksum(p->ip6, p->data_len, 58))) {
 		log_pkt6(LOG_OPT_DROP,p,"ICMP Invalid Checksum");
 		return;
 	}

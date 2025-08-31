@@ -28,7 +28,7 @@
 
 /**
  * @brief Check if an IPv4 address is valid
- * 
+ *
  * Checks if an address is within the ranges which are reserved
  * by protocol, such as multicast, link-local, etc.
  *
@@ -63,7 +63,7 @@ int validate_ip4_addr(const struct in_addr *a)
 
 /**
  * @brief Check if an IPv6 address is valid
- *  
+ *
  * Checks if an address is within the ranges which are reserved
  * by protocol, such as multicast, link-local, etc.
  *
@@ -94,7 +94,7 @@ int validate_ip6_addr(const struct in6_addr *a)
 
 /**
  * @brief Check if an IPv4 address is private
- *  
+ *
  * Checks if an address is within the ranges which are reserved
  * by IANA, and therefore, must not be translated using the
  * well-known prefix (64:ff9b::/96)
@@ -225,12 +225,12 @@ static void add_to_hash_table(struct cache_entry *c, uint32_t hash4,
 
 /**
  * @brief Initialize address translation cache
- *  
+ *
  * This function initializes the two hash sets used
  * for caching address translations.
  * If it has not been done already, this function allocates
  * `gcfg->cache_size` cache entries for the memory pool.
- * 
+ *
  * The address translation state is a set of IPv4-IPv6 address pairs.
  * There is additional metada as well: see `struct cache_entry`.
  * These pairs are stored in the linked list `gcfg->list`.
@@ -307,7 +307,7 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 }
 /**
  * @brief Check if an IPv4 address is in the cache
- *  
+ *
  * @param addr4 IPv4 address to check
  * @returns Cache entry, or NULL if none found
  */
@@ -325,7 +325,7 @@ struct map4 *find_map4(const struct in_addr *addr4)
 }
 /**
  * @brief Check if an IPv6 address is in the cache
- *  
+ *
  * @param addr6 IPv6 address to check
  * @returns Cache entry, or NULL if none found
  */
@@ -343,7 +343,7 @@ struct map6 *find_map6(const struct in6_addr *addr6)
 }
 /**
  * @brief Insert an IPv4 entry into the cache
- *  
+ *
  * @param map4 Cache entry to add
  * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
@@ -371,7 +371,7 @@ conflict:
 }
 /**
  * @brief Insert an IPv6 entry into the cache
- *  
+ *
  * @param map6 Cache entry to add
  * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
@@ -403,7 +403,7 @@ conflict:
 }
 /**
  * @brief Append an IPv4 address to an IPv6 translation prefix
- *  
+ *
  * @param[out] addr6 Return IPv6 address
  * @param[in] addr4 IPv4 address
  * @param[in] prefix IPv6 Prefix
@@ -465,9 +465,9 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 	case 96:
 		//Do not allow translation of well-known prefix
 		//But still allow local-use prefix
-		if (prefix->s6_addr32[0] == WKPF && 
-			!prefix->s6_addr32[1] && 
-			!prefix->s6_addr32[2] && 
+		if (prefix->s6_addr32[0] == WKPF &&
+			!prefix->s6_addr32[1] &&
+			!prefix->s6_addr32[2] &&
 			gcfg->wkpf_strict &&
 			is_private_ip4_addr(addr4))
 			return ERROR_REJECT;
@@ -483,7 +483,7 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 
 /**
  * @brief Map IPv4 to IPv6
- *  
+ *
  * @param[out] addr6 Return IPv6 address
  * @param[in] addr4 IPv4 address
  * @param[out] c_ptr Cache entry
@@ -613,7 +613,7 @@ static int extract_from_prefix(struct in_addr *addr4,
 }
 /**
  * @brief Map IPv6 to IPv4
- *  
+ *
  * @param[out] addr4 Return IPv6 address
  * @param[in] addr6 IPv4 address
  * @param[out] c_ptr Cache entry
@@ -658,7 +658,7 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	switch (map6->type) {
 	case MAP_TYPE_STATIC:
 		s = container_of(map6, struct map_static, map6);
-		
+
 		if (map6->prefix_len < 128) {
 			addr4->s_addr = s->map4.addr.s_addr | (addr6->s6_addr32[3] & ~map6->mask.s6_addr32[3]);
 		} else {
@@ -722,7 +722,7 @@ static void report_ageout(struct cache_entry *c)
 
 /**
  * @brief Perform periodic address cache maintenance
- *  
+ *
  */
 void addrmap_maint(void)
 {

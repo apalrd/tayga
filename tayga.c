@@ -388,7 +388,7 @@ static void print_op_info(void)
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
 				addrbuf, m6->prefix_len);
-		if (m6->addr.s6_addr32[0] == WKPF 
+		if (m6->addr.s6_addr32[0] == WKPF
 			&& !m6->addr.s6_addr32[1]
 			&& !m6->addr.s6_addr32[2]
 			&& gcfg->wkpf_strict)
