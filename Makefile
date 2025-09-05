@@ -35,7 +35,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(if $(NUMA),-lnuma)
 
 # Compile Tayga (static)
 .PHONY: static
@@ -45,7 +45,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread -static
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(if $(NUMA),-lnuma) -static
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test

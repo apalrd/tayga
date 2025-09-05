@@ -16,6 +16,7 @@
  *  GNU General Public License for more details.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <assert.h>
 #include <stdalign.h>
@@ -37,6 +38,15 @@
 #include <time.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <sched.h>
+#ifdef __linux__
+#include <numa.h>
+#include <numaif.h>
+#elif defined(__APPLE__)
+#include <mach/thread_policy.h>
+#include <mach/thread_act.h>
+#include <mach/mach_init.h>
+#endif
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
@@ -309,14 +319,15 @@ struct thread_pool {
 	atomic_int active_workers;
 };
 
-/// Packet queue for thread pool
+/// Lock-free packet queue (ring buffer)
 struct packet_queue {
 	struct thread_pkt *packets;
 	atomic_size_t head;
 	atomic_size_t tail;
+	atomic_size_t count;
 	size_t size;
-	pthread_mutex_t mutex;
 	pthread_cond_t cond;
+	pthread_mutex_t cond_mutex;  // Only for condition variable, not queue access
 };
 
 /// Thread-safe packet structure
@@ -334,6 +345,41 @@ struct packet_mem_pool {
 	size_t chunk_size;
 	atomic_size_t next_free;
 	pthread_mutex_t mutex;
+};
+
+/// Batch packet processing structure
+struct packet_batch {
+	struct thread_pkt packets[16];  // Process up to 16 packets at once
+	size_t count;
+};
+
+/// NUMA-aware thread configuration
+struct numa_config {
+	int cpu_id;
+	int numa_node;
+#ifdef __linux__
+	cpu_set_t cpuset;
+#elif defined(__APPLE__)
+	/* macOS doesn't have cpu_set_t, use thread affinity policy instead */
+	thread_affinity_policy_data_t affinity_policy;
+#endif
+};
+
+/// Zero-copy packet structure
+struct zero_copy_pkt {
+	uint8_t *direct_buffer;
+	size_t offset;
+	size_t length;
+	struct tun_pi pi;
+};
+
+/// Per-thread memory pool
+struct per_thread_mem_pool {
+	uint8_t *pool;
+	size_t pool_size;
+	size_t chunk_size;
+	atomic_size_t next_free;
+	// No mutex needed - per-thread access only
 };
 
 /// Configuration structure
@@ -382,6 +428,15 @@ struct config {
 	pthread_mutex_t map_mutex;
 	pthread_mutex_t dynamic_mutex;
 	int num_worker_threads;
+	
+	/* Performance optimization features */
+	int enable_batch_processing;
+	int enable_numa_optimization;
+	int enable_zero_copy;
+	int enable_vectorization;
+	int batch_size;
+	int queue_size;
+	struct per_thread_mem_pool *per_thread_pools;
 };
 
 /// Logging flags
@@ -472,9 +527,21 @@ int packet_queue_init(struct packet_queue *queue, size_t size);
 void packet_queue_destroy(struct packet_queue *queue);
 int packet_queue_enqueue(struct packet_queue *queue, const struct thread_pkt *pkt);
 int packet_queue_dequeue(struct packet_queue *queue, struct thread_pkt *pkt);
+int packet_queue_dequeue_batch(struct packet_queue *queue, struct packet_batch *batch);
 void *worker_thread(void *arg);
 int process_packet_threaded(const struct thread_pkt *thread_pkt);
+int process_packet_batch(const struct packet_batch *batch);
 int packet_mem_pool_init(struct packet_mem_pool *pool, size_t pool_size, size_t chunk_size);
 void packet_mem_pool_destroy(struct packet_mem_pool *pool);
 uint8_t *packet_mem_pool_alloc(struct packet_mem_pool *pool, size_t size);
 void packet_mem_pool_free(struct packet_mem_pool *pool, uint8_t *ptr);
+
+/* Performance optimization functions */
+int per_thread_mem_pool_init(struct per_thread_mem_pool *pool, size_t pool_size, size_t chunk_size);
+void per_thread_mem_pool_destroy(struct per_thread_mem_pool *pool);
+uint8_t *per_thread_mem_pool_alloc(struct per_thread_mem_pool *pool, size_t size);
+void per_thread_mem_pool_free(struct per_thread_mem_pool *pool, uint8_t *ptr);
+int setup_numa_affinity(int thread_id, int num_threads);
+int setup_cpu_affinity(pthread_t thread, int cpu_id);
+uint32_t calculate_checksum_vectorized(const uint8_t *data, size_t len);
+int zero_copy_packet_init(struct zero_copy_pkt *pkt, uint8_t *buffer, size_t offset, size_t len);

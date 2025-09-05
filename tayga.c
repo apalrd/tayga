@@ -824,8 +824,8 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	/* Initialize packet queue */
-	if (packet_queue_init(&gcfg->packet_queue, 1024) < 0) {
+	/* Initialize packet queue with optimized size */
+	if (packet_queue_init(&gcfg->packet_queue, gcfg->queue_size) < 0) {
 		slog(LOG_CRIT, "Failed to initialize packet queue\n");
 		exit(1);
 	}

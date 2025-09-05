@@ -497,6 +497,57 @@ static int config_worker_threads(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_batch_processing(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	
+	if (!strcasecmp(args[0], "true") || !strcasecmp(args[0], "on") || 
+	    !strcasecmp(args[0], "yes") || !strcasecmp(args[0], "1")) {
+		gcfg->enable_batch_processing = 1;
+	} else if (!strcasecmp(args[0], "false") || !strcasecmp(args[0], "off") || 
+	           !strcasecmp(args[0], "no") || !strcasecmp(args[0], "0")) {
+		gcfg->enable_batch_processing = 0;
+	} else {
+		slog(LOG_CRIT, "Error: batch-processing must be true/false on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	slog(LOG_INFO, "Batch processing %s\n", gcfg->enable_batch_processing ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_batch_size(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int size;
+	
+	size = atoi(args[0]);
+	if (size < 1 || size > 32) {
+		slog(LOG_CRIT, "Error: batch-size must be between 1 and 32 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->batch_size = size;
+	slog(LOG_INFO, "Batch size configured to %d\n", size);
+	return ERROR_NONE;
+}
+
+static int config_queue_size(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int size;
+	
+	size = atoi(args[0]);
+	if (size < 1024 || size > 65536) {
+		slog(LOG_CRIT, "Error: queue-size must be between 1024 and 65536 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->queue_size = size;
+	slog(LOG_INFO, "Queue size configured to %d\n", size);
+	return ERROR_NONE;
+}
+
 struct {
 	/* Long name */
 	char *name;
@@ -518,6 +569,9 @@ struct {
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
 	{ "worker-threads",	config_worker_threads,	1 },
+	{ "batch-processing",	config_batch_processing,	1 },
+	{ "batch-size",		config_batch_size,		1 },
+	{ "queue-size",		config_queue_size,		1 },
 	{ NULL, NULL, 0 }
 };
 
@@ -543,6 +597,16 @@ int config_init(void)
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
 	gcfg->num_worker_threads = 0; /* 0 = auto-detect based on CPU cores */
+	
+	/* Performance optimization defaults */
+	gcfg->enable_batch_processing = 1;  /* Enable batch processing by default */
+	gcfg->enable_numa_optimization = 1; /* Enable NUMA optimization by default */
+	gcfg->enable_zero_copy = 0;         /* Disable zero-copy by default (complex) */
+	gcfg->enable_vectorization = 1;     /* Enable vectorization by default */
+	gcfg->batch_size = 8;               /* Default batch size */
+	gcfg->queue_size = 8192;            /* Larger queue size for better throughput */
+	gcfg->per_thread_pools = NULL;      /* Will be allocated during init */
+	
 	return ERROR_NONE;
 }
 

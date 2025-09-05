@@ -216,6 +216,28 @@ For resource-constrained systems, use a smaller number (e.g., 2-4). For high-per
 .IP
 This configuration directive is optional.
 .IP
+.TP
+.BI "batch-processing " true|false
+Enable or disable batch packet processing for improved throughput. When enabled, TAYGA processes multiple packets simultaneously, reducing context switching overhead and improving performance.
+.IP
+Batch processing is enabled by default and provides significant performance improvements, especially on multi-core systems.
+.IP
+This configuration directive is optional.
+.TP
+.BI "batch-size " number
+Configure the number of packets to process in each batch. Valid values are 1 to 32, with a default of 8 packets per batch.
+.IP
+Larger batch sizes can improve throughput but may increase latency. Smaller batch sizes reduce latency but may decrease throughput.
+.IP
+This configuration directive is optional.
+.TP
+.BI "queue-size " number
+Configure the size of the internal packet queue. Valid values are 1024 to 65536, with a default of 8192.
+.IP
+Larger queue sizes can handle higher burst traffic but use more memory. Smaller queue sizes use less memory but may drop packets during traffic bursts.
+.IP
+This configuration directive is optional.
+.IP
 
 .SH "SEE ALSO"
 .BR tayga (8)

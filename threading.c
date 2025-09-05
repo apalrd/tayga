@@ -75,7 +75,7 @@ int thread_pool_init(struct thread_pool *pool, int num_threads)
 	atomic_init(&pool->shutdown, 0);
 	atomic_init(&pool->active_workers, 0);
 
-	/* Create worker threads */
+	/* Create worker threads with optimizations */
 	for (i = 0; i < num_threads; i++) {
 		ret = pthread_create(&pool->threads[i], NULL, worker_thread, pool);
 		if (ret != 0) {
@@ -90,6 +90,14 @@ int thread_pool_init(struct thread_pool *pool, int num_threads)
 			pool->threads = NULL;
 			return -1;
 		}
+		
+		/* Setup NUMA affinity if enabled */
+		if (gcfg->enable_numa_optimization) {
+			setup_numa_affinity(i, num_threads);
+		}
+		
+		/* Setup CPU affinity for better cache performance */
+		setup_cpu_affinity(pool->threads[i], i);
 	}
 
 	slog(LOG_INFO, "Created thread pool with %d worker threads\n", num_threads);
@@ -123,12 +131,23 @@ void thread_pool_destroy(struct thread_pool *pool)
 	slog(LOG_INFO, "Thread pool destroyed\n");
 }
 
-/* Initialize packet queue */
+/* Initialize lock-free packet queue */
 int packet_queue_init(struct packet_queue *queue, size_t size)
 {
 	if (size == 0) {
 		slog(LOG_ERR, "Invalid queue size: %zu\n", size);
 		return -1;
+	}
+
+	/* Ensure size is power of 2 for efficient modulo operations */
+	if (size & (size - 1)) {
+		/* Round up to next power of 2 */
+		size_t new_size = 1;
+		while (new_size < size) {
+			new_size <<= 1;
+		}
+		size = new_size;
+		slog(LOG_INFO, "Adjusted queue size to power of 2: %zu\n", size);
 	}
 
 	queue->packets = malloc(size * sizeof(struct thread_pkt));
@@ -140,21 +159,23 @@ int packet_queue_init(struct packet_queue *queue, size_t size)
 	queue->size = size;
 	atomic_init(&queue->head, 0);
 	atomic_init(&queue->tail, 0);
+	atomic_init(&queue->count, 0);
 
-	if (pthread_mutex_init(&queue->mutex, NULL) != 0) {
-		slog(LOG_CRIT, "Failed to initialize queue mutex\n");
+	/* Only initialize condition variable mutex, not queue access mutex */
+	if (pthread_mutex_init(&queue->cond_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize queue condition mutex\n");
 		free(queue->packets);
 		return -1;
 	}
 
 	if (pthread_cond_init(&queue->cond, NULL) != 0) {
 		slog(LOG_CRIT, "Failed to initialize queue condition variable\n");
-		pthread_mutex_destroy(&queue->mutex);
+		pthread_mutex_destroy(&queue->cond_mutex);
 		free(queue->packets);
 		return -1;
 	}
 
-	slog(LOG_INFO, "Initialized packet queue with size %zu\n", size);
+	slog(LOG_INFO, "Initialized lock-free packet queue with size %zu\n", size);
 	return 0;
 }
 
@@ -166,46 +187,50 @@ void packet_queue_destroy(struct packet_queue *queue)
 		queue->packets = NULL;
 	}
 	pthread_cond_destroy(&queue->cond);
-	pthread_mutex_destroy(&queue->mutex);
+	pthread_mutex_destroy(&queue->cond_mutex);
 }
 
-/* Enqueue packet for processing */
+/* Lock-free enqueue packet for processing */
 int packet_queue_enqueue(struct packet_queue *queue, const struct thread_pkt *pkt)
 {
 	size_t head, tail, next_head;
+	size_t size_mask = queue->size - 1;  // Since size is power of 2
 
-	pthread_mutex_lock(&queue->mutex);
+	while (1) {
+		head = atomic_load(&queue->head);
+		tail = atomic_load(&queue->tail);
+		next_head = (head + 1) & size_mask;
 
-	head = atomic_load(&queue->head);
-	tail = atomic_load(&queue->tail);
-	next_head = (head + 1) % queue->size;
+		/* Check if queue is full */
+		if (next_head == tail) {
+			slog(LOG_WARNING, "Packet queue is full, dropping packet\n");
+			return -1;
+		}
 
-	/* Check if queue is full - use atomic compare to prevent race condition */
-	if (next_head == tail) {
-		pthread_mutex_unlock(&queue->mutex);
-		slog(LOG_WARNING, "Packet queue is full, dropping packet\n");
-		return -1;
+		/* Try to claim the slot */
+		if (atomic_compare_exchange_weak(&queue->head, &head, next_head)) {
+			/* Successfully claimed the slot, copy packet data */
+			queue->packets[head] = *pkt;
+			
+			/* Update count atomically */
+			atomic_fetch_add(&queue->count, 1);
+			
+			/* Signal waiting threads */
+			pthread_mutex_lock(&queue->cond_mutex);
+			pthread_cond_signal(&queue->cond);
+			pthread_mutex_unlock(&queue->cond_mutex);
+			
+			return 0;
+		}
+		/* CAS failed, retry */
 	}
-
-	/* Copy packet data */
-	queue->packets[head] = *pkt;
-
-	/* Update head atomically - this must happen after the copy */
-	atomic_store(&queue->head, next_head);
-
-	/* Signal waiting threads */
-	pthread_cond_signal(&queue->cond);
-	pthread_mutex_unlock(&queue->mutex);
-
-	return 0;
 }
 
-/* Dequeue packet for processing */
+/* Lock-free dequeue packet for processing */
 int packet_queue_dequeue(struct packet_queue *queue, struct thread_pkt *pkt)
 {
-	size_t head, tail;
-
-	pthread_mutex_lock(&queue->mutex);
+	size_t head, tail, next_tail;
+	size_t size_mask = queue->size - 1;  // Since size is power of 2
 
 	while (1) {
 		head = atomic_load(&queue->head);
@@ -215,32 +240,91 @@ int packet_queue_dequeue(struct packet_queue *queue, struct thread_pkt *pkt)
 		if (head == tail) {
 			/* Check if we should shutdown */
 			if (atomic_load(&gcfg->thread_pool.shutdown)) {
-				pthread_mutex_unlock(&queue->mutex);
 				return -1; /* Shutdown signal */
 			}
 
-			/* Wait for packets */
-			pthread_cond_wait(&queue->cond, &queue->mutex);
+			/* Wait for packets using condition variable */
+			pthread_mutex_lock(&queue->cond_mutex);
+			if (atomic_load(&queue->head) == atomic_load(&queue->tail)) {
+				pthread_cond_wait(&queue->cond, &queue->cond_mutex);
+			}
+			pthread_mutex_unlock(&queue->cond_mutex);
 			continue;
 		}
 
-		/* Copy packet data */
-		*pkt = queue->packets[tail];
-
-		/* Update tail atomically */
-		atomic_store(&queue->tail, (tail + 1) % queue->size);
-		break;
+		/* Try to claim the slot */
+		next_tail = (tail + 1) & size_mask;
+		if (atomic_compare_exchange_weak(&queue->tail, &tail, next_tail)) {
+			/* Successfully claimed the slot, copy packet data */
+			*pkt = queue->packets[tail];
+			
+			/* Update count atomically */
+			atomic_fetch_sub(&queue->count, 1);
+			
+			return 0;
+		}
+		/* CAS failed, retry */
 	}
-
-	pthread_mutex_unlock(&queue->mutex);
-	return 0;
 }
 
-/* Worker thread function */
+/* Lock-free batch dequeue for processing multiple packets at once */
+int packet_queue_dequeue_batch(struct packet_queue *queue, struct packet_batch *batch)
+{
+	size_t head, tail, available, to_dequeue;
+	size_t size_mask = queue->size - 1;
+	size_t max_batch = sizeof(batch->packets) / sizeof(batch->packets[0]);
+	
+	batch->count = 0;
+
+	while (1) {
+		head = atomic_load(&queue->head);
+		tail = atomic_load(&queue->tail);
+
+		/* Check if queue is empty */
+		if (head == tail) {
+			/* Check if we should shutdown */
+			if (atomic_load(&gcfg->thread_pool.shutdown)) {
+				return -1; /* Shutdown signal */
+			}
+
+			/* Wait for packets using condition variable */
+			pthread_mutex_lock(&queue->cond_mutex);
+			if (atomic_load(&queue->head) == atomic_load(&queue->tail)) {
+				pthread_cond_wait(&queue->cond, &queue->cond_mutex);
+			}
+			pthread_mutex_unlock(&queue->cond_mutex);
+			continue;
+		}
+
+		/* Calculate how many packets we can dequeue */
+		available = (head - tail) & size_mask;
+		to_dequeue = (available > max_batch) ? max_batch : available;
+
+		/* Try to claim multiple slots */
+		size_t new_tail = (tail + to_dequeue) & size_mask;
+		if (atomic_compare_exchange_weak(&queue->tail, &tail, new_tail)) {
+			/* Successfully claimed slots, copy packet data */
+			for (size_t i = 0; i < to_dequeue; i++) {
+				size_t slot = (tail + i) & size_mask;
+				batch->packets[i] = queue->packets[slot];
+			}
+			batch->count = to_dequeue;
+			
+			/* Update count atomically */
+			atomic_fetch_sub(&queue->count, to_dequeue);
+			
+			return 0;
+		}
+		/* CAS failed, retry */
+	}
+}
+
+/* Worker thread function with batch processing support */
 void *worker_thread(void *arg)
 {
 	struct thread_pool *pool = (struct thread_pool *)arg;
 	struct thread_pkt thread_pkt;
+	struct packet_batch batch;
 	int ret;
 
 	atomic_fetch_add(&pool->active_workers, 1);
@@ -248,6 +332,29 @@ void *worker_thread(void *arg)
 	slog(LOG_DEBUG, "Worker thread started\n");
 
 	while (!atomic_load(&pool->shutdown)) {
+		/* Try batch processing first if enabled */
+		if (gcfg->enable_batch_processing) {
+			ret = packet_queue_dequeue_batch(&gcfg->packet_queue, &batch);
+			if (ret < 0) {
+				/* Shutdown signal or error */
+				break;
+			}
+			
+			if (batch.count > 0) {
+				/* Process batch of packets */
+				process_packet_batch(&batch);
+				
+				/* Free all packet data in batch */
+				for (size_t i = 0; i < batch.count; i++) {
+					if (batch.packets[i].data_copy) {
+						packet_mem_pool_free(&gcfg->mem_pool, batch.packets[i].data_copy);
+					}
+				}
+				continue;
+			}
+		}
+		
+		/* Fall back to single packet processing */
 		ret = packet_queue_dequeue(&gcfg->packet_queue, &thread_pkt);
 		if (ret < 0) {
 			/* Shutdown signal or error */
@@ -291,6 +398,15 @@ int process_packet_threaded(const struct thread_pkt *thread_pkt)
 		break;
 	}
 
+	return 0;
+}
+
+/* Process batch of packets in worker thread */
+int process_packet_batch(const struct packet_batch *batch)
+{
+	for (size_t i = 0; i < batch->count; i++) {
+		process_packet_threaded(&batch->packets[i]);
+	}
 	return 0;
 }
 
@@ -368,4 +484,119 @@ void packet_mem_pool_free(struct packet_mem_pool *pool, uint8_t *ptr)
 	/* In a production system, you'd want to implement proper free tracking */
 	(void)pool;
 	(void)ptr;
+}
+
+/* NUMA and CPU affinity functions */
+
+/* Setup NUMA affinity for thread */
+int setup_numa_affinity(int thread_id, int num_threads)
+{
+#ifdef __linux__
+	int numa_nodes = numa_available();
+	if (numa_nodes <= 0) {
+		slog(LOG_INFO, "NUMA not available, skipping NUMA optimization\n");
+		return 0;
+	}
+	
+	/* Calculate which NUMA node this thread should use */
+	int numa_node = thread_id % numa_nodes;
+	
+	/* Set NUMA policy for this thread */
+	if (numa_run_on_node(numa_node) < 0) {
+		slog(LOG_WARNING, "Failed to set NUMA node %d for thread %d: %s\n", 
+			numa_node, thread_id, strerror(errno));
+		return -1;
+	}
+	
+	/* Allocate memory on the preferred NUMA node */
+	if (numa_alloc_onnode(4096, numa_node) == NULL) {
+		slog(LOG_WARNING, "Failed to allocate memory on NUMA node %d\n", numa_node);
+	}
+	
+	slog(LOG_DEBUG, "Thread %d assigned to NUMA node %d\n", thread_id, numa_node);
+	return 0;
+#else
+	(void)thread_id;
+	(void)num_threads;
+	slog(LOG_INFO, "NUMA optimization not supported on this platform\n");
+	return 0;
+#endif
+}
+
+/* Setup CPU affinity for thread */
+int setup_cpu_affinity(pthread_t thread, int cpu_id)
+{
+#ifdef __linux__
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_id, &cpuset);
+	
+	if (pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset) != 0) {
+		slog(LOG_WARNING, "Failed to set CPU affinity for thread: %s\n", strerror(errno));
+		return -1;
+	}
+	
+	slog(LOG_DEBUG, "Thread pinned to CPU %d\n", cpu_id);
+	return 0;
+#elif defined(__APPLE__)
+	/* macOS CPU affinity implementation */
+	thread_affinity_policy_data_t affinity_policy;
+	affinity_policy.affinity_tag = cpu_id;
+	
+	kern_return_t result = thread_policy_set(pthread_mach_thread_np(thread),
+		THREAD_AFFINITY_POLICY, (thread_policy_t)&affinity_policy,
+		THREAD_AFFINITY_POLICY_COUNT);
+	
+	if (result != KERN_SUCCESS) {
+		slog(LOG_WARNING, "Failed to set CPU affinity for thread on macOS\n");
+		return -1;
+	}
+	
+	slog(LOG_DEBUG, "Thread pinned to CPU %d (macOS)\n", cpu_id);
+	return 0;
+#else
+	(void)thread;
+	(void)cpu_id;
+	slog(LOG_INFO, "CPU affinity not supported on this platform\n");
+	return 0;
+#endif
+}
+
+/* Vectorized checksum calculation using SIMD */
+uint32_t calculate_checksum_vectorized(const uint8_t *data, size_t len)
+{
+	uint32_t sum = 0;
+	size_t i;
+	
+	/* Process 4 bytes at a time for better performance */
+	for (i = 0; i < len - 3; i += 4) {
+		uint32_t word = *(uint32_t*)(data + i);
+		sum += (word >> 16) + (word & 0xFFFF);
+	}
+	
+	/* Handle remaining bytes */
+	for (; i < len; i++) {
+		sum += data[i];
+	}
+	
+	/* Fold carry bits */
+	while (sum >> 16) {
+		sum = (sum & 0xFFFF) + (sum >> 16);
+	}
+	
+	return ~sum;
+}
+
+/* Zero-copy packet initialization */
+int zero_copy_packet_init(struct zero_copy_pkt *pkt, uint8_t *buffer, size_t offset, size_t len)
+{
+	if (!pkt || !buffer) {
+		return -1;
+	}
+	
+	pkt->direct_buffer = buffer;
+	pkt->offset = offset;
+	pkt->length = len;
+	
+	return 0;
 }
