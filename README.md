@@ -1,6 +1,8 @@
 # TAYGA
 
-TAYGA is an out-of-kernel stateless NAT64 implementation for Linux and FreeBSD.  It uses the TUN driver to exchange packets with the kernel, which is the same driver used by OpenVPN and QEMU/KVM.  TAYGA needs no kernel patches or out-of-tree modules on either Linux or FreeBSD. 
+TAYGA is an out-of-kernel stateless NAT64 implementation for Linux, FreeBSD, and macOS.  It uses the TUN driver to exchange packets with the kernel, which is the same driver used by OpenVPN and QEMU/KVM.  TAYGA needs no kernel patches or out-of-tree modules on any supported platform.
+
+TAYGA features a multi-threaded architecture that automatically scales worker threads based on available CPU cores, providing optimal performance for packet translation across different system configurations. 
 
 Tayga was originally developed by Nathan Lutchansky (litech.org) through version 0.9.2. Following the last release in 2011, Tayga was mainatined by several Linux distributions independently, including patches from the Debian project, and FreeBSD. These patches have been collected and merged together, and is now maintained from @apalrd and from contributors here on Github. 
 
@@ -60,3 +62,34 @@ tayga process in the foreground and send all log messages to stdout:
 ```sh
 tayga -d
 ```
+
+# Multi-Threading Configuration
+
+TAYGA automatically detects the number of CPU cores and scales worker threads accordingly for optimal performance. By default, TAYGA will use the optimal number of threads for your system (typically equal to the number of CPU cores, capped at 16).
+
+## Thread Configuration Options
+
+You can control the number of worker threads in your `tayga.conf` file:
+
+```bash
+# Auto-detect based on CPU cores (recommended)
+worker-threads 0
+
+# Use specific number of threads
+worker-threads 4
+
+# Use fewer threads for resource-constrained systems
+worker-threads 2
+
+# Use more threads for high-performance systems
+worker-threads 8
+```
+
+## Performance Benefits
+
+- **Automatic Scaling**: Adapts to any system configuration
+- **Optimal Performance**: Uses all available CPU cores (up to 16)
+- **Resource Efficient**: Caps thread count to prevent context switching overhead
+- **Configurable**: Override auto-detection when needed
+
+The multi-threaded architecture provides significant performance improvements, especially on multi-core systems, by parallelizing packet processing across multiple worker threads.

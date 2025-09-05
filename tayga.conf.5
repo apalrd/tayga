@@ -205,6 +205,17 @@ Increasing this limit will allow Tayga to translate packets which are larger tha
 .IP
 .B Incorrectly setting this parameter may cause IPv4-translated packets to be dropped by IPv6 routers, in violation of expected IPv4 behavior. 
 .IP
+.TP
+.BI "worker-threads " number
+Configure the number of worker threads used for packet processing. TAYGA uses a multi-threaded architecture to parallelize packet translation for improved performance.
+.IP
+.I number
+can be set to 0 for automatic detection based on CPU cores (recommended), or any value from 1 to 64 for manual configuration. When set to 0, TAYGA will automatically detect the number of available CPU cores and use the optimal number of threads (typically equal to the number of cores, capped at 16 to prevent excessive context switching).
+.IP
+For resource-constrained systems, use a smaller number (e.g., 2-4). For high-performance systems, use a larger number (e.g., 8-16). The default value is 0 (auto-detect).
+.IP
+This configuration directive is optional.
+.IP
 
 .SH "SEE ALSO"
 .BR tayga (8)

@@ -281,6 +281,58 @@ static void tun_setup(int do_mktun, int do_rmtun)
 }
 #endif
 
+#ifdef __APPLE__
+void tun_setup(int do_mktun, int do_rmtun)
+{
+	/* macOS TUN setup - simplified version */
+	char devname[64];
+	int fd;
+
+	if (do_mktun || do_rmtun) {
+		slog(LOG_CRIT, "TUN device creation/removal not supported on macOS\n");
+		exit(1);
+	}
+
+	snprintf(devname, sizeof(devname), "/dev/%s", gcfg->tundev);
+	gcfg->tun_fd = open(devname, O_RDWR);
+	if (gcfg->tun_fd < 0) {
+		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
+				devname, strerror(errno));
+		exit(1);
+	}
+
+	set_nonblock(gcfg->tun_fd);
+
+	fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+
+	/* Query MTU from tun adapter */
+	struct ifreq ifr;
+	memset(&ifr, 0, sizeof(ifr));
+	strcpy(ifr.ifr_name, gcfg->tundev);
+	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
+		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+	close(fd);
+
+	gcfg->mtu = ifr.ifr_mtu;
+	if(gcfg->mtu < MTU_MIN) {
+		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
+				gcfg->mtu, MTU_MIN);
+		exit(1);
+	}
+
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
+			gcfg->mtu);
+}
+#endif
+
 static void signal_handler(int signal)
 {
 	(void)!write(signalfds[1], &signal, sizeof(signal));
@@ -311,7 +363,8 @@ static void read_from_tun(void)
 {
 	int ret;
 	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
-	struct pkt pbuf, *p = &pbuf;
+	struct thread_pkt thread_pkt;
+	uint8_t *data_copy;
 
 	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
 	if (ret < 0) {
@@ -321,29 +374,38 @@ static void read_from_tun(void)
 				"device: %s\n", strerror(errno));
 		return;
 	}
-	if (ret < sizeof(struct tun_pi)) {
+	if (ret < (int)sizeof(struct tun_pi)) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
 		return;
 	}
-	if (ret == gcfg->recv_buf_size) {
+	if (ret == (int)gcfg->recv_buf_size) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
-	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
-	p->data_len = ret - sizeof(struct tun_pi);
-	switch (TUN_GET_PROTO(pi)) {
-	case ETH_P_IP:
-		handle_ip4(p);
-		break;
-	case ETH_P_IPV6:
-		handle_ip6(p);
-		break;
-	default:
-		slog(LOG_WARNING, "Dropping unknown proto %04x from "
-				"tun device\n", ntohs(pi->proto));
-		break;
+
+	/* Copy packet data for thread processing using memory pool */
+	data_copy = packet_mem_pool_alloc(&gcfg->mem_pool, ret - sizeof(struct tun_pi));
+	if (!data_copy) {
+		slog(LOG_WARNING, "Failed to allocate memory for packet copy\n");
+		return;
+	}
+	memcpy(data_copy, gcfg->recv_buf + sizeof(struct tun_pi), 
+	       ret - sizeof(struct tun_pi));
+
+	/* Set up thread packet structure */
+	memset(&thread_pkt, 0, sizeof(struct thread_pkt));
+	thread_pkt.pi = *pi;
+	thread_pkt.data_copy = data_copy;
+	thread_pkt.data_len = ret - sizeof(struct tun_pi);
+	thread_pkt.pkt.data = data_copy;
+	thread_pkt.pkt.data_len = ret - sizeof(struct tun_pi);
+
+	/* Enqueue packet for processing by worker threads */
+	if (packet_queue_enqueue(&gcfg->packet_queue, &thread_pkt) < 0) {
+		/* Queue is full, free the copied data */
+		packet_mem_pool_free(&gcfg->mem_pool, data_copy);
+		slog(LOG_WARNING, "Packet queue full, dropping packet\n");
 	}
 }
 
@@ -366,6 +428,30 @@ static void read_from_signalfd(void)
 		}
 		if (gcfg->dynamic_pool)
 			dynamic_maint(gcfg->dynamic_pool, 1);
+		
+		/* Cleanup threading components */
+		thread_pool_destroy(&gcfg->thread_pool);
+		packet_queue_destroy(&gcfg->packet_queue);
+		packet_mem_pool_destroy(&gcfg->mem_pool);
+		pthread_mutex_destroy(&gcfg->cache_mutex);
+		pthread_mutex_destroy(&gcfg->map_mutex);
+		pthread_mutex_destroy(&gcfg->dynamic_mutex);
+		
+		/* Free global config structure */
+		if (gcfg) {
+			if (gcfg->recv_buf) {
+				free(gcfg->recv_buf);
+			}
+			if (gcfg->hash_table4) {
+				free(gcfg->hash_table4);
+			}
+			if (gcfg->hash_table6) {
+				free(gcfg->hash_table6);
+			}
+			free(gcfg);
+			gcfg = NULL;
+		}
+		
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		exit(0);
 	}
@@ -626,15 +712,35 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (detach && daemon(1, 0) < 0) {
-		slog(LOG_CRIT, "Error, unable to fork and detach: %s\n",
-				strerror(errno));
-		exit(1);
+	if (detach) {
+		pid_t pid = fork();
+		if (pid < 0) {
+			slog(LOG_CRIT, "Error, unable to fork: %s\n", strerror(errno));
+			exit(1);
+		}
+		if (pid > 0) {
+			/* Parent process - exit */
+			exit(0);
+		}
+		/* Child process continues */
+		if (setsid() < 0) {
+			slog(LOG_CRIT, "Error, unable to create new session: %s\n", strerror(errno));
+			exit(1);
+		}
+		/* Change to root directory */
+		if (chdir("/") < 0) {
+			slog(LOG_CRIT, "Error, unable to chdir to /: %s\n", strerror(errno));
+			exit(1);
+		}
+		/* Close standard file descriptors */
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
 	}
 
 	if (pidfile) {
 		snprintf(addrbuf, sizeof(addrbuf), "%ld\n", (long)getpid());
-		if (write(pidfd, addrbuf, strlen(addrbuf)) != strlen(addrbuf)) {
+		if (write(pidfd, addrbuf, strlen(addrbuf)) != (ssize_t)strlen(addrbuf)) {
 			slog(LOG_CRIT, "Error, unable to write PID file.\n");
 			exit(1);
 		}
@@ -697,6 +803,41 @@ int main(int argc, char **argv)
 
 	if (gcfg->cache_size)
 		create_cache();
+
+	/* Initialize mutexes */
+	if (pthread_mutex_init(&gcfg->cache_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize cache mutex\n");
+		exit(1);
+	}
+	if (pthread_mutex_init(&gcfg->map_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize map mutex\n");
+		exit(1);
+	}
+	if (pthread_mutex_init(&gcfg->dynamic_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize dynamic mutex\n");
+		exit(1);
+	}
+
+	/* Initialize packet memory pool */
+	if (packet_mem_pool_init(&gcfg->mem_pool, 1024 * 1024, 2048) < 0) {
+		slog(LOG_CRIT, "Failed to initialize packet memory pool\n");
+		exit(1);
+	}
+
+	/* Initialize packet queue */
+	if (packet_queue_init(&gcfg->packet_queue, 1024) < 0) {
+		slog(LOG_CRIT, "Failed to initialize packet queue\n");
+		exit(1);
+	}
+
+	/* Determine optimal thread count and initialize thread pool */
+	int optimal_threads = get_optimal_thread_count(gcfg->num_worker_threads);
+	slog(LOG_INFO, "Using %d worker threads\n", optimal_threads);
+	
+	if (thread_pool_init(&gcfg->thread_pool, optimal_threads) < 0) {
+		slog(LOG_CRIT, "Failed to initialize thread pool\n");
+		exit(1);
+	}
 
 	gcfg->recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
 	if (!gcfg->recv_buf) {

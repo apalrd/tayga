@@ -112,6 +112,7 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 
 static int config_ipv4_addr(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: duplicate ipv4-addr directive on "
 				"line %d\n", ln);
@@ -136,6 +137,7 @@ static int config_ipv4_addr(int ln, int arg_count, char **args)
 
 static int config_ipv6_addr(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->local_addr6.s6_addr[0]) {
 		slog(LOG_CRIT, "Error: duplicate ipv6-addr directive on line "
 				"%d\n", ln);
@@ -156,6 +158,7 @@ static int config_ipv6_addr(int ln, int arg_count, char **args)
 
 static int config_prefix(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct map_static *m;
 	struct map6 *m6;
 
@@ -199,6 +202,7 @@ static int config_prefix(int ln, int arg_count, char **args)
 
 static int config_wkpf_strict(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (!strcasecmp(args[0], "true") ||
 	    !strcasecmp(args[0], "on") ||
 	    !strcasecmp(args[0], "yes") ||
@@ -218,6 +222,7 @@ static int config_wkpf_strict(int ln, int arg_count, char **args)
 
 static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	/* Drop, or some variant of that */
 	if (!strncasecmp(args[0], "dr",2)){
 		gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
@@ -236,6 +241,7 @@ static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 
 static int config_tun_device(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->tundev[0]) {
 		slog(LOG_CRIT, "Error: duplicate tun-device directive on line "
 				"%d\n", ln);
@@ -252,6 +258,7 @@ static int config_tun_device(int ln, int arg_count, char **args)
 
 static int config_map(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct map_static *m;
 	struct map4 *m4;
 	struct map6 *m6;
@@ -324,6 +331,7 @@ static int config_map(int ln, int arg_count, char **args)
 
 static int config_dynamic_pool(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct dynamic_pool *pool;
 	struct map4 *m4;
 
@@ -384,6 +392,7 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 
 static int config_data_dir(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->data_dir[0]) {
 		slog(LOG_CRIT, "Error: duplicate data-dir directive on line "
 				"%d\n", ln);
@@ -399,6 +408,8 @@ static int config_data_dir(int ln, int arg_count, char **args)
 
 static int config_strict_fh(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
+	(void)args;
 	slog(LOG_WARNING,"Warning: strict-frag-hdr deprecated on line %d\n",ln);
 	return ERROR_NONE;
 }
@@ -431,6 +442,7 @@ static int config_log(int ln, int arg_count, char **args)
 
 static int config_offlink_mtu(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	/* Offlink MTU alreadys et */
 	if (gcfg->ipv6_offlink_mtu) {
 		slog(LOG_CRIT, "Error: duplicate offlink-mtu directive on "
@@ -458,6 +470,32 @@ static int config_offlink_mtu(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_worker_threads(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int threads;
+	
+	if (gcfg->num_worker_threads != 0) {
+		slog(LOG_CRIT, "Error: duplicate worker-threads directive on "
+				"line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	threads = atoi(args[0]);
+	if (threads < 0) {
+		slog(LOG_CRIT, "Error: worker-threads must be >= 0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	if (threads > 64) {
+		slog(LOG_CRIT, "Error: worker-threads %d is too large, maximum 64 on line %d\n", 
+			threads, ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->num_worker_threads = threads;
+	slog(LOG_INFO, "Worker threads configured to %d (0 = auto-detect)\n", threads);
+	return ERROR_NONE;
+}
 
 struct {
 	/* Long name */
@@ -469,7 +507,7 @@ struct {
 } config_directives[] = {
 	{ "ipv4-addr", 		config_ipv4_addr, 		1 },
 	{ "ipv6-addr", 		config_ipv6_addr, 		1 },
-	{ "prefix", 		config_prefix, 			1 },
+	{ "prefix", 		config_prefix, 			2 },
 	{ "wkpf-strict", 	config_wkpf_strict, 	1 },
 	{ "udp-cksum-mode", config_udp_cksum_mode, 	1 },
 	{ "tun-device", 	config_tun_device, 		1 },
@@ -479,6 +517,7 @@ struct {
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
+	{ "worker-threads",	config_worker_threads,	1 },
 	{ NULL, NULL, 0 }
 };
 
@@ -503,6 +542,7 @@ int config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	gcfg->num_worker_threads = 0; /* 0 = auto-detect based on CPU cores */
 	return ERROR_NONE;
 }
 

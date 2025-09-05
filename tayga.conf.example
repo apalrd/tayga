@@ -164,3 +164,25 @@ dynamic-pool 192.168.255.0/24
 #
 # Default value: 1280
 #offlink-mtu 1492
+
+#
+# Worker Threads Configuration
+#
+# TAYGA uses a multi-threaded architecture for improved performance.
+# The number of worker threads can be configured to match your system's
+# capabilities and requirements.
+#
+# Valid values:
+#   0 - Auto-detect based on CPU cores (recommended)
+#   1-64 - Manual thread count
+#
+# Examples:
+#   worker-threads 0    # Auto-detect (default)
+#   worker-threads 2    # For low-resource systems
+#   worker-threads 4    # For standard systems
+#   worker-threads 8    # For high-performance systems
+#   worker-threads 16   # For maximum throughput
+#
+# Default value: 0 (auto-detect)
+#
+#worker-threads 0

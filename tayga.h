@@ -35,6 +35,8 @@
 #include <syslog.h>
 #include <errno.h>
 #include <time.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
@@ -42,6 +44,11 @@
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
+#include <netinet/if_ether.h>
+#include <net/ethernet.h>
+#include <sys/uio.h>
+#elif defined(__APPLE__)
+#include <net/if.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <sys/uio.h>
@@ -80,6 +87,22 @@ struct tun_pi {
 #define	ETH_P_IPV6 AF_INET6
 #define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->proto = htonl(_af); }
 #define	TUN_GET_PROTO(_pi)			ntohl((_pi)->proto)
+#endif
+
+#ifdef __APPLE__
+#define s6_addr8  __u6_addr.__u6_addr8
+#define s6_addr16 __u6_addr.__u6_addr16
+#define s6_addr32 __u6_addr.__u6_addr32
+
+struct tun_pi {
+	uint16_t flags;
+	uint16_t proto;
+};
+
+#define ETH_P_IP 0x0800
+#define ETH_P_IPV6 0x86DD
+#define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->flags = 0; (_pi)->proto = htons(_af); }
+#define	TUN_GET_PROTO(_pi)			ntohs((_pi)->proto)
 #endif
 
 /* Configuration knobs */
@@ -278,6 +301,41 @@ enum udp_cksum_mode {
 	UDP_CKSUM_FWD
 };
 
+/// Thread pool configuration
+struct thread_pool {
+	pthread_t *threads;
+	int num_threads;
+	atomic_int shutdown;
+	atomic_int active_workers;
+};
+
+/// Packet queue for thread pool
+struct packet_queue {
+	struct thread_pkt *packets;
+	atomic_size_t head;
+	atomic_size_t tail;
+	size_t size;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+};
+
+/// Thread-safe packet structure
+struct thread_pkt {
+	struct pkt pkt;
+	uint8_t *data_copy;
+	size_t data_len;
+	struct tun_pi pi;
+};
+
+/// Memory pool for packet data
+struct packet_mem_pool {
+	uint8_t *pool;
+	size_t pool_size;
+	size_t chunk_size;
+	atomic_size_t next_free;
+	pthread_mutex_t mutex;
+};
+
 /// Configuration structure
 struct config {
 	char tundev[IFNAMSIZ];
@@ -315,6 +373,15 @@ struct config {
 	int wkpf_strict;
 	int log_opts;
 	enum udp_cksum_mode udp_cksum_mode;
+
+	/* Threading support */
+	struct thread_pool thread_pool;
+	struct packet_queue packet_queue;
+	struct packet_mem_pool mem_pool;
+	pthread_mutex_t cache_mutex;
+	pthread_mutex_t map_mutex;
+	pthread_mutex_t dynamic_mutex;
+	int num_worker_threads;
 };
 
 /// Logging flags
@@ -395,3 +462,19 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
+void tun_setup(int do_mktun, int do_rmtun);
+
+/* threading.c */
+int get_optimal_thread_count(int configured_threads);
+int thread_pool_init(struct thread_pool *pool, int num_threads);
+void thread_pool_destroy(struct thread_pool *pool);
+int packet_queue_init(struct packet_queue *queue, size_t size);
+void packet_queue_destroy(struct packet_queue *queue);
+int packet_queue_enqueue(struct packet_queue *queue, const struct thread_pkt *pkt);
+int packet_queue_dequeue(struct packet_queue *queue, struct thread_pkt *pkt);
+void *worker_thread(void *arg);
+int process_packet_threaded(const struct thread_pkt *thread_pkt);
+int packet_mem_pool_init(struct packet_mem_pool *pool, size_t pool_size, size_t chunk_size);
+void packet_mem_pool_destroy(struct packet_mem_pool *pool);
+uint8_t *packet_mem_pool_alloc(struct packet_mem_pool *pool, size_t size);
+void packet_mem_pool_free(struct packet_mem_pool *pool, uint8_t *ptr);

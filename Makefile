@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c threading.c
 
 #Check for release file / variable
 -include release
@@ -35,7 +35,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread
 
 # Compile Tayga (static)
 .PHONY: static
@@ -45,7 +45,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -static
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread -static
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test

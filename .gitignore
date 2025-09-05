@@ -18,3 +18,10 @@ version.h
 callgrind*
 unit_conffile
 unit_conffile.conf
+
+# Test executables created during development
+test_cpu_detection
+test_thread_configs
+
+# macOS debug symbols
+*.dSYM/
