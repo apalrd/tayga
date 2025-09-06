@@ -43,5 +43,8 @@ commit_message.txt
 *.bak
 *.orig
 
+# Service management files (these are generated/installed)
+# Note: The actual service files in scripts/ are tracked in git
+
 # macOS debug symbols
 *.dSYM/

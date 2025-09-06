@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# tayga		Start/Stop the TAYGA NAT64 daemon
+#
+# chkconfig: 35 80 20
+# description: TAYGA is a Simple, no-fuss NAT64 daemon
+#
+# processname: tayga
+# config: /etc/tayga.conf
+# pidfile: /var/run/tayga.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+# Default values
+TAYGA_USER="nobody"
+TAYGA_GROUP="nogroup"
+TAYGA_CONFIG="/etc/tayga.conf"
+TAYGA_PIDFILE="/var/run/tayga.pid"
+TAYGA_DATADIR="/var/lib/tayga"
+TAYGA_BINARY="/usr/sbin/tayga"
+
+# Load custom configuration if it exists
+[ -f /etc/sysconfig/tayga ] && . /etc/sysconfig/tayga
+
+start() {
+    echo -n $"Starting $prog: "
+    
+    # Create data directory if it doesn't exist
+    if [ ! -d "$TAYGA_DATADIR" ]; then
+        mkdir -p "$TAYGA_DATADIR"
+        chown $TAYGA_USER:$TAYGA_GROUP "$TAYGA_DATADIR"
+    fi
+    
+    # Create tun adapter
+    $TAYGA_BINARY --mktun
+    
+    # Start the daemon
+    daemon --user $TAYGA_USER --pidfile $TAYGA_PIDFILE \
+        $TAYGA_BINARY -p $TAYGA_PIDFILE -u $TAYGA_USER -g $TAYGA_GROUP \
+        --config $TAYGA_CONFIG
+    
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/tayga
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Shutting down $prog: "
+    killproc -p $TAYGA_PIDFILE $TAYGA_BINARY
+    RETVAL=$?
+    echo
+    
+    # Remove tun adapter
+    $TAYGA_BINARY --rmtun
+    
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/tayga
+    return $RETVAL
+}
+
+restart() {
+    stop
+    start
+}
+
+reload() {
+    echo -n $"Reloading $prog: "
+    killproc -p $TAYGA_PIDFILE $TAYGA_BINARY -HUP
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+check_status() {
+    status -p $TAYGA_PIDFILE $TAYGA_BINARY
+    RETVAL=$?
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        check_status
+        ;;
+    restart)
+        restart
+        ;;
+    reload)
+        reload
+        ;;
+    condrestart)
+        [ -f /var/lock/subsys/tayga ] && restart || :
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|reload|condrestart}"
+        exit 1
+esac
+
+exit $?
