@@ -266,3 +266,34 @@ dynamic-pool 192.168.255.0/24
 #   batch-processing true   # Enable all optimizations
 #   batch-size 8           # Balanced batch size
 #   queue-size 8192        # Default queue size
+
+#
+# SERVICE MANAGEMENT
+#
+# When TAYGA is installed as a system service, this configuration file is
+# automatically copied to the appropriate platform-specific location:
+#
+#   systemd (Linux):     /etc/tayga/default.conf
+#   OpenRC (Alpine):     /etc/tayga.conf
+#   launchd (macOS):     /usr/local/etc/tayga.conf
+#   FreeBSD rc.d:        /usr/local/etc/tayga.conf
+#   SysV init (Linux):   /etc/tayga.conf
+#
+# To install TAYGA as a service:
+#   make all
+#   sudo make install
+#   sudo make enable-service
+#   sudo make start-service
+#
+# To manage the service:
+#   sudo make start-service    # Start TAYGA service
+#   sudo make stop-service     # Stop TAYGA service
+#   sudo make restart-service  # Restart TAYGA service
+#   make status-service        # Check service status
+#
+# After modifying this configuration file, restart the service:
+#   sudo make restart-service
+#
+# For detailed service management documentation, see:
+#   docs/service-management.md
+#

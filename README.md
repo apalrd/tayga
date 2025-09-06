@@ -187,3 +187,207 @@ queue-size 8192
 - ✅ Lock-free operations
 
 The multi-threaded architecture provides massive performance improvements, especially on multi-core systems, by parallelizing packet processing across multiple optimized worker threads.
+
+# Service Management
+
+TAYGA includes comprehensive cross-platform service management support, making it easy to install and manage as a system service across all major operating systems.
+
+## Quick Service Installation
+
+The easiest way to install TAYGA as a service:
+
+```sh
+# Build TAYGA
+make all
+
+# Install TAYGA and auto-detect service files for your platform
+sudo make install
+
+# Enable and start the service
+sudo make enable-service
+sudo make start-service
+```
+
+## Platform-Specific Service Installation
+
+### Linux with systemd (Ubuntu, Debian, CentOS, RHEL, Fedora, etc.)
+
+```sh
+# Install systemd service files
+sudo make install-systemd
+
+# Enable and start service
+sudo systemctl enable tayga@default.service
+sudo systemctl start tayga@default.service
+
+# Check status
+sudo systemctl status tayga@default.service
+```
+
+**Configuration**: `/etc/tayga/default.conf`
+
+### Alpine Linux / Gentoo (OpenRC)
+
+```sh
+# Install OpenRC service files
+sudo make install-openrc
+
+# Enable and start service
+sudo rc-update add tayga default
+sudo rc-service tayga start
+
+# Check status
+sudo rc-service tayga status
+```
+
+**Configuration**: `/etc/tayga.conf`
+
+### macOS (launchd)
+
+```sh
+# Install launchd service files
+sudo make install-launchd
+
+# Enable and start service
+sudo launchctl load -w /Library/LaunchDaemons/com.tayga.plist
+sudo launchctl start com.tayga
+
+# Check status
+launchctl list | grep com.tayga
+```
+
+**Configuration**: `/usr/local/etc/tayga.conf`
+
+### FreeBSD (rc.d)
+
+```sh
+# Install FreeBSD rc.d service files
+sudo make install-rc
+
+# Enable service (add to /etc/rc.conf)
+echo 'tayga_enable="YES"' | sudo tee -a /etc/rc.conf
+
+# Start service
+sudo service tayga start
+
+# Check status
+sudo service tayga status
+```
+
+**Configuration**: `/usr/local/etc/tayga.conf`
+
+### Older Linux (SysV init)
+
+```sh
+# Install SysV init service files
+sudo make install-sysv
+
+# Enable service (Red Hat/CentOS)
+sudo chkconfig tayga on
+
+# OR enable service (Debian/Ubuntu)
+sudo update-rc.d tayga defaults
+
+# Start service
+sudo service tayga start
+
+# Check status
+sudo service tayga status
+```
+
+**Configuration**: `/etc/tayga.conf`
+
+## Service Management Commands
+
+TAYGA provides platform-agnostic service management through the Makefile:
+
+```sh
+# Enable service (auto-detects platform)
+sudo make enable-service
+
+# Disable service
+sudo make disable-service
+
+# Start service
+sudo make start-service
+
+# Stop service
+sudo make stop-service
+
+# Restart service
+sudo make restart-service
+
+# Check service status
+make status-service
+```
+
+## Multiple Instances (systemd only)
+
+systemd supports multiple TAYGA instances:
+
+```sh
+# Create additional configuration
+sudo cp /etc/tayga/default.conf /etc/tayga/instance2.conf
+
+# Edit the new configuration
+sudo nano /etc/tayga/instance2.conf
+
+# Enable and start the new instance
+sudo systemctl enable tayga@instance2.service
+sudo systemctl start tayga@instance2.service
+```
+
+## Service Configuration
+
+Each platform installs a default configuration file that you can customize:
+
+- **systemd**: `/etc/tayga/default.conf`
+- **OpenRC**: `/etc/tayga.conf`
+- **launchd**: `/usr/local/etc/tayga.conf`
+- **FreeBSD rc.d**: `/usr/local/etc/tayga.conf`
+- **SysV init**: `/etc/tayga.conf`
+
+After modifying the configuration, restart the service:
+
+```sh
+sudo make restart-service
+```
+
+## Troubleshooting Services
+
+### Check Service Logs
+
+```sh
+# systemd
+sudo journalctl -u tayga@default.service
+
+# OpenRC
+sudo rc-service tayga status
+
+# launchd
+tail -f /var/log/tayga.log
+
+# FreeBSD
+sudo service tayga status
+
+# SysV
+sudo service tayga status
+```
+
+### Verify TUN Interface
+
+```sh
+# Linux
+ip link show nat64
+
+# FreeBSD/macOS
+ifconfig nat64
+```
+
+### Check Configuration
+
+```sh
+tayga --config /path/to/config.conf --check-config
+```
+
+For detailed service management documentation, see [Service Management Guide](docs/service-management.md).

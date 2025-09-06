@@ -96,6 +96,97 @@ License GPLv2+: GNU GPL version 2 or later
 .br
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
+.SH "SERVICE MANAGEMENT"
+
+TAYGA includes comprehensive cross-platform service management support. The easiest way to install TAYGA as a service is:
+
+.RS
+.nf
+make all
+sudo make install
+sudo make enable-service
+sudo make start-service
+.fi
+.RE
+
+Platform-specific service installation:
+
+.TP
+.B Linux with systemd
+sudo make install-systemd
+sudo systemctl enable tayga@default.service
+sudo systemctl start tayga@default.service
+
+.TP
+.B Alpine Linux / Gentoo (OpenRC)
+sudo make install-openrc
+sudo rc-update add tayga default
+sudo rc-service tayga start
+
+.TP
+.B macOS (launchd)
+sudo make install-launchd
+sudo launchctl load -w /Library/LaunchDaemons/com.tayga.plist
+
+.TP
+.B FreeBSD (rc.d)
+sudo make install-rc
+echo 'tayga_enable="YES"' | sudo tee -a /etc/rc.conf
+sudo service tayga start
+
+.TP
+.B Older Linux (SysV init)
+sudo make install-sysv
+sudo chkconfig tayga on  # Red Hat/CentOS
+# OR
+sudo update-rc.d tayga defaults  # Debian/Ubuntu
+
+Service management commands:
+
+.TP
+.B make enable-service
+Enable TAYGA service (auto-detects platform)
+
+.TP
+.B make start-service
+Start TAYGA service
+
+.TP
+.B make stop-service
+Stop TAYGA service
+
+.TP
+.B make restart-service
+Restart TAYGA service
+
+.TP
+.B make status-service
+Check TAYGA service status
+
+Configuration files are installed at platform-specific locations:
+
+.TP
+.B systemd
+/etc/tayga/default.conf
+
+.TP
+.B OpenRC
+/etc/tayga.conf
+
+.TP
+.B launchd
+/usr/local/etc/tayga.conf
+
+.TP
+.B FreeBSD rc.d
+/usr/local/etc/tayga.conf
+
+.TP
+.B SysV init
+/etc/tayga.conf
+
+For detailed service management documentation, see the Service Management Guide in the docs/ directory.
+
 .SH "SEE ALSO"
 
 .BR tayga.conf (5)

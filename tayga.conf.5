@@ -239,6 +239,58 @@ Larger queue sizes can handle higher burst traffic but use more memory. Smaller 
 This configuration directive is optional.
 .IP
 
+.SH "SERVICE CONFIGURATION"
+
+When TAYGA is installed as a system service, the configuration file is placed at platform-specific locations:
+
+.TP
+.B systemd (Linux)
+/etc/tayga/default.conf
+
+.TP
+.B OpenRC (Alpine/Gentoo)
+/etc/tayga.conf
+
+.TP
+.B launchd (macOS)
+/usr/local/etc/tayga.conf
+
+.TP
+.B FreeBSD rc.d
+/usr/local/etc/tayga.conf
+
+.TP
+.B SysV init (older Linux)
+/etc/tayga.conf
+
+After modifying the configuration file, restart the TAYGA service:
+
+.TP
+.B Platform-agnostic
+sudo make restart-service
+
+.TP
+.B systemd
+sudo systemctl restart tayga@default.service
+
+.TP
+.B OpenRC
+sudo rc-service tayga restart
+
+.TP
+.B launchd
+sudo launchctl stop com.tayga && sudo launchctl start com.tayga
+
+.TP
+.B FreeBSD rc.d
+sudo service tayga restart
+
+.TP
+.B SysV init
+sudo service tayga restart
+
+For detailed service management documentation, see the Service Management Guide in the docs/ directory.
+
 .SH "SEE ALSO"
 .BR tayga (8)
 .br
