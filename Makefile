@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c threading.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c threading.c linux_optimizations.c macos_optimizations.c
 
 #Check for release file / variable
 -include release

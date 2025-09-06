@@ -23,5 +23,25 @@ unit_conffile.conf
 test_cpu_detection
 test_thread_configs
 
+# Test configuration files
+test.conf
+test_*.conf
+minimal.conf
+thread_examples.conf
+
+# Test scripts (keep the main ones, ignore temporary ones)
+test-cross-platform-freebsd.sh
+test-multithreading-freebsd.sh
+
+# Temporary commit files
+commit_message.txt
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.bak
+*.orig
+
 # macOS debug symbols
 *.dSYM/

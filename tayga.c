@@ -55,7 +55,7 @@ void slog(int priority, const char *format, ...)
 	va_end(ap);
 }
 
-static void set_nonblock(int fd)
+void set_nonblock(int fd)
 {
 	int flags;
 
@@ -88,7 +88,7 @@ void read_random_bytes(void *d, int len)
 }
 
 #ifdef __linux__
-static void tun_setup(int do_mktun, int do_rmtun)
+void tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
 	int fd;
@@ -176,7 +176,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 #endif
 
 #ifdef __FreeBSD__
-static void tun_setup(int do_mktun, int do_rmtun)
+void tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
 	int fd, do_rename = 0, multi_af;
@@ -281,57 +281,7 @@ static void tun_setup(int do_mktun, int do_rmtun)
 }
 #endif
 
-#ifdef __APPLE__
-void tun_setup(int do_mktun, int do_rmtun)
-{
-	/* macOS TUN setup - simplified version */
-	char devname[64];
-	int fd;
-
-	if (do_mktun || do_rmtun) {
-		slog(LOG_CRIT, "TUN device creation/removal not supported on macOS\n");
-		exit(1);
-	}
-
-	snprintf(devname, sizeof(devname), "/dev/%s", gcfg->tundev);
-	gcfg->tun_fd = open(devname, O_RDWR);
-	if (gcfg->tun_fd < 0) {
-		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
-				devname, strerror(errno));
-		exit(1);
-	}
-
-	set_nonblock(gcfg->tun_fd);
-
-	fd = socket(PF_INET, SOCK_DGRAM, 0);
-	if (fd < 0) {
-		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-
-	/* Query MTU from tun adapter */
-	struct ifreq ifr;
-	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
-		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	close(fd);
-
-	gcfg->mtu = ifr.ifr_mtu;
-	if(gcfg->mtu < MTU_MIN) {
-		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
-				gcfg->mtu, MTU_MIN);
-		exit(1);
-	}
-
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
-}
-#endif
+/* macOS tun_setup moved to macos_optimizations.c */
 
 static void signal_handler(int signal)
 {
@@ -830,10 +780,29 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	/* Apply platform-specific optimizations */
+#ifdef __linux__
+	if (setup_linux_optimizations() < 0) {
+		slog(LOG_WARNING, "Some Linux optimizations failed, continuing anyway\n");
+	}
+#endif
+
+#ifdef __FreeBSD__
+	if (setup_freebsd_optimizations() < 0) {
+		slog(LOG_WARNING, "Some FreeBSD optimizations failed, continuing anyway\n");
+	}
+#endif
+
+#ifdef __APPLE__
+	if (setup_macos_optimizations() < 0) {
+		slog(LOG_WARNING, "Some macOS optimizations failed, continuing anyway\n");
+	}
+#endif
+	
 	/* Determine optimal thread count and initialize thread pool */
 	int optimal_threads = get_optimal_thread_count(gcfg->num_worker_threads);
 	slog(LOG_INFO, "Using %d worker threads\n", optimal_threads);
-	
+
 	if (thread_pool_init(&gcfg->thread_pool, optimal_threads) < 0) {
 		slog(LOG_CRIT, "Failed to initialize thread pool\n");
 		exit(1);

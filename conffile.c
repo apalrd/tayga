@@ -548,6 +548,145 @@ static int config_queue_size(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+#ifdef __linux__
+static int config_epoll_io(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_epoll_io = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_epoll_io = 0;
+	} else {
+		slog(LOG_CRIT, "Error: epoll-io must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux epoll I/O %s\n", gcfg->enable_epoll_io ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_io_uring(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_io_uring = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_io_uring = 0;
+	} else {
+		slog(LOG_CRIT, "Error: io-uring must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux io_uring %s\n", gcfg->enable_io_uring ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_cpu_governor(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_cpu_governor = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_cpu_governor = 0;
+	} else {
+		slog(LOG_CRIT, "Error: cpu-governor must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux CPU governor optimization %s\n", gcfg->enable_cpu_governor ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_net_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_net_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_net_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: net-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux network optimization %s\n", gcfg->enable_net_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_memory_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_memory_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_memory_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: memory-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux memory optimization %s\n", gcfg->enable_memory_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+#endif
+
+#ifdef __FreeBSD__
+static int config_kqueue_io(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_kqueue_io = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_kqueue_io = 0;
+	} else {
+		slog(LOG_CRIT, "Error: kqueue-io must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD kqueue I/O %s\n", gcfg->enable_kqueue_io ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_async_queue(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_async_queue = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_async_queue = 0;
+	} else {
+		slog(LOG_CRIT, "Error: async-queue must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD async queue %s\n", gcfg->enable_async_queue ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_packet_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_packet_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_packet_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: packet-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD packet optimization %s\n", gcfg->enable_packet_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_sysctl_tuning(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_sysctl_tuning = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_sysctl_tuning = 0;
+	} else {
+		slog(LOG_CRIT, "Error: sysctl-tuning must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD sysctl tuning %s\n", gcfg->enable_sysctl_tuning ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+#endif
+
 struct {
 	/* Long name */
 	char *name;
@@ -572,6 +711,19 @@ struct {
 	{ "batch-processing",	config_batch_processing,	1 },
 	{ "batch-size",		config_batch_size,		1 },
 	{ "queue-size",		config_queue_size,		1 },
+#ifdef __linux__
+	{ "epoll-io",		config_epoll_io,		1 },
+	{ "io-uring",		config_io_uring,		1 },
+	{ "cpu-governor",	config_cpu_governor,		1 },
+	{ "net-optimization",	config_net_optimization,	1 },
+	{ "memory-optimization",	config_memory_optimization,	1 },
+#endif
+#ifdef __FreeBSD__
+	{ "kqueue-io",		config_kqueue_io,		1 },
+	{ "async-queue",	config_async_queue,		1 },
+	{ "packet-optimization",	config_packet_optimization,	1 },
+	{ "sysctl-tuning",	config_sysctl_tuning,		1 },
+#endif
 	{ NULL, NULL, 0 }
 };
 
@@ -606,6 +758,31 @@ int config_init(void)
 	gcfg->batch_size = 8;               /* Default batch size */
 	gcfg->queue_size = 8192;            /* Larger queue size for better throughput */
 	gcfg->per_thread_pools = NULL;      /* Will be allocated during init */
+
+#ifdef __linux__
+	/* Linux-specific optimization defaults */
+	gcfg->enable_epoll_io = 1;          /* Enable epoll I/O by default on Linux */
+	gcfg->enable_io_uring = 0;          /* Disable io_uring by default (requires liburing) */
+	gcfg->enable_cpu_governor = 1;      /* Enable CPU governor optimization by default on Linux */
+	gcfg->enable_net_optimization = 1;  /* Enable network optimization by default on Linux */
+	gcfg->enable_memory_optimization = 1; /* Enable memory optimization by default on Linux */
+#endif
+
+#ifdef __FreeBSD__
+	/* FreeBSD-specific optimization defaults */
+	gcfg->enable_kqueue_io = 1;         /* Enable kqueue I/O by default on FreeBSD */
+	gcfg->enable_async_queue = 1;       /* Enable async queue by default on FreeBSD */
+	gcfg->enable_packet_optimization = 1; /* Enable packet optimization by default on FreeBSD */
+	gcfg->enable_sysctl_tuning = 1;     /* Enable sysctl tuning by default on FreeBSD */
+#endif
+
+#ifdef __APPLE__
+	/* macOS-specific optimization defaults */
+	gcfg->enable_macos_optimizations = 1; /* Enable macOS optimizations by default */
+	gcfg->macos_optimization.enable_cpu_affinity = 1;
+	gcfg->macos_optimization.enable_memory_optimization = 1;
+	gcfg->macos_optimization.enable_network_optimization = 1;
+#endif
 	
 	return ERROR_NONE;
 }

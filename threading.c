@@ -539,21 +539,9 @@ int setup_cpu_affinity(pthread_t thread, int cpu_id)
 	slog(LOG_DEBUG, "Thread pinned to CPU %d\n", cpu_id);
 	return 0;
 #elif defined(__APPLE__)
-	/* macOS CPU affinity implementation */
-	thread_affinity_policy_data_t affinity_policy;
-	affinity_policy.affinity_tag = cpu_id;
-	
-	kern_return_t result = thread_policy_set(pthread_mach_thread_np(thread),
-		THREAD_AFFINITY_POLICY, (thread_policy_t)&affinity_policy,
-		THREAD_AFFINITY_POLICY_COUNT);
-	
-	if (result != KERN_SUCCESS) {
-		slog(LOG_WARNING, "Failed to set CPU affinity for thread on macOS\n");
-		return -1;
-	}
-	
-	slog(LOG_DEBUG, "Thread pinned to CPU %d (macOS)\n", cpu_id);
-	return 0;
+	/* macOS CPU affinity implementation moved to macos_optimizations.c */
+	extern int setup_cpu_affinity_macos(pthread_t thread, int cpu_id);
+	return setup_cpu_affinity_macos(thread, cpu_id);
 #else
 	(void)thread;
 	(void)cpu_id;
