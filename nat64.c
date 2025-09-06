@@ -239,7 +239,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 		return;
 
 	orig_len = orig->header_len + orig->data_len;
-	if (orig_len > 576 - sizeof(struct ip4) - sizeof(struct icmp))
+	if (orig_len > (int)(576 - sizeof(struct ip4) - sizeof(struct icmp)))
 		orig_len = 576 - sizeof(struct ip4) - sizeof(struct icmp);
 	icmp.type = type;
 	icmp.code = code;
@@ -398,7 +398,7 @@ static void xlate_4to6_data(struct pkt *p)
 				return;
 			}
 			no_frag_hdr = 1;
-		} else if (p->data_len <= frag_size) {
+		} else if (p->data_len <= (uint32_t)frag_size) {
 			no_frag_hdr = 1;
 		}
 	}
@@ -439,7 +439,7 @@ static void xlate_4to6_data(struct pkt *p)
 		frag_size = (frag_size - sizeof(header.ip6_frag)) & ~7;
 
 		while (p->data_len > 0) {
-			if (p->data_len < frag_size)
+			if (p->data_len < (uint32_t)frag_size)
 				frag_size = p->data_len;
 
 			header.ip6.payload_length =
@@ -805,7 +805,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 		return;
 
 	orig_len = sizeof(struct ip6) + orig->header_len + orig->data_len;
-	if (orig_len > MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp))
+	if (orig_len > (int)(MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp)))
 		orig_len = MTU_MIN - sizeof(struct ip6) - sizeof(struct icmp);
 	icmp.type = type;
 	icmp.code = code;
@@ -838,6 +838,7 @@ static void host_handle_icmp6(struct pkt *p)
 static void xlate_header_6to4(struct pkt *p, struct ip4 *ip4,
 		int payload_length, struct cache_entry *dest)
 {
+	(void)dest;
 	ip4->ver_ihl = 0x45;
 	ip4->tos = (ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff;
 	ip4->length = htons(sizeof(struct ip4) + payload_length);
@@ -1033,7 +1034,7 @@ static int parse_ip6(struct pkt *p,int em)
 			return ERROR_DROP;
 		}
 		hdr_len = (p->data[1] + 1) * 8;
-		if (p->data_len < hdr_len) {
+		if (p->data_len < (uint32_t)hdr_len) {
 			if(!em) log_pkt6(LOG_OPT_DROP,p,"Extension Header Invalid Length");
 			return ERROR_DROP;
 		}

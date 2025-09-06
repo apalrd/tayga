@@ -293,8 +293,12 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 {
 	struct cache_entry *c;
 
-	if (list_empty(&gcfg->cache_pool))
+	pthread_mutex_lock(&gcfg->cache_mutex);
+
+	if (list_empty(&gcfg->cache_pool)) {
+		pthread_mutex_unlock(&gcfg->cache_mutex);
 		return NULL;
+	}
 	c = list_entry(gcfg->cache_pool.next, struct cache_entry, list);
 	c->addr4 = *addr4;
 	c->addr6 = *addr6;
@@ -303,6 +307,8 @@ static struct cache_entry *cache_insert(const struct in_addr *addr4,
 	c->ip4_ident = 1;
 	list_add(&c->list, &gcfg->cache_active);
 	add_to_hash_table(c, hash4, hash6);
+
+	pthread_mutex_unlock(&gcfg->cache_mutex);
 	return c;
 }
 /**
@@ -316,11 +322,17 @@ struct map4 *find_map4(const struct in_addr *addr4)
 	struct list_head *entry;
 	struct map4 *m;
 
+	pthread_mutex_lock(&gcfg->map_mutex);
+
 	list_for_each(entry, &gcfg->map4_list) {
 		m = list_entry(entry, struct map4, list);
-		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr))
+		if (m->addr.s_addr == (m->mask.s_addr & addr4->s_addr)) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return m;
+		}
 	}
+
+	pthread_mutex_unlock(&gcfg->map_mutex);
 	return NULL;
 }
 /**
@@ -334,11 +346,17 @@ struct map6 *find_map6(const struct in6_addr *addr6)
 	struct list_head *entry;
 	struct map6 *m;
 
+	pthread_mutex_lock(&gcfg->map_mutex);
+
 	list_for_each(entry, &gcfg->map6_list) {
 		m = list_entry(entry, struct map6, list);
-		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask))
+		if (IN6_IS_IN_NET(addr6, &m->addr, &m->mask)) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return m;
+		}
 	}
+
+	pthread_mutex_unlock(&gcfg->map_mutex);
 	return NULL;
 }
 /**
@@ -729,6 +747,8 @@ void addrmap_maint(void)
 	struct list_head *entry, *next;
 	struct cache_entry *c;
 
+	pthread_mutex_lock(&gcfg->cache_mutex);
+
 	list_for_each_safe(entry, next, &gcfg->cache_active) {
 		c = list_entry(entry, struct cache_entry, list);
 		if (c->last_use + CACHE_MAX_AGE < now) {
@@ -739,4 +759,6 @@ void addrmap_maint(void)
 			list_del(&c->hash6);
 		}
 	}
+
+	pthread_mutex_unlock(&gcfg->cache_mutex);
 }

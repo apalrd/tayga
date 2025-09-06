@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# $FreeBSD$
+#
+# PROVIDE: tayga
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable tayga:
+#
+# tayga_enable="YES"
+# tayga_config="/usr/local/etc/tayga.conf"
+# tayga_user="nobody"
+# tayga_group="nogroup"
+# tayga_pidfile="/var/run/tayga.pid"
+# tayga_datadir="/var/lib/tayga"
+
+. /etc/rc.subr
+
+name="tayga"
+rcvar="tayga_enable"
+
+load_rc_config $name
+
+: ${tayga_enable:="NO"}
+: ${tayga_config:="/usr/local/etc/tayga.conf"}
+: ${tayga_user:="nobody"}
+: ${tayga_group:="nogroup"}
+: ${tayga_pidfile:="/var/run/tayga.pid"}
+: ${tayga_datadir:="/var/lib/tayga"}
+
+command="/usr/local/sbin/tayga"
+command_args="-p ${tayga_pidfile} -u ${tayga_user} -g ${tayga_group} --config ${tayga_config}"
+
+pidfile="${tayga_pidfile}"
+
+start_precmd="tayga_precmd"
+stop_postcmd="tayga_postcmd"
+
+tayga_precmd()
+{
+    # Create data directory if it doesn't exist
+    if [ ! -d "${tayga_datadir}" ]; then
+        install -d -o ${tayga_user} -g ${tayga_group} -m 755 "${tayga_datadir}"
+    fi
+    
+    # Create tun adapter
+    ${command} --mktun
+    
+    # Run custom pre-start script if it exists
+    if [ -f "/usr/local/etc/rc.d/tayga_pre" ]; then
+        . /usr/local/etc/rc.d/tayga_pre
+    fi
+}
+
+tayga_postcmd()
+{
+    # Remove tun adapter
+    ${command} --rmtun
+    
+    # Run custom post-stop script if it exists
+    if [ -f "/usr/local/etc/rc.d/tayga_post" ]; then
+        . /usr/local/etc/rc.d/tayga_post
+    fi
+}
+
+run_rc_command "$1"

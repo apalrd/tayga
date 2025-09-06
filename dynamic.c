@@ -119,6 +119,8 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 	if (!pool)
 		return NULL;
 
+	pthread_mutex_lock(&gcfg->dynamic_mutex);
+
 	list_for_each(entry, &pool->dormant_list) {
 		d = list_entry(entry, struct map_dynamic, list);
 		if (IN6_ARE_ADDR_EQUAL(addr6, &d->map6.addr)) {
@@ -161,8 +163,10 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 		}
 	}
 
-	if (list_empty(&pool->dormant_list))
+	if (list_empty(&pool->dormant_list)) {
+		pthread_mutex_unlock(&gcfg->dynamic_mutex);
 		return NULL;
+	}
 
 	d = list_entry(pool->dormant_list.prev, struct map_dynamic, list);
 	d->map6.addr = *addr6;
@@ -171,6 +175,7 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 
 activate:
 	move_to_mapped(d, pool);
+	pthread_mutex_unlock(&gcfg->dynamic_mutex);
 	return &d->map6;
 }
 
@@ -352,9 +357,9 @@ static void write_to_file(struct dynamic_pool *pool)
 		d = list_entry(entry, struct map_dynamic, list);
 		inet_ntop(AF_INET, &d->map4.addr, addrbuf4, sizeof(addrbuf4));
 		inet_ntop(AF_INET6, &d->map6.addr, addrbuf6, sizeof(addrbuf6));
-		fprintf(out, "%s\t%s\t%" PRId64 "\n", addrbuf4, addrbuf6,
-				d->cache_entry ?
-					d->cache_entry->last_use : d->last_use);
+		fprintf(out, "%s\t%s\t%ld\n", addrbuf4, addrbuf6,
+				(long)(d->cache_entry ?
+					d->cache_entry->last_use : d->last_use));
 		entry = entry->next;
 	}
 	fclose(out);
@@ -372,6 +377,8 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 	struct list_head *entry, *next;
 	struct map_dynamic *d;
 	struct free_addr *f;
+
+	pthread_mutex_lock(&gcfg->dynamic_mutex);
 
 	list_for_each_safe(entry, next, &pool->mapped_list) {
 		d = list_entry(entry, struct map_dynamic, list);
@@ -403,4 +410,6 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 			gcfg->map_write_pending = 0;
 		}
 	}
+
+	pthread_mutex_unlock(&gcfg->dynamic_mutex);
 }
