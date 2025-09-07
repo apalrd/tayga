@@ -93,7 +93,11 @@ int thread_pool_init(struct thread_pool *pool, int num_threads)
 		
 		/* Setup NUMA affinity if enabled */
 		if (gcfg->enable_numa_optimization) {
+#ifdef HAVE_NUMA_H
 			setup_numa_affinity(i, num_threads);
+#else
+			slog(LOG_INFO, "NUMA optimization requested but not available (libnuma not installed)\n");
+#endif
 		}
 		
 		/* Setup CPU affinity for better cache performance */
@@ -488,6 +492,7 @@ void packet_mem_pool_free(struct packet_mem_pool *pool, uint8_t *ptr)
 
 /* NUMA and CPU affinity functions */
 
+#ifdef HAVE_NUMA_H
 /* Setup NUMA affinity for thread */
 int setup_numa_affinity(int thread_id, int num_threads)
 {
@@ -522,6 +527,16 @@ int setup_numa_affinity(int thread_id, int num_threads)
 	return 0;
 #endif
 }
+#else
+/* NUMA not available - provide stub function */
+int setup_numa_affinity(int thread_id, int num_threads)
+{
+	(void)thread_id;
+	(void)num_threads;
+	slog(LOG_INFO, "NUMA optimization not available (libnuma not installed)\n");
+	return 0;
+}
+#endif
 
 /* Setup CPU affinity for thread */
 int setup_cpu_affinity(pthread_t thread, int cpu_id)

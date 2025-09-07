@@ -29,6 +29,21 @@ launchd_agents_dir ?= /Library/LaunchDaemons
 rc_conf_dir ?= /etc/rc.conf.d
 sysconfig_dir ?= /etc/sysconfig
 
+# Auto-detect NUMA support
+NUMA_CFLAGS := $(shell pkg-config --cflags libnuma 2>/dev/null || echo "")
+NUMA_LDFLAGS := $(shell pkg-config --libs libnuma 2>/dev/null || echo "")
+ifeq ($(NUMA_LDFLAGS),)
+	# Fallback: check if numa.h exists and numa library is available
+	NUMA_CFLAGS := $(shell test -f /usr/include/numa.h && echo "-DHAVE_NUMA_H" || echo "")
+	NUMA_LDFLAGS := $(shell test -f /usr/lib/libnuma.so -o -f /usr/lib64/libnuma.so -o -f /usr/lib/x86_64-linux-gnu/libnuma.so && echo "-lnuma" || echo "")
+endif
+
+# Debug output (can be enabled with make NUMA_DEBUG=1)
+ifdef NUMA_DEBUG
+$(info NUMA_CFLAGS: $(NUMA_CFLAGS))
+$(info NUMA_LDFLAGS: $(NUMA_LDFLAGS))
+endif
+
 # Show help information
 .PHONY: help
 help:
@@ -64,6 +79,10 @@ help:
 	@echo "  make install && make enable-service && make start-service"
 	@echo "  make install-systemd  # Install only systemd files"
 	@echo "  make status-service   # Check if service is running"
+	@echo ""
+	@echo "Build options:"
+	@echo "  NUMA_DEBUG=1          # Show NUMA detection debug info"
+	@echo "  make NUMA_DEBUG=1     # Debug NUMA auto-detection"
 
 # Compile Tayga
 .PHONY: all
@@ -74,7 +93,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(if $(NUMA),-lnuma)
+	$(CC) $(CFLAGS) $(NUMA_CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(NUMA_LDFLAGS)
 
 # Compile Tayga (static)
 .PHONY: static
@@ -84,7 +103,7 @@ ifndef RELEASE
 	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty)\"" >> version.h
 	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD)\"" >> version.h
 endif
-	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(if $(NUMA),-lnuma) -static
+	$(CC) $(CFLAGS) $(NUMA_CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) -lpthread $(NUMA_LDFLAGS) -static
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test

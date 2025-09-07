@@ -40,8 +40,11 @@
 #include <stdatomic.h>
 #include <sched.h>
 #ifdef __linux__
+/* NUMA support is optional - check if available */
+#ifdef HAVE_NUMA_H
 #include <numa.h>
 #include <numaif.h>
+#endif
 #elif defined(__APPLE__)
 #include <mach/thread_policy.h>
 #include <mach/thread_act.h>
@@ -675,7 +678,9 @@ int per_thread_mem_pool_init(struct per_thread_mem_pool *pool, size_t pool_size,
 void per_thread_mem_pool_destroy(struct per_thread_mem_pool *pool);
 uint8_t *per_thread_mem_pool_alloc(struct per_thread_mem_pool *pool, size_t size);
 void per_thread_mem_pool_free(struct per_thread_mem_pool *pool, uint8_t *ptr);
+#ifdef HAVE_NUMA_H
 int setup_numa_affinity(int thread_id, int num_threads);
+#endif
 int setup_cpu_affinity(pthread_t thread, int cpu_id);
 uint32_t calculate_checksum_vectorized(const uint8_t *data, size_t len);
 int zero_copy_packet_init(struct zero_copy_pkt *pkt, uint8_t *buffer, size_t offset, size_t len);

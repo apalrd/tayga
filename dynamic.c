@@ -20,6 +20,10 @@
 #include <inttypes.h>
 #include <limits.h>
 
+/* MAP_FILE might be defined by sys/mman.h, so we need to handle the conflict */
+#ifdef MAP_FILE
+#undef MAP_FILE
+#endif
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
 

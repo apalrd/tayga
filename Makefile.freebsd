@@ -19,7 +19,7 @@ INSTALL_PROGRAM = install -m 755
 
 # Check if we're on FreeBSD and adjust flags accordingly
 .if exists(/usr/include/numa.h)
-NUMA_CFLAGS = -DHAVE_NUMA
+NUMA_CFLAGS = -DHAVE_NUMA_H
 NUMA_LDFLAGS = -lnuma
 .else
 NUMA_CFLAGS = 
