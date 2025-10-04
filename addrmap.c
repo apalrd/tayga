@@ -33,13 +33,21 @@
  * by protocol, such as multicast, link-local, etc.
  *
  * @param a struct in_addr address to validate
- * @returns ERROR_DROP if invalid, else 0
+ * @returns ERROR_DROP  if invalid,
+ *          ERROR_LOCAL if in link-local block,
+ *          ERROR_NULL  if is 0.0.0.0,
+ *                      else 0
  */
 int validate_ip4_addr(const struct in_addr *a)
 {
 	/* First Octet == 0 */
-	if ((a->s_addr & htonl(0xff000000)) == htonl(0x00000000))
-		return ERROR_DROP;
+	if ((a->s_addr & htonl(0xff000000)) == htonl(0x00000000)) {
+		if (a->s_addr == 0x0) {
+			return ERROR_NULL;
+		} else {
+			return ERROR_DROP;
+		}
+	}
 	/* First octet == 127 */
 	if ((a->s_addr & htonl(0xff000000)) == htonl(0x7f000000))
 		return ERROR_DROP;

@@ -295,10 +295,16 @@ static int config_map(int ln, int arg_count, char **args)
 	}
 	m->map6.prefix_len = prefix6;
 	calc_ip6_mask(&m->map6.mask, NULL, prefix6);
-    int ret = validate_ip4_addr(&m->map4.addr);
+	int ret = validate_ip4_addr(&m->map4.addr);
 	if (ret == ERROR_LOCAL) {
 		slog(LOG_WARNING, "Using link-local address %s in map "
 			"directive, use with caution\n", args[0]);
+	} else if (ret == ERROR_NULL) {
+		if (prefix4 != 0) {
+			slog(LOG_CRIT, "Default map must have prefix length 0,"
+				" got %d\n", prefix4);
+			return ERROR_REJECT;
+		}
 	} else if (ret < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[0]);
