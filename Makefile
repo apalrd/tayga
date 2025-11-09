@@ -4,12 +4,6 @@ CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
 
-#Check for release file / variable
--include release
-ifdef RELEASE
-$(info Using RELEASE $(RELEASE))
-endif
-
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
 exec_prefix ?= $(prefix)
@@ -62,7 +56,6 @@ help:
 	@echo 'INSTALL_PROGRAM - Script to install executable files [$$(INSTALL)]'
 
 # Synthesize the version.h header from Git
-ifndef RELEASE
 define VERSION_HEADER
 #ifndef __TAYGA_VERSION_H__
 #define __TAYGA_VERSION_H__
@@ -73,11 +66,10 @@ define VERSION_HEADER
 
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
-endif
 
 # Compile Tayga
 tayga: $(SOURCES)
-	$(if $(RELEASE),,$(file > version.h,$(VERSION_HEADER)))
+	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Compile Tayga (statically link)
