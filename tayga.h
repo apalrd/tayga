@@ -50,8 +50,6 @@
 #endif
 #include "list.h"
 
-#define _U_ __attribute__((unused))
-
 #ifdef COVERAGE_TESTING
 //for coverage testing
 inline static void dummy()
