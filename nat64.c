@@ -127,7 +127,7 @@ static void log_pkt6(int err, struct pkt *p, const char *msg)
 		type, saddr, daddr, (p->header_len + p->data_len),p->data_proto,msg);
 }
 
-static uint16_t ip_checksum(void *d, int c)
+static uint16_t ip_checksum(void *d, uint32_t c)
 {
 	uint32_t sum = 0xffff;
 	uint16_t *p = d;
@@ -196,7 +196,7 @@ static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 
 static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 		struct in_addr *dest, struct icmp *icmp,
-		uint8_t *data, int data_len)
+		uint8_t *data, uint32_t data_len)
 {
 	struct ip4_icmp header;
 	struct iovec iov[2];
@@ -231,7 +231,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 		struct pkt *orig)
 {
 	struct icmp icmp;
-	int orig_len;
+	uint32_t orig_len;
 
 	/* Don't send ICMP errors in response to ICMP messages other than
 	   echo request */
@@ -350,7 +350,7 @@ static void xlate_4to6_data(struct pkt *p)
 	struct iovec iov[2];
 	int no_frag_hdr = 0;
 	uint16_t off = ntohs(p->ip4->flags_offset);
-	int frag_size;
+	uint32_t frag_size;
 	int ret;
 
 	frag_size = gcfg->ipv6_offlink_mtu;
@@ -765,7 +765,7 @@ void handle_ip4(struct pkt *p)
 
 static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 		struct in6_addr *dest, struct icmp *icmp,
-		uint8_t *data, int data_len)
+		uint8_t *data, uint32_t data_len)
 {
 	struct ip6_icmp header;
 	struct iovec iov[2];
@@ -797,7 +797,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 				struct pkt *orig)
 {
 	struct icmp icmp;
-	int orig_len;
+	uint32_t orig_len;
 
 	/* Don't send ICMP errors in response to ICMP messages other than
 	   echo request */
@@ -836,7 +836,7 @@ static void host_handle_icmp6(struct pkt *p)
 }
 
 static void xlate_header_6to4(struct pkt *p, struct ip4 *ip4,
-		int payload_length, struct cache_entry *dest)
+		int payload_length)
 {
 	ip4->ver_ihl = 0x45;
 	ip4->tos = (ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff;
@@ -975,7 +975,7 @@ static void xlate_6to4_data(struct pkt *p)
 		return;
 	}
 
-	xlate_header_6to4(p, &header.ip4, p->data_len, dest);
+	xlate_header_6to4(p, &header.ip4, p->data_len);
 	--header.ip4.ttl;
 
 	if (xlate_payload_6to4(p, &header.ip4,0) < 0)
@@ -1002,7 +1002,7 @@ static void xlate_6to4_data(struct pkt *p)
 
 static int parse_ip6(struct pkt *p,int em)
 {
-	int hdr_len;
+	uint32_t hdr_len;
 	uint8_t seg_left = 0;
 	uint16_t seg_ptr = sizeof(struct ip6);
 
@@ -1230,7 +1230,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	}
 
 	xlate_header_6to4(&p_em, &header.ip4_em,
-		ntohs(p_em.ip6->payload_length) - p_em.header_len, NULL);
+		ntohs(p_em.ip6->payload_length) - p_em.header_len);
 
 	header.ip4_em.cksum =
 		ip_checksum(&header.ip4_em, sizeof(header.ip4_em));
@@ -1249,7 +1249,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	}
 
 	xlate_header_6to4(p, &header.ip4, sizeof(header.icmp) +
-				sizeof(header.ip4_em) + p_em.data_len, NULL);
+				sizeof(header.ip4_em) + p_em.data_len);
 	--header.ip4.ttl;
 
 	header.ip4.cksum = ip_checksum(&header.ip4, sizeof(header.ip4));
