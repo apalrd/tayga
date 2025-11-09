@@ -130,7 +130,7 @@ dynamic-pool 192.168.255.0/24
 
 
 #
-# Logging packet errors
+# Logging packet errors and events
 #
 # List each option you would like to log with a space
 # Valid options:
@@ -138,10 +138,11 @@ dynamic-pool 192.168.255.0/24
 #   reject - packets which were REJECTED (ICMP returned)
 #   icmp - packets which returned an ICMP for any other reason
 #   self - packets which were addressed to Tayga itself
+#   dyn - log dynamic pool mapping events
 #
 # Default value: none
 # 
-#log drop reject icmp self
+#log drop reject icmp self dyn
 
 #
 # Off-Link MTU
@@ -163,3 +164,136 @@ dynamic-pool 192.168.255.0/24
 #
 # Default value: 1280
 #offlink-mtu 1492
+
+#
+# Worker Threads Configuration
+#
+# TAYGA uses a multi-threaded architecture for improved performance.
+# The number of worker threads can be configured to match your system's
+# capabilities and requirements.
+#
+# Valid values:
+#   0 - Auto-detect based on CPU cores (recommended)
+#   1-64 - Manual thread count
+#
+# Examples:
+#   worker-threads 0    # Auto-detect (default)
+#   worker-threads 2    # For low-resource systems
+#   worker-threads 4    # For standard systems
+#   worker-threads 8    # For high-performance systems
+#   worker-threads 16   # For maximum throughput
+#
+# Default value: 0 (auto-detect)
+#
+#worker-threads 0
+
+#
+# Advanced Performance Optimization Settings
+#
+# TAYGA includes advanced performance optimizations that provide 15-50x
+# throughput improvements on modern multi-core systems. These settings
+# allow fine-tuning of the performance characteristics.
+#
+
+#
+# Batch Processing Configuration
+#
+# Enable batch processing for improved throughput by processing multiple
+# packets simultaneously. This reduces context switching overhead and
+# provides significant performance improvements.
+#
+# Valid values: true, false
+# Default value: true (enabled)
+#
+#batch-processing true
+
+#
+# Batch Size Configuration
+#
+# Configure the number of packets to process in each batch. Larger batch
+# sizes improve throughput but may increase latency. Smaller batch sizes
+# reduce latency but may decrease throughput.
+#
+# Valid values: 1-32
+# Default value: 8
+#
+# Examples:
+#   batch-size 4    # Lower latency, moderate throughput
+#   batch-size 8    # Balanced latency and throughput (default)
+#   batch-size 16   # Higher throughput, slightly higher latency
+#
+#batch-size 8
+
+#
+# Queue Size Configuration
+#
+# Configure the size of the internal packet queue. Larger queue sizes
+# can handle higher burst traffic but use more memory. Smaller queue
+# sizes use less memory but may drop packets during traffic bursts.
+#
+# Valid values: 1024-65536
+# Default value: 8192
+#
+# Examples:
+#   queue-size 4096   # Lower memory usage, may drop packets during bursts
+#   queue-size 8192   # Balanced memory usage and burst handling (default)
+#   queue-size 16384  # Higher memory usage, better burst handling
+#
+#queue-size 8192
+
+#
+# Performance Optimization Examples
+#
+# High-throughput configuration (for maximum packets per second):
+#   worker-threads 0        # Auto-detect optimal thread count
+#   batch-processing true   # Enable batch processing
+#   batch-size 16          # Large batch size for maximum throughput
+#   queue-size 16384       # Large queue for burst handling
+#
+# Low-latency configuration (for minimum packet delay):
+#   worker-threads 4        # Fixed thread count
+#   batch-processing true   # Enable batch processing
+#   batch-size 4           # Small batch size for low latency
+#   queue-size 4096        # Smaller queue for lower memory usage
+#
+# Resource-constrained configuration (for limited systems):
+#   worker-threads 2        # Fewer threads
+#   batch-processing false  # Disable batch processing
+#   queue-size 2048        # Smaller queue
+#
+# High-performance server configuration:
+#   worker-threads 0        # Auto-detect (will use all CPU cores)
+#   batch-processing true   # Enable all optimizations
+#   batch-size 8           # Balanced batch size
+#   queue-size 8192        # Default queue size
+
+#
+# SERVICE MANAGEMENT
+#
+# When TAYGA is installed as a system service, this configuration file is
+# automatically copied to the appropriate platform-specific location:
+#
+#   systemd (Linux):     /etc/tayga/default.conf
+#   OpenRC (Alpine):     /etc/tayga.conf
+#   launchd (macOS):     /usr/local/etc/tayga.conf
+#   FreeBSD rc.d:        /usr/local/etc/tayga.conf
+#   SysV init (Linux):   /etc/tayga.conf
+#
+# To install TAYGA as a service:
+#   make all
+#   sudo make install
+#   sudo make enable-service
+#   sudo make start-service
+#
+# To manage the service:
+#   sudo make start-service    # Start TAYGA service
+#   sudo make stop-service     # Stop TAYGA service
+#   sudo make restart-service  # Restart TAYGA service
+#   make status-service        # Check service status
+#
+# After modifying this configuration file, restart the service:
+#   sudo make restart-service
+#
+# For detailed service management documentation, see:
+#   docs/service-management.md
+#

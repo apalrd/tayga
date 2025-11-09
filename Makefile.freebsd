@@ -1,0 +1,61 @@
+# FreeBSD-compatible Makefile for TAYGA
+# This Makefile is compatible with BSD Make
+
+# Default compiler flags
+CC = gcc
+CFLAGS = -Wall -O2
+LDFLAGS = 
+SOURCES = nat64.c addrmap.c dynamic.c tayga.c conffile.c threading.c freebsd_optimizations.c macos_optimizations.c
+
+# Default installation paths
+prefix = /usr/local
+exec_prefix = $(prefix)
+DESTDIR = 
+sbindir = $(exec_prefix)/sbin
+datarootdir = $(prefix)/share
+mandir = $(datarootdir)/man
+INSTALL_DATA = install -m 644
+INSTALL_PROGRAM = install -m 755
+
+# Check if we're on FreeBSD and adjust flags accordingly
+.if exists(/usr/include/numa.h)
+NUMA_CFLAGS = -DHAVE_NUMA_H
+NUMA_LDFLAGS = -lnuma
+.else
+NUMA_CFLAGS = 
+NUMA_LDFLAGS = 
+.endif
+
+# Main target
+all: tayga
+
+# Generate version.h
+version.h:
+	@echo "#define TAYGA_VERSION \"$(shell git describe --tags --dirty 2>/dev/null || echo 'unknown')\"" > version.h
+	@echo "#define TAYGA_BRANCH \"$(shell git describe --all --dirty 2>/dev/null || echo 'unknown')\"" >> version.h
+	@echo "#define TAYGA_COMMIT \"$(shell git rev-parse HEAD 2>/dev/null || echo 'unknown')\"" >> version.h
+
+# Build tayga
+tayga: version.h $(SOURCES)
+	$(CC) $(CFLAGS) $(NUMA_CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(NUMA_LDFLAGS) -lpthread
+
+# Clean target
+clean:
+	rm -f tayga version.h
+
+# Install target
+install: tayga
+	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/
+	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(mandir)/man8/
+	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(mandir)/man5/
+	$(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(datarootdir)/tayga/
+
+# Uninstall target
+uninstall:
+	rm -f $(DESTDIR)$(sbindir)/tayga
+	rm -f $(DESTDIR)$(mandir)/man8/tayga.8
+	rm -f $(DESTDIR)$(mandir)/man5/tayga.conf.5
+	rm -f $(DESTDIR)$(datarootdir)/tayga/tayga.conf.example
+
+# Phony targets
+.PHONY: all clean install uninstall

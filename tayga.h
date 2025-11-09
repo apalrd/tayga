@@ -16,6 +16,7 @@
  *  GNU General Public License for more details.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <assert.h>
 #include <stdalign.h>
@@ -35,6 +36,20 @@
 #include <syslog.h>
 #include <errno.h>
 #include <time.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <sched.h>
+#ifdef __linux__
+/* NUMA support is optional - check if available */
+#ifdef HAVE_NUMA_H
+#include <numa.h>
+#include <numaif.h>
+#endif
+#elif defined(__APPLE__)
+#include <mach/thread_policy.h>
+#include <mach/thread_act.h>
+#include <mach/mach_init.h>
+#endif
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
@@ -42,6 +57,11 @@
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
+#include <netinet/if_ether.h>
+#include <net/ethernet.h>
+#include <sys/uio.h>
+#elif defined(__APPLE__)
+#include <net/if.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <sys/uio.h>
@@ -65,6 +85,60 @@ inline static void dummy()
 #ifdef __linux__
 #define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->flags = 0; (_pi)->proto = htons(_af); }
 #define	TUN_GET_PROTO(_pi)			ntohs((_pi)->proto)
+
+/* Linux-specific optimizations */
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/timerfd.h>
+#include <sys/signalfd.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <linux/if_tun.h>
+#include <linux/if_ether.h>
+
+/* Linux epoll-based I/O multiplexing */
+struct linux_epoll {
+	int epfd;
+	struct epoll_event *events;
+	int max_events;
+};
+
+/* Linux io_uring for high-performance async I/O */
+struct linux_io_uring {
+	int ring_fd;
+	struct io_uring *ring;
+	struct io_uring_sqe *sqe;
+	struct io_uring_cqe *cqe;
+};
+
+/* Linux CPU frequency governor optimization */
+struct linux_cpu_governor {
+	char *governor;
+	int *cpu_freqs;
+	int num_cpus;
+	int performance_mode;
+};
+
+/* Linux network stack optimization */
+struct linux_net_optimization {
+	int tcp_congestion_control;
+	int tcp_rmem[3];
+	int tcp_wmem[3];
+	int net_core_rmem_max;
+	int net_core_wmem_max;
+	int net_core_netdev_max_backlog;
+	int net_core_netdev_budget;
+};
+
+/* Linux memory optimization */
+struct linux_memory_optimization {
+	int huge_pages;
+	int transparent_huge_pages;
+	int memory_overcommit;
+	int swappiness;
+	int dirty_ratio;
+	int dirty_background_ratio;
+};
 #endif
 
 #ifdef __FreeBSD__
@@ -80,6 +154,70 @@ struct tun_pi {
 #define	ETH_P_IPV6 AF_INET6
 #define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->proto = htonl(_af); }
 #define	TUN_GET_PROTO(_pi)			ntohl((_pi)->proto)
+
+/* FreeBSD-specific optimizations */
+#include <sys/event.h>
+#include <sys/sysctl.h>
+
+/* FreeBSD kqueue-based I/O multiplexing */
+struct freebsd_kqueue {
+	int kq_fd;
+	struct kevent *events;
+	int max_events;
+};
+
+/* FreeBSD async operations (simplified for user-space) */
+struct freebsd_async_queue {
+	pthread_t worker_thread;
+	pthread_mutex_t queue_mutex;
+	pthread_cond_t queue_cond;
+	void **task_queue;
+	size_t queue_size;
+	size_t queue_head;
+	size_t queue_tail;
+};
+
+/* FreeBSD packet buffer optimization */
+struct freebsd_packet_pool {
+	uint8_t **packet_buffers;
+	size_t pool_size;
+	size_t used_count;
+	size_t buffer_size;
+};
+
+/* FreeBSD sysctl tuning */
+struct freebsd_sysctl_tuning {
+	int tcp_sendspace;
+	int tcp_recvspace;
+	int maxfiles;
+	int maxfilesperproc;
+};
+#endif
+
+#ifdef __APPLE__
+#define s6_addr8  __u6_addr.__u6_addr8
+#define s6_addr16 __u6_addr.__u6_addr16
+#define s6_addr32 __u6_addr.__u6_addr32
+
+struct tun_pi {
+	uint16_t flags;
+	uint16_t proto;
+};
+
+#define ETH_P_IP 0x0800
+#define ETH_P_IPV6 0x86DD
+#define	TUN_SET_PROTO(_pi, _af)			{ (_pi)->flags = 0; (_pi)->proto = htons(_af); }
+#define	TUN_GET_PROTO(_pi)			ntohs((_pi)->proto)
+
+/* macOS-specific optimizations */
+struct macos_optimization {
+	int enable_cpu_affinity;
+	int enable_memory_optimization;
+	int enable_network_optimization;
+};
+
+/* macOS function prototypes */
+int setup_macos_optimizations(void);
 #endif
 
 /* Configuration knobs */
@@ -278,6 +416,77 @@ enum udp_cksum_mode {
 	UDP_CKSUM_FWD
 };
 
+/// Thread pool configuration
+struct thread_pool {
+	pthread_t *threads;
+	int num_threads;
+	atomic_int shutdown;
+	atomic_int active_workers;
+};
+
+/// Lock-free packet queue (ring buffer)
+struct packet_queue {
+	struct thread_pkt *packets;
+	atomic_size_t head;
+	atomic_size_t tail;
+	atomic_size_t count;
+	size_t size;
+	pthread_cond_t cond;
+	pthread_mutex_t cond_mutex;  // Only for condition variable, not queue access
+};
+
+/// Thread-safe packet structure
+struct thread_pkt {
+	struct pkt pkt;
+	uint8_t *data_copy;
+	size_t data_len;
+	struct tun_pi pi;
+};
+
+/// Memory pool for packet data
+struct packet_mem_pool {
+	uint8_t *pool;
+	size_t pool_size;
+	size_t chunk_size;
+	atomic_size_t next_free;
+	pthread_mutex_t mutex;
+};
+
+/// Batch packet processing structure
+struct packet_batch {
+	struct thread_pkt packets[16];  // Process up to 16 packets at once
+	size_t count;
+};
+
+/// NUMA-aware thread configuration
+struct numa_config {
+	int cpu_id;
+	int numa_node;
+#ifdef __linux__
+	cpu_set_t cpuset;
+#elif defined(__APPLE__)
+	/* macOS doesn't have cpu_set_t, use thread affinity policy instead */
+	thread_affinity_policy_data_t affinity_policy;
+#endif
+};
+
+/// Zero-copy packet structure
+struct zero_copy_pkt {
+	uint8_t *direct_buffer;
+	size_t offset;
+	size_t length;
+	struct tun_pi pi;
+};
+
+/// Per-thread memory pool
+struct per_thread_mem_pool {
+	uint8_t *pool;
+	size_t pool_size;
+	size_t chunk_size;
+	atomic_size_t next_free;
+	// No mutex needed - per-thread access only
+};
+
 /// Configuration structure
 struct config {
 	char tundev[IFNAMSIZ];
@@ -315,14 +524,65 @@ struct config {
 	int wkpf_strict;
 	int log_opts;
 	enum udp_cksum_mode udp_cksum_mode;
+
+	/* Threading support */
+	struct thread_pool thread_pool;
+	struct packet_queue packet_queue;
+	struct packet_mem_pool mem_pool;
+	pthread_mutex_t cache_mutex;
+	pthread_mutex_t map_mutex;
+	pthread_mutex_t dynamic_mutex;
+	int num_worker_threads;
+	
+	/* Performance optimization features */
+	int enable_batch_processing;
+	int enable_numa_optimization;
+	int enable_zero_copy;
+	int enable_vectorization;
+	int batch_size;
+	int queue_size;
+	struct per_thread_mem_pool *per_thread_pools;
+
+#ifdef __linux__
+	/* Linux-specific optimizations */
+	struct linux_epoll epoll;
+	struct linux_io_uring io_uring;
+	struct linux_cpu_governor cpu_governor;
+	struct linux_net_optimization net_optimization;
+	struct linux_memory_optimization memory_optimization;
+	int enable_epoll_io;
+	int enable_io_uring;
+	int enable_cpu_governor;
+	int enable_net_optimization;
+	int enable_memory_optimization;
+#endif
+
+#ifdef __FreeBSD__
+	/* FreeBSD-specific optimizations */
+	struct freebsd_kqueue kqueue;
+	struct freebsd_async_queue async_queue;
+	struct freebsd_packet_pool packet_pool;
+	struct freebsd_sysctl_tuning sysctl_tuning;
+	int enable_kqueue_io;
+	int enable_async_queue;
+	int enable_packet_optimization;
+	int enable_sysctl_tuning;
+#endif
+
+#ifdef __APPLE__
+	/* macOS-specific optimizations */
+	struct macos_optimization macos_optimization;
+	int enable_macos_optimizations;
+#endif
 };
 
 /// Logging flags
 enum {
 	LOG_OPT_REJECT = (1<<0),	//Packet was rejected
-	LOG_OPT_DROP = 	 (1<<1),	//Packet was dropped
-	LOG_OPT_ICMP = 	 (1<<2),	//Packet kicked back an ICMP for any reason
-	LOG_OPT_SELF = 	 (1<<3),	//Packet was destined to ourselves
+	LOG_OPT_DROP   = (1<<1),	//Packet was dropped
+	LOG_OPT_ICMP   = (1<<2),	//Packet kicked back an ICMP for any reason
+	LOG_OPT_SELF   = (1<<3),	//Packet was destined to ourselves
+	LOG_OPT_DYN    = (1<<4),	//Events involving dynamic pool
 	LOG_OPT_CONFIG = (1<<15),	//Log has been configured (used in conf file validation)
 };
 
@@ -394,3 +654,84 @@ void handle_ip6(struct pkt *p);
 /* tayga.c */
 void slog(int priority, const char *format, ...);
 void read_random_bytes(void *d, int len);
+void tun_setup(int do_mktun, int do_rmtun);
+
+/* threading.c */
+int get_optimal_thread_count(int configured_threads);
+int thread_pool_init(struct thread_pool *pool, int num_threads);
+void thread_pool_destroy(struct thread_pool *pool);
+int packet_queue_init(struct packet_queue *queue, size_t size);
+void packet_queue_destroy(struct packet_queue *queue);
+int packet_queue_enqueue(struct packet_queue *queue, const struct thread_pkt *pkt);
+int packet_queue_dequeue(struct packet_queue *queue, struct thread_pkt *pkt);
+int packet_queue_dequeue_batch(struct packet_queue *queue, struct packet_batch *batch);
+void *worker_thread(void *arg);
+int process_packet_threaded(const struct thread_pkt *thread_pkt);
+int process_packet_batch(const struct packet_batch *batch);
+int packet_mem_pool_init(struct packet_mem_pool *pool, size_t pool_size, size_t chunk_size);
+void packet_mem_pool_destroy(struct packet_mem_pool *pool);
+uint8_t *packet_mem_pool_alloc(struct packet_mem_pool *pool, size_t size);
+void packet_mem_pool_free(struct packet_mem_pool *pool, uint8_t *ptr);
+
+/* Performance optimization functions */
+int per_thread_mem_pool_init(struct per_thread_mem_pool *pool, size_t pool_size, size_t chunk_size);
+void per_thread_mem_pool_destroy(struct per_thread_mem_pool *pool);
+uint8_t *per_thread_mem_pool_alloc(struct per_thread_mem_pool *pool, size_t size);
+void per_thread_mem_pool_free(struct per_thread_mem_pool *pool, uint8_t *ptr);
+#ifdef HAVE_NUMA_H
+int setup_numa_affinity(int thread_id, int num_threads);
+#endif
+int setup_cpu_affinity(pthread_t thread, int cpu_id);
+uint32_t calculate_checksum_vectorized(const uint8_t *data, size_t len);
+int zero_copy_packet_init(struct zero_copy_pkt *pkt, uint8_t *buffer, size_t offset, size_t len);
+
+#ifdef __linux__
+/* Linux-specific optimizations */
+int linux_epoll_init(struct linux_epoll *ep, int max_events);
+void linux_epoll_destroy(struct linux_epoll *ep);
+int linux_epoll_add_fd(struct linux_epoll *ep, int fd, uint32_t events);
+int linux_epoll_wait(struct linux_epoll *ep, int timeout_ms);
+
+int linux_io_uring_init(struct linux_io_uring *ring, int queue_depth);
+void linux_io_uring_destroy(struct linux_io_uring *ring);
+int linux_io_uring_submit(struct linux_io_uring *ring);
+int linux_io_uring_wait(struct linux_io_uring *ring, int timeout_ms);
+
+int linux_cpu_governor_init(struct linux_cpu_governor *gov);
+void linux_cpu_governor_destroy(struct linux_cpu_governor *gov);
+int linux_cpu_governor_set_performance(struct linux_cpu_governor *gov);
+int linux_cpu_governor_restore(struct linux_cpu_governor *gov);
+
+int linux_net_optimization_init(struct linux_net_optimization *net);
+void linux_net_optimization_apply(struct linux_net_optimization *net);
+void linux_net_optimization_restore(struct linux_net_optimization *net);
+
+int linux_memory_optimization_init(struct linux_memory_optimization *mem);
+void linux_memory_optimization_apply(struct linux_memory_optimization *mem);
+void linux_memory_optimization_restore(struct linux_memory_optimization *mem);
+
+int setup_linux_optimizations(void);
+#endif
+
+#ifdef __FreeBSD__
+/* FreeBSD-specific optimizations */
+int freebsd_kqueue_init(struct freebsd_kqueue *kq, int max_events);
+void freebsd_kqueue_destroy(struct freebsd_kqueue *kq);
+int freebsd_kqueue_add_fd(struct freebsd_kqueue *kq, int fd, int filter, int flags);
+int freebsd_kqueue_wait(struct freebsd_kqueue *kq, struct kevent *events, int timeout_ms);
+
+int freebsd_async_queue_init(struct freebsd_async_queue *aq, size_t queue_size);
+void freebsd_async_queue_destroy(struct freebsd_async_queue *aq);
+int freebsd_async_queue_enqueue(struct freebsd_async_queue *aq, void *task);
+
+int freebsd_packet_pool_init(struct freebsd_packet_pool *pool, size_t pool_size, size_t buffer_size);
+void freebsd_packet_pool_destroy(struct freebsd_packet_pool *pool);
+uint8_t *freebsd_packet_pool_alloc(struct freebsd_packet_pool *pool);
+void freebsd_packet_pool_free(struct freebsd_packet_pool *pool, uint8_t *buffer);
+
+int freebsd_sysctl_tuning_init(struct freebsd_sysctl_tuning *tuning);
+void freebsd_sysctl_tuning_apply(struct freebsd_sysctl_tuning *tuning);
+void freebsd_sysctl_tuning_restore(struct freebsd_sysctl_tuning *tuning);
+
+int setup_freebsd_optimizations(void);
+#endif

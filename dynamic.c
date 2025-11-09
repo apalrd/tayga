@@ -20,6 +20,10 @@
 #include <inttypes.h>
 #include <limits.h>
 
+/* MAP_FILE might be defined by sys/mman.h, so we need to handle the conflict */
+#ifdef MAP_FILE
+#undef MAP_FILE
+#endif
 #define MAP_FILE	"dynamic.map"
 #define TMP_MAP_FILE	"dynamic.map~~"
 
@@ -99,7 +103,10 @@ static void print_dyn_change(char *str, struct map_dynamic *d)
 
 	inet_ntop(AF_INET, &d->map4.addr, addrbuf4, sizeof(addrbuf4));
 	inet_ntop(AF_INET6, &d->map6.addr, addrbuf6, sizeof(addrbuf6));
-	slog(LOG_DEBUG, "%s pool address %s (%s)\n", str, addrbuf4, addrbuf6);
+	/* Log dynamic assignment changes */
+	if(gcfg->log_opts & LOG_OPT_DYN) {
+		slog(LOG_INFO, "DYN: [%s] [%s]->[%s]\n",str,addrbuf4, addrbuf6);
+	}
 }
 
 struct map6 *assign_dynamic(const struct in6_addr *addr6)
@@ -116,10 +123,12 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 	if (!pool)
 		return NULL;
 
+	pthread_mutex_lock(&gcfg->dynamic_mutex);
+
 	list_for_each(entry, &pool->dormant_list) {
 		d = list_entry(entry, struct map_dynamic, list);
 		if (IN6_ARE_ADDR_EQUAL(addr6, &d->map6.addr)) {
-			print_dyn_change("reactivated dormant", d);
+			print_dyn_change("reactivated", d);
 			goto activate;
 		}
 	}
@@ -152,22 +161,25 @@ struct map6 *assign_dynamic(const struct in6_addr *addr6)
 			d = alloc_map_dynamic(addr6, &addr4, f);
 			if (!d)
 				return NULL;
-			print_dyn_change("assigned new", d);
+			print_dyn_change("assigned", d);
 			gcfg->map_write_pending = 1;
 			goto activate;
 		}
 	}
 
-	if (list_empty(&pool->dormant_list))
+	if (list_empty(&pool->dormant_list)) {
+		pthread_mutex_unlock(&gcfg->dynamic_mutex);
 		return NULL;
+	}
 
 	d = list_entry(pool->dormant_list.prev, struct map_dynamic, list);
 	d->map6.addr = *addr6;
-	print_dyn_change("reassigned dormant", d);
+	print_dyn_change("reassigned", d);
 	gcfg->map_write_pending = 1;
 
 activate:
 	move_to_mapped(d, pool);
+	pthread_mutex_unlock(&gcfg->dynamic_mutex);
 	return &d->map6;
 }
 
@@ -296,6 +308,7 @@ malformed:
 		d = list_entry(entry, struct map_dynamic, list);
 		if (d->last_use > last_use)
 			last_use = d->last_use;
+		print_dyn_change("loaded",d);
 		++count;
 	}
 	slog(LOG_INFO, "Loaded %d dynamic %s from %s/%s\n", count,
@@ -348,9 +361,9 @@ static void write_to_file(struct dynamic_pool *pool)
 		d = list_entry(entry, struct map_dynamic, list);
 		inet_ntop(AF_INET, &d->map4.addr, addrbuf4, sizeof(addrbuf4));
 		inet_ntop(AF_INET6, &d->map6.addr, addrbuf6, sizeof(addrbuf6));
-		fprintf(out, "%s\t%s\t%" PRId64 "\n", addrbuf4, addrbuf6,
-				d->cache_entry ?
-					d->cache_entry->last_use : d->last_use);
+		fprintf(out, "%s\t%s\t%ld\n", addrbuf4, addrbuf6,
+				(long)(d->cache_entry ?
+					d->cache_entry->last_use : d->last_use));
 		entry = entry->next;
 	}
 	fclose(out);
@@ -369,12 +382,14 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 	struct map_dynamic *d;
 	struct free_addr *f;
 
+	pthread_mutex_lock(&gcfg->dynamic_mutex);
+
 	list_for_each_safe(entry, next, &pool->mapped_list) {
 		d = list_entry(entry, struct map_dynamic, list);
 		if (d->cache_entry)
 			continue;
 		if (d->last_use + gcfg->dyn_min_lease < now) {
-			print_dyn_change("unmapped dormant", d);
+			print_dyn_change("dormant", d);
 			move_to_dormant(d, pool);
 		}
 	}
@@ -399,4 +414,6 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 			gcfg->map_write_pending = 0;
 		}
 	}
+
+	pthread_mutex_unlock(&gcfg->dynamic_mutex);
 }

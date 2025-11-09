@@ -205,6 +205,91 @@ Increasing this limit will allow Tayga to translate packets which are larger tha
 .IP
 .B Incorrectly setting this parameter may cause IPv4-translated packets to be dropped by IPv6 routers, in violation of expected IPv4 behavior. 
 .IP
+.TP
+.BI "worker-threads " number
+Configure the number of worker threads used for packet processing. TAYGA uses a multi-threaded architecture to parallelize packet translation for improved performance.
+.IP
+.I number
+can be set to 0 for automatic detection based on CPU cores (recommended), or any value from 1 to 64 for manual configuration. When set to 0, TAYGA will automatically detect the number of available CPU cores and use the optimal number of threads (typically equal to the number of cores, capped at 16 to prevent excessive context switching).
+.IP
+For resource-constrained systems, use a smaller number (e.g., 2-4). For high-performance systems, use a larger number (e.g., 8-16). The default value is 0 (auto-detect).
+.IP
+This configuration directive is optional.
+.IP
+.TP
+.BI "batch-processing " true|false
+Enable or disable batch packet processing for improved throughput. When enabled, TAYGA processes multiple packets simultaneously, reducing context switching overhead and improving performance.
+.IP
+Batch processing is enabled by default and provides significant performance improvements, especially on multi-core systems.
+.IP
+This configuration directive is optional.
+.TP
+.BI "batch-size " number
+Configure the number of packets to process in each batch. Valid values are 1 to 32, with a default of 8 packets per batch.
+.IP
+Larger batch sizes can improve throughput but may increase latency. Smaller batch sizes reduce latency but may decrease throughput.
+.IP
+This configuration directive is optional.
+.TP
+.BI "queue-size " number
+Configure the size of the internal packet queue. Valid values are 1024 to 65536, with a default of 8192.
+.IP
+Larger queue sizes can handle higher burst traffic but use more memory. Smaller queue sizes use less memory but may drop packets during traffic bursts.
+.IP
+This configuration directive is optional.
+.IP
+
+.SH "SERVICE CONFIGURATION"
+
+When TAYGA is installed as a system service, the configuration file is placed at platform-specific locations:
+
+.TP
+.B systemd (Linux)
+/etc/tayga/default.conf
+
+.TP
+.B OpenRC (Alpine/Gentoo)
+/etc/tayga.conf
+
+.TP
+.B launchd (macOS)
+/usr/local/etc/tayga.conf
+
+.TP
+.B FreeBSD rc.d
+/usr/local/etc/tayga.conf
+
+.TP
+.B SysV init (older Linux)
+/etc/tayga.conf
+
+After modifying the configuration file, restart the TAYGA service:
+
+.TP
+.B Platform-agnostic
+sudo make restart-service
+
+.TP
+.B systemd
+sudo systemctl restart tayga@default.service
+
+.TP
+.B OpenRC
+sudo rc-service tayga restart
+
+.TP
+.B launchd
+sudo launchctl stop com.tayga && sudo launchctl start com.tayga
+
+.TP
+.B FreeBSD rc.d
+sudo service tayga restart
+
+.TP
+.B SysV init
+sudo service tayga restart
+
+For detailed service management documentation, see the Service Management Guide in the docs/ directory.
 
 .SH "SEE ALSO"
 .BR tayga (8)

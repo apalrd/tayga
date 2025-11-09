@@ -112,6 +112,7 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 
 static int config_ipv4_addr(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: duplicate ipv4-addr directive on "
 				"line %d\n", ln);
@@ -136,6 +137,7 @@ static int config_ipv4_addr(int ln, int arg_count, char **args)
 
 static int config_ipv6_addr(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->local_addr6.s6_addr[0]) {
 		slog(LOG_CRIT, "Error: duplicate ipv6-addr directive on line "
 				"%d\n", ln);
@@ -156,6 +158,7 @@ static int config_ipv6_addr(int ln, int arg_count, char **args)
 
 static int config_prefix(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct map_static *m;
 	struct map6 *m6;
 
@@ -199,6 +202,7 @@ static int config_prefix(int ln, int arg_count, char **args)
 
 static int config_wkpf_strict(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (!strcasecmp(args[0], "true") ||
 	    !strcasecmp(args[0], "on") ||
 	    !strcasecmp(args[0], "yes") ||
@@ -218,6 +222,7 @@ static int config_wkpf_strict(int ln, int arg_count, char **args)
 
 static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	/* Drop, or some variant of that */
 	if (!strncasecmp(args[0], "dr",2)){
 		gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
@@ -236,6 +241,7 @@ static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 
 static int config_tun_device(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->tundev[0]) {
 		slog(LOG_CRIT, "Error: duplicate tun-device directive on line "
 				"%d\n", ln);
@@ -252,6 +258,7 @@ static int config_tun_device(int ln, int arg_count, char **args)
 
 static int config_map(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct map_static *m;
 	struct map4 *m4;
 	struct map6 *m6;
@@ -324,6 +331,7 @@ static int config_map(int ln, int arg_count, char **args)
 
 static int config_dynamic_pool(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	struct dynamic_pool *pool;
 	struct map4 *m4;
 
@@ -384,6 +392,7 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 
 static int config_data_dir(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	if (gcfg->data_dir[0]) {
 		slog(LOG_CRIT, "Error: duplicate data-dir directive on line "
 				"%d\n", ln);
@@ -399,6 +408,8 @@ static int config_data_dir(int ln, int arg_count, char **args)
 
 static int config_strict_fh(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
+	(void)args;
 	slog(LOG_WARNING,"Warning: strict-frag-hdr deprecated on line %d\n",ln);
 	return ERROR_NONE;
 }
@@ -420,6 +431,7 @@ static int config_log(int ln, int arg_count, char **args)
 		else if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
 		else if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
 		else if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
+		else if(!strcasecmp(args[i],"dyn")) gcfg->log_opts |= LOG_OPT_DYN;
 		else {
 			slog(LOG_CRIT, "Error: invalid value for log on line %d\n",ln);
 			return ERROR_REJECT;
@@ -430,6 +442,7 @@ static int config_log(int ln, int arg_count, char **args)
 
 static int config_offlink_mtu(int ln, int arg_count, char **args)
 {
+	(void)arg_count;
 	/* Offlink MTU alreadys et */
 	if (gcfg->ipv6_offlink_mtu) {
 		slog(LOG_CRIT, "Error: duplicate offlink-mtu directive on "
@@ -457,6 +470,222 @@ static int config_offlink_mtu(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_worker_threads(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int threads;
+	
+	if (gcfg->num_worker_threads != 0) {
+		slog(LOG_CRIT, "Error: duplicate worker-threads directive on "
+				"line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	threads = atoi(args[0]);
+	if (threads < 0) {
+		slog(LOG_CRIT, "Error: worker-threads must be >= 0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	if (threads > 64) {
+		slog(LOG_CRIT, "Error: worker-threads %d is too large, maximum 64 on line %d\n", 
+			threads, ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->num_worker_threads = threads;
+	slog(LOG_INFO, "Worker threads configured to %d (0 = auto-detect)\n", threads);
+	return ERROR_NONE;
+}
+
+static int config_batch_processing(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	
+	if (!strcasecmp(args[0], "true") || !strcasecmp(args[0], "on") || 
+	    !strcasecmp(args[0], "yes") || !strcasecmp(args[0], "1")) {
+		gcfg->enable_batch_processing = 1;
+	} else if (!strcasecmp(args[0], "false") || !strcasecmp(args[0], "off") || 
+	           !strcasecmp(args[0], "no") || !strcasecmp(args[0], "0")) {
+		gcfg->enable_batch_processing = 0;
+	} else {
+		slog(LOG_CRIT, "Error: batch-processing must be true/false on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	slog(LOG_INFO, "Batch processing %s\n", gcfg->enable_batch_processing ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_batch_size(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int size;
+	
+	size = atoi(args[0]);
+	if (size < 1 || size > 32) {
+		slog(LOG_CRIT, "Error: batch-size must be between 1 and 32 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->batch_size = size;
+	slog(LOG_INFO, "Batch size configured to %d\n", size);
+	return ERROR_NONE;
+}
+
+static int config_queue_size(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	int size;
+	
+	size = atoi(args[0]);
+	if (size < 1024 || size > 65536) {
+		slog(LOG_CRIT, "Error: queue-size must be between 1024 and 65536 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	
+	gcfg->queue_size = size;
+	slog(LOG_INFO, "Queue size configured to %d\n", size);
+	return ERROR_NONE;
+}
+
+#ifdef __linux__
+static int config_epoll_io(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_epoll_io = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_epoll_io = 0;
+	} else {
+		slog(LOG_CRIT, "Error: epoll-io must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux epoll I/O %s\n", gcfg->enable_epoll_io ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_io_uring(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_io_uring = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_io_uring = 0;
+	} else {
+		slog(LOG_CRIT, "Error: io-uring must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux io_uring %s\n", gcfg->enable_io_uring ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_cpu_governor(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_cpu_governor = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_cpu_governor = 0;
+	} else {
+		slog(LOG_CRIT, "Error: cpu-governor must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux CPU governor optimization %s\n", gcfg->enable_cpu_governor ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_net_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_net_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_net_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: net-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux network optimization %s\n", gcfg->enable_net_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_memory_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_memory_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_memory_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: memory-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "Linux memory optimization %s\n", gcfg->enable_memory_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+#endif
+
+#ifdef __FreeBSD__
+static int config_kqueue_io(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_kqueue_io = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_kqueue_io = 0;
+	} else {
+		slog(LOG_CRIT, "Error: kqueue-io must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD kqueue I/O %s\n", gcfg->enable_kqueue_io ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_async_queue(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_async_queue = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_async_queue = 0;
+	} else {
+		slog(LOG_CRIT, "Error: async-queue must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD async queue %s\n", gcfg->enable_async_queue ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_packet_optimization(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_packet_optimization = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_packet_optimization = 0;
+	} else {
+		slog(LOG_CRIT, "Error: packet-optimization must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD packet optimization %s\n", gcfg->enable_packet_optimization ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+
+static int config_sysctl_tuning(int ln, int arg_count, char **args)
+{
+	(void)arg_count;
+	if (strcmp(args[0], "true") == 0 || strcmp(args[0], "yes") == 0 || strcmp(args[0], "1") == 0) {
+		gcfg->enable_sysctl_tuning = 1;
+	} else if (strcmp(args[0], "false") == 0 || strcmp(args[0], "no") == 0 || strcmp(args[0], "0") == 0) {
+		gcfg->enable_sysctl_tuning = 0;
+	} else {
+		slog(LOG_CRIT, "Error: sysctl-tuning must be true/false, yes/no, or 1/0 on line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	slog(LOG_INFO, "FreeBSD sysctl tuning %s\n", gcfg->enable_sysctl_tuning ? "enabled" : "disabled");
+	return ERROR_NONE;
+}
+#endif
 
 struct {
 	/* Long name */
@@ -468,7 +697,7 @@ struct {
 } config_directives[] = {
 	{ "ipv4-addr", 		config_ipv4_addr, 		1 },
 	{ "ipv6-addr", 		config_ipv6_addr, 		1 },
-	{ "prefix", 		config_prefix, 			1 },
+	{ "prefix", 		config_prefix, 			2 },
 	{ "wkpf-strict", 	config_wkpf_strict, 	1 },
 	{ "udp-cksum-mode", config_udp_cksum_mode, 	1 },
 	{ "tun-device", 	config_tun_device, 		1 },
@@ -478,6 +707,23 @@ struct {
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
+	{ "worker-threads",	config_worker_threads,	1 },
+	{ "batch-processing",	config_batch_processing,	1 },
+	{ "batch-size",		config_batch_size,		1 },
+	{ "queue-size",		config_queue_size,		1 },
+#ifdef __linux__
+	{ "epoll-io",		config_epoll_io,		1 },
+	{ "io-uring",		config_io_uring,		1 },
+	{ "cpu-governor",	config_cpu_governor,		1 },
+	{ "net-optimization",	config_net_optimization,	1 },
+	{ "memory-optimization",	config_memory_optimization,	1 },
+#endif
+#ifdef __FreeBSD__
+	{ "kqueue-io",		config_kqueue_io,		1 },
+	{ "async-queue",	config_async_queue,		1 },
+	{ "packet-optimization",	config_packet_optimization,	1 },
+	{ "sysctl-tuning",	config_sysctl_tuning,		1 },
+#endif
 	{ NULL, NULL, 0 }
 };
 
@@ -502,6 +748,42 @@ int config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	gcfg->num_worker_threads = 0; /* 0 = auto-detect based on CPU cores */
+	
+	/* Performance optimization defaults */
+	gcfg->enable_batch_processing = 1;  /* Enable batch processing by default */
+	gcfg->enable_numa_optimization = 1; /* Enable NUMA optimization by default */
+	gcfg->enable_zero_copy = 0;         /* Disable zero-copy by default (complex) */
+	gcfg->enable_vectorization = 1;     /* Enable vectorization by default */
+	gcfg->batch_size = 8;               /* Default batch size */
+	gcfg->queue_size = 8192;            /* Larger queue size for better throughput */
+	gcfg->per_thread_pools = NULL;      /* Will be allocated during init */
+
+#ifdef __linux__
+	/* Linux-specific optimization defaults */
+	gcfg->enable_epoll_io = 1;          /* Enable epoll I/O by default on Linux */
+	gcfg->enable_io_uring = 0;          /* Disable io_uring by default (requires liburing) */
+	gcfg->enable_cpu_governor = 1;      /* Enable CPU governor optimization by default on Linux */
+	gcfg->enable_net_optimization = 1;  /* Enable network optimization by default on Linux */
+	gcfg->enable_memory_optimization = 1; /* Enable memory optimization by default on Linux */
+#endif
+
+#ifdef __FreeBSD__
+	/* FreeBSD-specific optimization defaults */
+	gcfg->enable_kqueue_io = 1;         /* Enable kqueue I/O by default on FreeBSD */
+	gcfg->enable_async_queue = 1;       /* Enable async queue by default on FreeBSD */
+	gcfg->enable_packet_optimization = 1; /* Enable packet optimization by default on FreeBSD */
+	gcfg->enable_sysctl_tuning = 1;     /* Enable sysctl tuning by default on FreeBSD */
+#endif
+
+#ifdef __APPLE__
+	/* macOS-specific optimization defaults */
+	gcfg->enable_macos_optimizations = 1; /* Enable macOS optimizations by default */
+	gcfg->macos_optimization.enable_cpu_affinity = 1;
+	gcfg->macos_optimization.enable_memory_optimization = 1;
+	gcfg->macos_optimization.enable_network_optimization = 1;
+#endif
+	
 	return ERROR_NONE;
 }
 
