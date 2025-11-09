@@ -30,11 +30,6 @@ time_t now;
 static const char *progname;
 static const char *progname;
 static int signalfds[2];
-static enum {
-	LOG_TO_SYSLOG = 0,
-	LOG_TO_STDOUT = 1,
-	LOG_TO_JOURNAL = 2,
-} logger_output;
 
 void usage(int code) {
 	fprintf(stderr,
@@ -68,33 +63,6 @@ void die(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
 	vfprintf(stderr, format, ap);
-	va_end(ap);
-	putc('\n', stderr);
-	exit(1);
-}
-
-/* Log the message to the configured logger */
-void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
-{
-	va_list ap;
-	(void)file;
-	(void)line;
-	(void)func;
-
-	va_start(ap, format);
-	switch (logger_output) {
-		case LOG_TO_STDOUT:
-			vprintf(format, ap);
-			break;
-		case LOG_TO_SYSLOG:
-			vsyslog(priority, format, ap);
-			break;
-		case LOG_TO_JOURNAL:
-			journal_printv_with_location(priority, file, line, func, format, ap);
-			break;
-		default:
-			die("Invalid logger_output value %d", logger_output);
-	}
 	va_end(ap);
 	putc('\n', stderr);
 	exit(1);
@@ -483,9 +451,6 @@ int main(int argc, char **argv)
 	int do_rmtun = 0;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
-
-	progname = argv[0];
-
 	progname = argv[0];
 
 	/* Init config structure */
@@ -513,9 +478,10 @@ int main(int argc, char **argv)
 		{ 0, 0, 0, 0 }
 	};
 
+	/* Arg parsing loop */
 	for (;;) {
 		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
-		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
+		/* Reached last argument, terminate loop */
 		if (c == -1)
 			break;
 		switch (c) {
@@ -535,13 +501,13 @@ int main(int argc, char **argv)
 					do_rmtun = 1;
 					break;
 				case 2: /* --syslog */
-					logger_output = LOG_TO_SYSLOG;
+					gcfg->log_out = LOG_TO_SYSLOG;
 					break;
 				case 3: /* --stdout */
-					logger_output = LOG_TO_STDOUT;
+					gcfg->log_out = LOG_TO_STDOUT;
 					break;
 				case 4: /* --journal */
-					logger_output = LOG_TO_JOURNAL;
+					gcfg->log_out = LOG_TO_JOURNAL;
 					break;
 				default:
 					usage(1);
@@ -551,7 +517,7 @@ int main(int argc, char **argv)
 			conffile = optarg;
 			break;
 		case 'd':
-			logger_output = LOG_TO_STDOUT;
+			gcfg->log_out = LOG_TO_STDOUT;
 			detach = 0;
 			break;
 		case 'n':
@@ -571,7 +537,6 @@ int main(int argc, char **argv)
 			break;
 		default:
 			die("Try `%s --help' for more information (got %c)", argv[0],c);
-			die("Try `%s --help' for more information (got %c)", argv[0],c);
 			exit(1);
 		}
 	}
@@ -584,20 +549,16 @@ int main(int argc, char **argv)
 
 	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {
-		logger_output = LOG_TO_STDOUT;
+		gcfg->log_out = LOG_TO_STDOUT;
 		if (user) {
-			die("Error: cannot specify -u or --user "
-					"with mktun/rmtun operation");
 			die("Error: cannot specify -u or --user "
 					"with mktun/rmtun operation");
 		}
 		if (group) {
 			die("Error: cannot specify -g or --group "
-			die("Error: cannot specify -g or --group "
 					"with mktun/rmtun operation\n");
 		}
 		if (do_chroot) {
-			die("Error: cannot specify -r or --chroot "
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
@@ -606,9 +567,9 @@ int main(int argc, char **argv)
 	}
 
 	/* Setup logging */
-	if (logger_output == LOG_TO_SYSLOG) {
+	if (gcfg->log_out == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (logger_output == LOG_TO_JOURNAL) {
+	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
 		int r = journal_init("tayga");
 		if (r < 0)
 			die("Error: Unable to initialize journal: %s\n", strerror(-r));
@@ -779,16 +740,13 @@ int main(int argc, char **argv)
 	pollfds[1].fd = gcfg->tun_fd;
 	pollfds[1].events = POLLIN;
 
-	int r = notify("READY=1");
-	if (r < 0) {
-		slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
-		exit(1);
-	}
-
-	int r = notify("READY=1");
-	if (r < 0) {
-		slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
-		exit(1);
+	/* Tell systemd logger we are ready */
+	if(gcfg->log_out == LOG_TO_JOURNAL) {
+		int r = notify("READY=1");
+		if (r < 0) {
+			slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
+			exit(1);
+		}
 	}
 
 	/* Main loop */
@@ -820,9 +778,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (logger_output == LOG_TO_SYSLOG) {
+	if (gcfg->log_out == LOG_TO_SYSLOG) {
 		closelog();
-	} else if (logger_output == LOG_TO_JOURNAL) {
+	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
 		journal_cleanup();
 	}
 	return 0;

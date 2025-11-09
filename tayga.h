@@ -399,6 +399,17 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown);
 void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
 
-/* tayga.c */
-void slog(int priority, const char *format, ...);
-void read_random_bytes(void *d, int len);
+/* log.c */
+#define STRINGIFY_IMPL(x) #x
+#define STRINGIFY(x) STRINGIFY_IMPL(x)
+#define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
+int notify(const char *msg);
+int journal_init(const char *progname);
+void journal_cleanup(void);
+int journal_printv_with_location(
+        int priority, const char *file, const char *line, const char *func,
+        const char *format, va_list ap);
+
+
+#endif /* #ifndef __TAYGA_H__ */
