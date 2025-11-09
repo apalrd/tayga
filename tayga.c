@@ -29,11 +29,6 @@ extern struct config *gcfg;
 time_t now;
 static const char *progname;
 static int signalfds[2];
-static enum {
-	LOG_TO_SYSLOG = 0,
-	LOG_TO_STDOUT = 1,
-	LOG_TO_JOURNAL = 2,
-} logger_output;
 
 void usage(int code) {
 	fprintf(stderr,
@@ -72,31 +67,6 @@ void die(const char *format, ...) {
 	exit(1);
 }
 
-/* Log the message to the configured logger */
-void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
-{
-	va_list ap;
-	(void)file;
-	(void)line;
-	(void)func;
-
-	va_start(ap, format);
-	switch (logger_output) {
-		case LOG_TO_STDOUT:
-			vprintf(format, ap);
-			break;
-		case LOG_TO_SYSLOG:
-			vsyslog(priority, format, ap);
-			break;
-		case LOG_TO_JOURNAL:
-			journal_printv_with_location(priority, file, line, func, format, ap);
-			break;
-		default:
-			die("Invalid logger_output value %d", logger_output);
-	}
-	va_end(ap);
-}
-
 static void set_nonblock(int fd)
 {
 	int flags;
@@ -109,22 +79,6 @@ static void set_nonblock(int fd)
 	flags |= O_NONBLOCK;
 	if (fcntl(fd, F_SETFL, flags) < 0) {
 		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		exit(1);
-	}
-}
-
-void read_random_bytes(void *d, int len)
-{
-	int ret;
-
-	ret = read(gcfg->urandom_fd, d, len);
-	if (ret < 0) {
-		slog(LOG_CRIT, "read /dev/urandom returned %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	if (ret < len) {
-		slog(LOG_CRIT, "read /dev/urandom returned EOF\n");
 		exit(1);
 	}
 }
@@ -540,13 +494,13 @@ int main(int argc, char **argv)
 					do_rmtun = 1;
 					break;
 				case 2: /* --syslog */
-					logger_output = LOG_TO_SYSLOG;
+					gcfg->log_out = LOG_TO_SYSLOG;
 					break;
 				case 3: /* --stdout */
-					logger_output = LOG_TO_STDOUT;
+					gcfg->log_out = LOG_TO_STDOUT;
 					break;
 				case 4: /* --journal */
-					logger_output = LOG_TO_JOURNAL;
+					gcfg->log_out = LOG_TO_JOURNAL;
 					break;
 				default:
 					usage(1);
@@ -556,7 +510,7 @@ int main(int argc, char **argv)
 			conffile = optarg;
 			break;
 		case 'd':
-			logger_output = LOG_TO_STDOUT;
+			gcfg->log_out = LOG_TO_STDOUT;
 			detach = 0;
 			break;
 		case 'n':
@@ -588,7 +542,7 @@ int main(int argc, char **argv)
 
 	/* Check if we are doing tunnel operations only */
 	if (do_mktun || do_rmtun) {
-		logger_output = LOG_TO_STDOUT;
+		gcfg->log_out = LOG_TO_STDOUT;
 		if (user) {
 			die("Error: cannot specify -u or --user "
 					"with mktun/rmtun operation");
@@ -606,9 +560,9 @@ int main(int argc, char **argv)
 	}
 
 	/* Setup logging */
-	if (logger_output == LOG_TO_SYSLOG) {
+	if (gcfg->log_out == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (logger_output == LOG_TO_JOURNAL) {
+	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
 		int r = journal_init("tayga");
 		if (r < 0)
 			die("Error: Unable to initialize journal: %s\n", strerror(-r));
@@ -703,13 +657,24 @@ int main(int argc, char **argv)
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
 	if (gcfg->cache_size) {
-		gcfg->urandom_fd = open("/dev/urandom", O_RDONLY);
-		if (gcfg->urandom_fd < 0) {
+		int urandom_fd = open("/dev/urandom", O_RDONLY);
+		if (urandom_fd < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/urandom, "
 					"aborting: %s\n", strerror(errno));
 			exit(1);
+		}		
+		int len = 8 * sizeof(uint32_t);
+		int ret = read(urandom_fd, gcfg->rand, len);
+		if (ret < 0) {
+			slog(LOG_CRIT, "read /dev/urandom returned %s\n",
+					strerror(errno));
+			exit(1);
 		}
-		read_random_bytes(gcfg->rand, 8 * sizeof(uint32_t));
+		if (ret < len) {
+			slog(LOG_CRIT, "read /dev/urandom returned EOF\n");
+			exit(1);
+		}
+
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 
@@ -803,9 +768,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (logger_output == LOG_TO_SYSLOG) {
+	if (gcfg->log_out == LOG_TO_SYSLOG) {
 		closelog();
-	} else if (logger_output == LOG_TO_JOURNAL) {
+	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
 		journal_cleanup();
 	}
 	return 0;

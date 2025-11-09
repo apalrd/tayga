@@ -298,7 +298,6 @@ struct config {
 	int cache_size;
 	int ipv6_offlink_mtu;
 
-	int urandom_fd;
 	int tun_fd;
 
 	uint16_t mtu;
@@ -317,7 +316,12 @@ struct config {
 
 	int wkpf_strict;
 	int log_opts;
-	enum udp_cksum_mode udp_cksum_mode;
+	enum udp_cksum_mode udp_cksum_mode;	
+	enum {
+		LOG_TO_SYSLOG = 0,
+		LOG_TO_STDOUT = 1,
+		LOG_TO_JOURNAL = 2,
+	} log_out;
 };
 
 /// Logging flags
@@ -394,12 +398,11 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown);
 void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
 
-/* tayga.c */
+/* log.c */
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 #define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
 void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
-void read_random_bytes(void *d, int len);
 
 /* sd-util.c */
 int notify(const char *msg);

@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c sd-util.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
 
 #Check for release file / variable
 -include release
@@ -34,7 +34,10 @@ TAYGA_VERSION = $(shell $(GIT) describe --tags --dirty)
 TAYGA_BRANCH = $(shell $(GIT) describe --all --dirty)
 TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 
-.DEFAULT: help
+.DEFAULT: all
+.PHONY: all
+all: tayga
+
 help:
 	@echo 'Targets:'
 	@echo 'tayga           - Compile tayga (produces ./tayga)'
@@ -58,8 +61,6 @@ help:
 	@echo 'INSTALL_DATA    - Script to install non-executable files [$$(INSTALL) -m 644]'
 	@echo 'INSTALL_PROGRAM - Script to install executable files [$$(INSTALL)]'
 
-.PHONY: all
-all: tayga
 
 # Synthesize the version.h header from Git
 ifndef RELEASE
@@ -91,14 +92,16 @@ static: tayga
 test: unit_conffile
 	./unit_conffile
 
-# these are only valid for GCC
+# Only do coverage analysis with gcc
 ifeq ($(CC),gcc)
 TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
 else
 TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
 endif
 TEST_FILES := test/unit.c
-unit_conffile:
+
+# Each unit test
+unit_conffile: $(TEST_FILES) conffile.c addrmap.c test/unit_conffile.c 
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 
 .PHONY: integration

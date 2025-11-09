@@ -1,5 +1,5 @@
 /*
- *  sd-util.c -- systemd utilities
+ *  log.c - logging related functions
  *
  *  part of TAYGA <https://github.com/apalrd/tayga>
  *  Copyright (C) 2010  Nathan Lutchansky <lutchann@litech.org>
@@ -34,6 +34,32 @@
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
+
+
+/* Log the message to the configured logger */
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
+{
+	va_list ap;
+	(void)file;
+	(void)line;
+	(void)func;
+
+	va_start(ap, format);
+	switch (gcfg->log_out) {
+        default:
+		case LOG_TO_STDOUT:
+			vprintf(format, ap);
+			break;
+		case LOG_TO_SYSLOG:
+			vsyslog(priority, format, ap);
+			break;
+		case LOG_TO_JOURNAL:
+			journal_printv_with_location(priority, file, line, func, format, ap);
+			break;
+	}
+	va_end(ap);
+}
+
 
 union sockaddr_union {
     struct sockaddr sa;
