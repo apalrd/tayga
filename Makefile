@@ -2,13 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c sd-util.c
-
-#Check for release file / variable
--include release
-ifdef RELEASE
-$(info Using RELEASE $(RELEASE))
-endif
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
 
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
@@ -26,6 +20,7 @@ DESTDIR ?=
 GIT ?= git
 INSTALL ?= install
 IP ?= ip
+SYSTEMCTL ?= /bin/systemctl
 
 INSTALL_DATA ?= $(INSTALL) -m 644
 INSTALL_PROGRAM ?= $(INSTALL)
@@ -34,35 +29,24 @@ TAYGA_VERSION = $(shell $(GIT) describe --tags --dirty)
 TAYGA_BRANCH = $(shell $(GIT) describe --all --dirty)
 TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 
-.DEFAULT: help
+.PHONY: all
+all: tayga
+
+.PHONY: help
 help:
 	@echo 'Targets:'
-	@echo 'tayga           - Compile tayga (produces ./tayga)'
+	@echo 'all             - Compile tayga (produces ./tayga)'
 	@echo 'static          - Compile tayga with static linkage (produces ./tayga)'
 	@echo 'test            - Run the test suite'
 	@echo 'integration     - Run integration tests. Requires root permissions'
 	@echo 'install         - Installs tayga and manpages'
-	@echo 'install-systemd - Installs the tayga@.service template and the example configuration file'
-	@echo 'install-openrc  - Installs the tayga.initd script and the example configuration file'
 	@echo
 	@echo 'Installation Variables:'
-	@echo 'prefix          - Installation prefix [/usr/local]'
-	@echo 'exec_prefix     - Executable installation prefix [$$(prefix)]'
-	@echo 'sbindir         - System administrator executable directory [$$(prefix)/sbin]'
-	@echo 'datarootdir     - Read-only data files [$$(prefix)/share]'
-	@echo 'mandir          - Manpage directory [$$(datarootdir)/man]'
-	@echo 'man5dir man8dir - Manpage section directories [$$(mandir)/man5 $$(mandir)/man8]'
-	@echo 'sysconfdir      - System configuration directory [/etc]'
-	@echo 'servicedir      - systemd service file location [$$(sysconfdir)/systemd/system]'
-	@echo 'DESTDIR         - Prepended to each installed file'
-	@echo 'INSTALL_DATA    - Script to install non-executable files [$$(INSTALL) -m 644]'
-	@echo 'INSTALL_PROGRAM - Script to install executable files [$$(INSTALL)]'
-
-.PHONY: all
-all: tayga
+	@echo 'LIVE            - Install on a live system (daemon-reload)'
+	@echo 'WITH_SYSTEMD    - Install systemd scripts'
+	@echo 'WITH_OPENRC     - Install OpenRC scripts and example config'
 
 # Synthesize the version.h header from Git
-ifndef RELEASE
 define VERSION_HEADER
 #ifndef __TAYGA_VERSION_H__
 #define __TAYGA_VERSION_H__
@@ -74,11 +58,9 @@ define VERSION_HEADER
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
 
-endif
-
 # Compile Tayga
 tayga: $(SOURCES)
-	$(if $(RELEASE),,$(file > version.h,$(VERSION_HEADER)))
+	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Compile Tayga (statically link)
@@ -92,13 +74,12 @@ test: unit_conffile
 	./unit_conffile
 
 # these are only valid for GCC
-ifeq ($(CC),gcc)
 TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
-else
-TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
+ifeq ($(CC),gcc)
+TEST_CFLAGS += -coverage
 endif
 TEST_FILES := test/unit.c
-unit_conffile:
+unit_conffile: $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 
 .PHONY: integration
@@ -113,6 +94,7 @@ integration: tayga
 clean:
 	$(RM) tayga version.h
 	$(RM) unit_conffile *.gcda *.gcno
+	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
 .PHONY: install
@@ -121,19 +103,23 @@ install: $(TARGET)
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(man5dir)
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(man8dir)
-
 # Install systemd service file
-.PHONY: install-systemd
-install-systemd:
+ifdef WITH_SYSTEMD
 	-mkdir -p $(DESTDIR)$(servicedir) $(DESTDIR)$(sysconfdir)/tayga
 	$(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(servicedir)/tayga@.service
 	test -e $(DESTDIR)$(sysconfdir)/tayga/default.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf
+ifdef LIVE
+	if test -d "/run/systemd/system" && test -x "$(SYSTEMCTL)"; then $(SYSTEMCTL) daemon-reload; fi
+else
 	@echo "Run 'systemctl daemon-reload' to have systemd recognize the newly installed service"
-
+endif
+	@echo "Systemd service installed. To enable: systemctl enable tayga@default.service"
+endif
 # Install openrc init script
-.PHONY: install-openrc
-install-openrc:
+ifdef WITH_OPENRC
+	@echo "Installing OpenRC unit and configurations"
 	-mkdir -p $(DESTDIR)$(sysconfdir)/init.d $(DESTDIR)$(sysconfdir)/conf.d
 	$(INSTALL_PROGRAM) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga
 	$(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga
 	test -e $(DESTDIR)$(sysconfdir)/tayga.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf
+endif
