@@ -18,8 +18,6 @@ datarootdir ?= $(prefix)/share
 mandir ?= $(datarootdir)/man
 man5dir ?= $(mandir)/man5
 man8dir ?= $(mandir)/man8
-man5dir ?= $(mandir)/man5
-man8dir ?= $(mandir)/man8
 sysconfdir ?= /etc
 servicedir ?= $(sysconfdir)/systemd/system
 DESTDIR ?=
@@ -93,6 +91,7 @@ test: unit_conffile
 	./unit_conffile
 
 # these are only valid for GCC
+TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
 ifeq ($(CC),gcc)
 TEST_CFLAGS += -coverage
 endif
