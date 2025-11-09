@@ -169,3 +169,11 @@ Tayga provides a `Containerfile` which may be used in containerized environments
 | `TAYGA_ADDR6`   | The IPv6 address used by Tayga to source ICMPv6 packets. If not provided, the container launch script will choose the first IPv6 address assigned to the container's `eth0` interface.                    |
 
 If you wish to provide a custom `tayga.conf`, you may override `/app/tayga.conf` and the launch script will not overwrite it. The variables `pool4` and `pool6` are still required to configure the tunnel interface.
+
+
+# Example Configurations
+Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
+
+* [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
+* [Stateless 464XLAT CLAT](clat/RAEDME.md)
+* [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
