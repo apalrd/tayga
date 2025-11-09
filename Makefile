@@ -18,6 +18,8 @@ datarootdir ?= $(prefix)/share
 mandir ?= $(datarootdir)/man
 man5dir ?= $(mandir)/man5
 man8dir ?= $(mandir)/man8
+man5dir ?= $(mandir)/man5
+man8dir ?= $(mandir)/man8
 sysconfdir ?= /etc
 servicedir ?= $(sysconfdir)/systemd/system
 DESTDIR ?=
@@ -74,6 +76,17 @@ define VERSION_HEADER
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
 
+define VERSION_HEADER
+#ifndef __TAYGA_VERSION_H__
+#define __TAYGA_VERSION_H__
+
+#define TAYGA_VERSION "$(TAYGA_VERSION)"
+#define TAYGA_BRANCH  "$(TAYGA_BRANCH)"
+#define TAYGA_COMMIT  "$(TAYGA_COMMIT)"
+
+#endif /* #ifndef __TAYGA_VERSION_H__ */
+endef
+
 endif
 
 # Compile Tayga
@@ -81,8 +94,16 @@ tayga: $(SOURCES)
 	$(if $(RELEASE),,$(file > version.h,$(VERSION_HEADER)))
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
+# Compile Tayga
+tayga: $(SOURCES)
+	$(if $(RELEASE),,$(file > version.h,$(VERSION_HEADER)))
+	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
+
+# Compile Tayga (statically link)
 # Compile Tayga (statically link)
 .PHONY: static
+static: LDFLAGS += -static
+static: tayga
 static: LDFLAGS += -static
 static: tayga
 
@@ -93,9 +114,7 @@ test: unit_conffile
 
 # these are only valid for GCC
 ifeq ($(CC),gcc)
-TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
-else
-TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
+TEST_CFLAGS += -coverage
 endif
 TEST_FILES := test/unit.c
 unit_conffile:
@@ -109,16 +128,46 @@ integration: tayga
 	$(IP) netns exec tayga-test python3 test/translate.py
 	$(IP) netns del tayga-test
 
+.PHONY: integration
+integration: tayga
+	-$(IP) netns add tayga-test
+	$(IP) netns exec tayga-test python3 test/addressing.py
+	$(IP) netns exec tayga-test python3 test/mapping.py
+	$(IP) netns exec tayga-test python3 test/translate.py
+	$(IP) netns del tayga-test
+
 .PHONY: clean
 clean:
 	$(RM) tayga version.h
+	$(RM) unit_conffile *.gcda *.gcno
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
 .PHONY: install
 install: $(TARGET)
 	-mkdir -p $(DESTDIR)$(sbindir) $(DESTDIR)$(man5dir) $(DESTDIR)$(man8dir)
+.PHONY: install
+install: $(TARGET)
+	-mkdir -p $(DESTDIR)$(sbindir) $(DESTDIR)$(man5dir) $(DESTDIR)$(man8dir)
 	$(INSTALL_PROGRAM) tayga $(DESTDIR)$(sbindir)/tayga
+	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(man5dir)
+	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(man8dir)
+
+# Install systemd service file
+.PHONY: install-systemd
+install-systemd:
+	-mkdir -p $(DESTDIR)$(servicedir) $(DESTDIR)$(sysconfdir)/tayga
+	$(INSTALL_DATA) scripts/tayga@.service $(DESTDIR)$(servicedir)/tayga@.service
+	test -e $(DESTDIR)$(sysconfdir)/tayga/default.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga/default.conf
+	@echo "Run 'systemctl daemon-reload' to have systemd recognize the newly installed service"
+
+# Install openrc init script
+.PHONY: install-openrc
+install-openrc:
+	-mkdir -p $(DESTDIR)$(sysconfdir)/init.d $(DESTDIR)$(sysconfdir)/conf.d
+	$(INSTALL_PROGRAM) scripts/tayga.initd $(DESTDIR)$(sysconfdir)/init.d/tayga
+	$(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga
+	test -e $(DESTDIR)$(sysconfdir)/tayga.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf
 	$(INSTALL_DATA) tayga.conf.5 $(DESTDIR)$(man5dir)
 	$(INSTALL_DATA) tayga.8 $(DESTDIR)$(man8dir)
 

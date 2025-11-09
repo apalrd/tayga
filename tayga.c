@@ -28,6 +28,7 @@
 extern struct config *gcfg;
 time_t now;
 static const char *progname;
+static const char *progname;
 static int signalfds[2];
 static enum {
 	LOG_TO_SYSLOG = 0,
@@ -95,6 +96,8 @@ void slog_impl(int priority, const char *file, const char *line, const char *fun
 			die("Invalid logger_output value %d", logger_output);
 	}
 	va_end(ap);
+	putc('\n', stderr);
+	exit(1);
 }
 
 static void set_nonblock(int fd)
@@ -109,22 +112,6 @@ static void set_nonblock(int fd)
 	flags |= O_NONBLOCK;
 	if (fcntl(fd, F_SETFL, flags) < 0) {
 		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		exit(1);
-	}
-}
-
-void read_random_bytes(void *d, int len)
-{
-	int ret;
-
-	ret = read(gcfg->urandom_fd, d, len);
-	if (ret < 0) {
-		slog(LOG_CRIT, "read /dev/urandom returned %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	if (ret < len) {
-		slog(LOG_CRIT, "read /dev/urandom returned EOF\n");
 		exit(1);
 	}
 }
@@ -499,12 +486,18 @@ int main(int argc, char **argv)
 
 	progname = argv[0];
 
+	progname = argv[0];
+
 	/* Init config structure */
 	if(config_init() < 0) return 1;
 
 	static struct option longopts[] = {
 		{ "mktun", 0, 0, 0 },
 		{ "rmtun", 0, 0, 0 },
+		{ "syslog", 0, 0, 0 },
+		{ "stdout", 0, 0, 0 },
+		{ "journal", 0, 0, 0 },
+		{ "help", 0, 0, 'h' },
 		{ "syslog", 0, 0, 0 },
 		{ "stdout", 0, 0, 0 },
 		{ "journal", 0, 0, 0 },
@@ -516,10 +509,12 @@ int main(int argc, char **argv)
 		{ "chroot", 0, 0, 'r' },
 		{ "pidfile", 1, 0, 'p' },
 		{ "debug", 0, 0, 'd' },
+		{ "debug", 0, 0, 'd' },
 		{ 0, 0, 0, 0 }
 	};
 
 	for (;;) {
+		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
 		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
 		if (c == -1)
 			break;
@@ -576,6 +571,7 @@ int main(int argc, char **argv)
 			break;
 		default:
 			die("Try `%s --help' for more information (got %c)", argv[0],c);
+			die("Try `%s --help' for more information (got %c)", argv[0],c);
 			exit(1);
 		}
 	}
@@ -592,12 +588,16 @@ int main(int argc, char **argv)
 		if (user) {
 			die("Error: cannot specify -u or --user "
 					"with mktun/rmtun operation");
+			die("Error: cannot specify -u or --user "
+					"with mktun/rmtun operation");
 		}
 		if (group) {
+			die("Error: cannot specify -g or --group "
 			die("Error: cannot specify -g or --group "
 					"with mktun/rmtun operation\n");
 		}
 		if (do_chroot) {
+			die("Error: cannot specify -r or --chroot "
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
@@ -703,13 +703,24 @@ int main(int argc, char **argv)
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
 	if (gcfg->cache_size) {
-		gcfg->urandom_fd = open("/dev/urandom", O_RDONLY);
-		if (gcfg->urandom_fd < 0) {
+		int urandom_fd = open("/dev/urandom", O_RDONLY);
+		if (urandom_fd < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/urandom, "
 					"aborting: %s\n", strerror(errno));
 			exit(1);
+		}		
+		int len = 8 * sizeof(uint32_t);
+		int ret = read(urandom_fd, gcfg->rand, len);
+		if (ret < 0) {
+			slog(LOG_CRIT, "read /dev/urandom returned %s\n",
+					strerror(errno));
+			exit(1);
 		}
-		read_random_bytes(gcfg->rand, 8 * sizeof(uint32_t));
+		if (ret < len) {
+			slog(LOG_CRIT, "read /dev/urandom returned EOF\n");
+			exit(1);
+		}
+
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 
@@ -767,6 +778,12 @@ int main(int argc, char **argv)
 	pollfds[0].events = POLLIN;
 	pollfds[1].fd = gcfg->tun_fd;
 	pollfds[1].events = POLLIN;
+
+	int r = notify("READY=1");
+	if (r < 0) {
+		slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
+		exit(1);
+	}
 
 	int r = notify("READY=1");
 	if (r < 0) {
