@@ -22,7 +22,7 @@ extern int print_fail_only;
 /* Capture slog to the output */
 extern int has_slogged;
 extern int print_slog;
-void slog(int priority, const char *format, ...);
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
 /* Expect for long ints */
 void expectl(long a, long b, const char *res);
 /* Expect for strings */

@@ -7,6 +7,12 @@ After=network.target
 # /etc/tayga/instancename.conf
 # /etc/tayga/instancename.conf
 # systemctl enable tayga@instancename.service
+Type=notify
+ExecStart=tayga --config /etc/tayga/%i.conf --journal --nodetach
+
+# Hardening options
+PrivateTmp=true
+StateDirectory=tayga
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
@@ -16,10 +22,6 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
-StateDirectory=tayga
-PrivateTmp=true
-Type=forking
-ExecStart=tayga --config /etc/tayga/%i.conf
 
 [Install]
 WantedBy=multi-user.target
