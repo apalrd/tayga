@@ -95,7 +95,6 @@ void test_config_compare(void) {
     expectl(gcfg->udp_cksum_mode, tcfg.udp_cksum_mode, "udp_cksum_mode");
 
     /* Pointers in gcfg which are not touched by conffile.c */
-    expectl(gcfg->urandom_fd, 0, "urandom_fd");
     expectl(gcfg->tun_fd, 0, "tun_fd");
     expectl((long)gcfg->recv_buf, 0, "recv_buf");
 
@@ -179,6 +178,12 @@ void test_config_init(void) {
     tcfg.hash_bits = 7;
     tcfg.cache_size = 1<<13;
     tcfg.wkpf_strict = 1;
+
+    /* Make sure config is the size we expect
+     * This ensures the test has been updated for new variables
+     */
+    printf("TEST CASE: config struct size\n");
+    expectl(sizeof(struct config),768,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");

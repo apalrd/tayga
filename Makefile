@@ -38,28 +38,16 @@ TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 .PHONY: all
 all: tayga
 
+.PHONY: help
 help:
+	@echo 'TAYGA Makefile'
 	@echo 'Targets:'
-	@echo 'tayga           - Compile tayga (produces ./tayga)'
+	@echo 'all             - Compile tayga (produces ./tayga) (default)'
 	@echo 'static          - Compile tayga with static linkage (produces ./tayga)'
-	@echo 'test            - Run the test suite'
+	@echo 'test            - Run the unit test suite'
 	@echo 'integration     - Run integration tests. Requires root permissions'
 	@echo 'install         - Installs tayga and manpages'
-	@echo 'install-systemd - Installs the tayga@.service template and the example configuration file'
-	@echo 'install-openrc  - Installs the tayga.initd script and the example configuration file'
-	@echo
-	@echo 'Installation Variables:'
-	@echo 'prefix          - Installation prefix [/usr/local]'
-	@echo 'exec_prefix     - Executable installation prefix [$$(prefix)]'
-	@echo 'sbindir         - System administrator executable directory [$$(prefix)/sbin]'
-	@echo 'datarootdir     - Read-only data files [$$(prefix)/share]'
-	@echo 'mandir          - Manpage directory [$$(datarootdir)/man]'
-	@echo 'man5dir man8dir - Manpage section directories [$$(mandir)/man5 $$(mandir)/man8]'
-	@echo 'sysconfdir      - System configuration directory [/etc]'
-	@echo 'servicedir      - systemd service file location [$$(sysconfdir)/systemd/system]'
-	@echo 'DESTDIR         - Prepended to each installed file'
-	@echo 'INSTALL_DATA    - Script to install non-executable files [$$(INSTALL) -m 644]'
-	@echo 'INSTALL_PROGRAM - Script to install executable files [$$(INSTALL)]'
+	@echo 'install-live	   - Installs on a running system, reloading services as required'
 
 
 # Synthesize the version.h header from Git
@@ -93,10 +81,10 @@ test: unit_conffile
 	./unit_conffile
 
 # Only do coverage analysis with gcc
+
+TEST_CFLAGS := $(CFLAGS) -Werror -Wextra -DCOVERAGE_TESTING
 ifeq ($(CC),gcc)
-TEST_CFLAGS := $(CFLAGS) -Werror -coverage -DCOVERAGE_TESTING
-else
-TEST_CFLAGS := $(CFLAGS) -Werror -DCOVERAGE_TESTING
+TEST_CFLAGS += -coverage
 endif
 TEST_FILES := test/unit.c
 

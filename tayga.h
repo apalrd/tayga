@@ -57,7 +57,7 @@
 //for coverage testing
 inline static void dummy()
 {
-	volatile static int temp;
+	static volatile int temp;
 	temp++;
 }
 #else
@@ -403,8 +403,6 @@ void handle_ip6(struct pkt *p);
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 #define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
 void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
-
-/* sd-util.c */
 int notify(const char *msg);
 int journal_init(const char *progname);
 void journal_cleanup(void);

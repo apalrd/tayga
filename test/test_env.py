@@ -415,8 +415,8 @@ class test_env:
             report_file.write(f"Failed: {self.test_failed}\n")
             print("="*40)
             print(f"Total Tests: {self.test_passed+self.test_failed}")
-            print(f"Passed: {self.test_passed}")
-            print(f"Failed: {self.test_failed}")
+            print(f"Passed: {self.test_passed} (expected {expect_pass})")
+            print(f"Failed: {self.test_failed} (expected {expect_fail})")
         overall = 0
         if self.test_passed != expect_pass:
             print(f"Expected {expect_pass} passes, only got {self.test_passed}")
