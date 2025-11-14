@@ -472,7 +472,7 @@ int main(int argc, char **argv)
 	};
 
 	for (;;) {
-		c = getopt_long(argc, argv, "c:dnu:g:rp:", longopts, &longind);
+		c = getopt_long(argc, argv, "c:dnu:g:rp:h", longopts, &longind);
 		if (c == -1)
 			break;
 		switch (c) {
@@ -518,6 +518,9 @@ int main(int argc, char **argv)
 		case 'p':
 			pidfile = optarg;
 			break;
+		case 'h':		
+			fprintf(stderr, USAGE_TEXT, TAYGA_VERSION, argv[0]);
+			exit(0);
 		default:
 			fprintf(stderr, "Try `%s --help' for more "
 					"information (got %c)\n", argv[0],c);
