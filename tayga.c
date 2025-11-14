@@ -543,15 +543,34 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* Setup logging
+	 * But not if we are only doing mktun / rmtun
+	 * This must be done before config parsing, since those rely
+	 * on logging based on log_out
+	 */
+	if(do_mktun || do_rmtun) {
+		//Force stdout for these options
+		gcfg->log_out = LOG_TO_STDOUT;
+	} else if (gcfg->log_out == LOG_TO_SYSLOG) {
+		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+		int r = journal_init("tayga");
+		if (r < 0) {
+			fprintf(stderr,"Error: Unable to initialize journal: %s\n", strerror(-r));
+			return 1;
+		}
+	}
+
 	/* Parse config file options */
 	if(config_read(conffile) < 0) return 1;
 
 	/* Validate config */
 	if(config_validate() < 0) return 1;
 
-	/* Check if we are doing tunnel operations only */
+	/* Check if we are doing tunnel operations only
+	 * Must be done after config reading so we know tun name
+	 */
 	if (do_mktun || do_rmtun) {
-		gcfg->log_out = LOG_TO_STDOUT;
 		if (user) {
 			die("Error: cannot specify -u or --user "
 					"with mktun/rmtun operation");
@@ -566,15 +585,6 @@ int main(int argc, char **argv)
 		}
 		tun_setup(do_mktun, do_rmtun);
 		return 0;
-	}
-
-	/* Setup logging */
-	if (gcfg->log_out == LOG_TO_SYSLOG) {
-		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-		int r = journal_init("tayga");
-		if (r < 0)
-			die("Error: Unable to initialize journal: %s\n", strerror(-r));
 	}
 
 	/* Change user */

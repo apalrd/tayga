@@ -252,9 +252,10 @@ int journal_printv_with_location(
     mh.msg_iov = iov;
     mh.msg_iovlen = iovlen;
 
-    int r = sendmsg(journal_fd, &mh, MSG_NOSIGNAL);
+    int r = -1;
+    if(journal_fd >= 0) 
+        r = sendmsg(journal_fd, &mh, MSG_NOSIGNAL);
     if (r >= 0)
         return 0;
-
     return -errno;
 }
