@@ -535,6 +535,8 @@ int main(int argc, char **argv)
 		case 'p':
 			pidfile = optarg;
 			break;
+		case 'h':
+			usage(1);
 		default:
 			die("Try `%s --help' for more information (got %c)", argv[0],c);
 			exit(1);
