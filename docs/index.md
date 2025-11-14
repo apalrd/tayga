@@ -175,5 +175,5 @@ If you wish to provide a custom `tayga.conf`, you may override `/app/tayga.conf`
 Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
 
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
-* [Stateless 464XLAT CLAT](clat/RAEDME.md)
+* [Stateless 464XLAT CLAT](clat/README.md)
 * [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
