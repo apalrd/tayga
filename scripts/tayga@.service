@@ -8,6 +8,9 @@ After=network.target
 # /etc/tayga/instancename.conf
 # systemctl enable tayga@instancename.service
 Type=notify
+
+# Ensure sbin directories are searched for the tayga binary
+ExecSearchPath=/usr/local/sbin:/usr/sbin
 ExecStart=tayga --config /etc/tayga/%i.conf --journal --nodetach
 
 # Hardening options
