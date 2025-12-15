@@ -277,6 +277,11 @@ static void read_from_signalfd(void)
 		if (gcfg->dynamic_pool)
 			dynamic_maint(gcfg->dynamic_pool, 1);
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
+		if (gcfg->log_out == LOG_TO_SYSLOG) {
+			closelog();
+		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+			journal_cleanup();
+		}
 		exit(0);
 	}
 }
@@ -701,12 +706,6 @@ int main(int argc, char **argv)
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
 		}
-	}
-
-	if (gcfg->log_out == LOG_TO_SYSLOG) {
-		closelog();
-	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-		journal_cleanup();
 	}
 	return 0;
 }
