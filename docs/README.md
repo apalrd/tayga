@@ -1,3 +1,7 @@
+# How to use Tayga
+
+If you just want to install / use Tayga, skip down to [Installation](#installation--basic-configuration)
+
 ## Stateless versus Stateful NAT64
 
 Most people are familiar with stateful NAT, which allows N:1 address mapping
@@ -157,23 +161,10 @@ tayga process in the foreground and send all log messages to stdout:
 tayga -d
 ```
 
-# Container Usage
-Tayga provides a `Containerfile` which may be used in containerized environments. Tayga relies on the kernel tun/tap interface, as such, the container environment must provide access to `/dev/net/tun` with adequate permissions. The container launch script relies on several environment variables to configure the tun adapter within the container:
-
-| Environment Variable | Description                                                                 |
-|-----------------------|-----------------------------------------------------------------------------|
-| `TAYGA_POOL4`     | IPv4 pool for dynamic use by Tayga (CIDR notation, default `192.168.255.0/24`)            |
-| `TAYGA_POOL6`   | IPv6 prefix to be used for NAT64 translation (CIDR notation, default `64:ff9b::/96`)                    |
-| `TAYGA_WKPF_STRICT`   | Select if the RFC6052 limitations on use of the well-known prefix (`64:ff9b::/96`) along with non-global IPv4 addresses should be enforced (default `no`)                   |
-| `TAYGA_ADDR4`   | The IPv4 address used by Tayga to source ICMPv4 packets. If not provided, the container launch script will choose the first IPv4 address assigned to the container's `eth0` interface.                    |
-| `TAYGA_ADDR6`   | The IPv6 address used by Tayga to source ICMPv6 packets. If not provided, the container launch script will choose the first IPv6 address assigned to the container's `eth0` interface.                    |
-
-If you wish to provide a custom `tayga.conf`, you may override `/app/tayga.conf` and the launch script will not overwrite it. The variables `pool4` and `pool6` are still required to configure the tunnel interface.
-
-
-# Example Configurations
+# Usage Guides
 Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
 
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
 * [Stateless 464XLAT CLAT](clat/README.md)
 * [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
+* [Container Docs](container/README.md) for using prebuilt Tayga containers
