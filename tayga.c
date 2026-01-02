@@ -537,6 +537,7 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			usage(1);
+			break;
 		default:
 			die("Try `%s --help' for more information (got %c)", argv[0],c);
 			exit(1);
