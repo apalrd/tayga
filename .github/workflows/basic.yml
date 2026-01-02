@@ -1,5 +1,4 @@
-# This is a basic workflow that is manually triggered
-
+# This make sure the code builds successfully on amd64/arm64 with gcc and clang
 name: Basic Test
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
@@ -11,6 +10,8 @@ on:
         description: 'Any valid git ref'
         required: false
         type: string
+  pull_request:
+    types: [opened, synchronize]
 
 # permissions are set per job
 permissions: { }
@@ -52,3 +53,7 @@ jobs:
         run: make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
       - name: run test clang w/o LTO
         run: make test CC=clang LDFLAGS=""
+      - name: run build gcc w/ Wextra
+        run: make CC=gcc CFLAGS="-Werror -Wextra -O2"
+      - name: run build clang w/ wextra
+        run: make CC=clang CFLAGS="-Werror -Wextra -O2"
