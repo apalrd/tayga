@@ -11,7 +11,7 @@ WORKDIR /app
 COPY ./ ./
 
 # Build the code statically
-RUN make static
+RUN make clean && make static
 
 # Stage 2a: Final image (nat64)
 FROM alpine:latest AS final-nat64
@@ -23,7 +23,7 @@ WORKDIR /app
 COPY --from=build-env /app/tayga /app/tayga
 
 # Copy launch script
-COPY launch-nat64.sh /app/launch-nat64.sh
+COPY scripts/launch-nat64.sh /app/launch-nat64.sh
 
 # Set the entrypoint to the launch script
 ENTRYPOINT ["/bin/sh","/app/launch-nat64.sh"]
@@ -34,7 +34,7 @@ FROM alpine:latest AS final-clat
 RUN apk add --no-cache iproute2
 WORKDIR /app
 COPY --from=build-env /app/tayga /app/tayga
-COPY launch-clat.sh /app/launch-clat.sh
+COPY scripts/launch-clat.sh /app/launch-clat.sh
 ENTRYPOINT ["/bin/sh","/app/launch-clat.sh"]
 
 # Stage 2c: Final Image (No Config / Bring Your Own)
@@ -43,5 +43,5 @@ FROM alpine:latest AS final
 RUN apk add --no-cache iproute2
 WORKDIR /app
 COPY --from=build-env /app/tayga /app/tayga
-COPY launch.sh /app/launch.sh
+COPY scripts/launch.sh /app/launch.sh
 ENTRYPOINT ["/bin/sh","/app/launch.sh"]

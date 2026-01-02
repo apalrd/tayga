@@ -11,6 +11,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/proxy_ndp
 TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
 TAYGA_MTU="${TAYGA_MTU:-65535}"
+TAYGA_LOG="${TAYGA_LOG:-drop reject icmp self dyn}"
 
 # For debugging
 echo IP Addresses:
@@ -75,6 +76,7 @@ wkpf-strict ${TAYGA_WKPF_STRICT}
 ipv4-addr ${TAYGA_ADDR4}
 ipv6-addr ${TAYGA_ADDR6}
 prefix ${TAYGA_PREF64}
+log ${TAYGA_LOG}
 EOF
 
 # If tayga.conf does not already exist, use our new conf

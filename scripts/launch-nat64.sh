@@ -1,6 +1,5 @@
 ## Launch Tayga within a container
 
-
 # Enable Forwarding
 echo "Enabling IPv4 and IPv6 forwarding"
 echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
@@ -10,6 +9,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
 TAYGA_POOL4="${TAYGA_POOL4:-192.168.240.0/20}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
+TAYGA_LOG="${TAYGA_LOG:-drop reject icmp self dyn}"
 
 # Auto-detect ADDR4 and ADDR6 from the container if not set
 echo Finding Addr4
@@ -26,7 +26,7 @@ fi
 echo Finding Addr6
 if [[ -z "${TAYGA_ADDR6}" ]]; then
     IF6=$(ip -o -6 route show to default | awk '{print $5}')
-    ADDR6=$(ip addr show ${IF6} | grep -E 'inet6 ' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+    ADDR6=$(ip addr show ${IF6} | grep -E 'inet6 ' | awk '{print $2}' | head -n 1 | cut -d'/' -f1 )
     if [[ -z "${ADDR6}" ]]; then
         echo "No IPv6 address found on iface ${IF6}, exiting"
         exit 1
@@ -56,7 +56,8 @@ ipv4-addr ${TAYGA_ADDR4}
 ipv6-addr ${TAYGA_ADDR6}
 prefix ${TAYGA_PREF64}
 dynamic-pool ${TAYGA_POOL4}
-data-dir /app/
+log ${TAYGA_LOG}
+data-dir /app
 EOF
 
 # If tayga.conf does not already exist, use our new conf
