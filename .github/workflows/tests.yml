@@ -41,7 +41,7 @@ jobs:
       - name: install deps
         run: sudo apt-get install -y python3-pyroute2 python3-scapy
       - name: run test
-        run: make integration
+        run: sudo make integration
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.arch }}
