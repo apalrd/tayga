@@ -133,11 +133,18 @@ endif
 container: tayga-clat.tar tayga-nat64.tar tayga.tar
 .PHONY: container
 
+# Flags for Podman
+PODMAN_FLAGS := --cgroup-manager=cgroupfs
+ifdef CONT_ALL
+#Option to build for all platforms
+PODMAN_FLAGS += --all-platforms
+endif
+
 tayga.tar: scripts/launch.sh
 	$(RM) $@
 	podman manifest create tayga
-	podman build --all-platforms . --manifest tayga --cgroup-manager=cgroupfs 
-ifdef PUSH_CONTANER
+	podman build $(PODMAN_FLAGS) . --manifest tayga
+ifdef CONT_PUSH
 	podman manifest push --all tayga ghcr.io/apalrd/tayga:latest
 endif
 	podman save -o $@ tayga
@@ -146,8 +153,8 @@ endif
 tayga-clat.tar: scripts/launch-clat.sh
 	$(RM) $@
 	podman manifest create tayga-clat
-	podman build --all-platforms . --manifest tayga-clat --target final-clat --cgroup-manager=cgroupfs 
-ifdef PUSH_CONTANER
+	podman build $(PODMAN_FLAGS) . --manifest tayga-clat --target final-clat
+ifdef CONT_PUSH
 	podman manifest push --all tayga-clat ghcr.io/apalrd/tayga-clat:latest
 endif
 	podman save -o $@ tayga-clat
@@ -156,8 +163,8 @@ endif
 tayga-nat64.tar: scripts/launch-nat64.sh
 	$(RM) $@
 	podman manifest create tayga-nat64
-	podman build --all-platforms . --manifest tayga-nat64 --target final-nat64 --cgroup-manager=cgroupfs 
-ifdef PUSH_CONTANER
+	podman build $(PODMAN_FLAGS) . --manifest tayga-nat64 --target final-nat64
+ifdef CONT_PUSH
 	podman manifest push --all tayga-nat64 ghcr.io/apalrd/tayga-nat64:latest
 endif
 	podman save -o $@ tayga-nat64
