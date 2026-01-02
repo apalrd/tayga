@@ -1,3 +1,7 @@
+# How to use Tayga
+
+If you just want to install / use Tayga, skip down to [Installation](#installation--basic-configuration)
+
 ## Stateless versus Stateful NAT64
 
 Most people are familiar with stateful NAT, which allows N:1 address mapping
@@ -157,12 +161,10 @@ tayga process in the foreground and send all log messages to stdout:
 tayga -d
 ```
 
-# Container Usage
-See [Container Docs](container/README.md) for container usage
-
-# Example Configurations
+# Usage Guides
 Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
 
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
 * [Stateless 464XLAT CLAT](clat/README.md)
 * [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
+* [Container Docs](container/README.md) for using prebuilt Tayga containers

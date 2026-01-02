@@ -12,59 +12,20 @@ TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
 TAYGA_MTU="${TAYGA_MTU:-65535}"
 TAYGA_LOG="${TAYGA_LOG:-drop reject icmp self dyn}"
+#Default address for Tayga s in the DS-Lite range for CLAT use
+TAYGA_ADDR4="${TAYGA_ADDR:-192.0.0.2}"
+#Must specify ADDR6 for clat
+WILLEXIT=""
+if [ -z "$TAYGA_ADDR6" ]; then echo "TAYGA_ADDR6 must be set"; WILLEXIT="1"; fi
+#Must specify MAP4 and MAP6
+if [ -z "$TAYGA_MAP4" ]; then echo "TAYGA_MAP4 must be set"; WILLEXIT="1"; fi
+if [ -z "$TAYGA_MAP6" ]; then echo "TAYGA_MAP6 must be set"; WILLEXIT="1"; fi
 
-# For debugging
-echo IP Addresses:
-ip a
-echo IPv6 Routes:
-ip -6 route
-echo IPv4 Routes:
-ip -4 route
+#Exit on validation error
+if [ -n "$WILLEXIT" ]; then exit 1; fi
 
-# Delete default route if we have one
-ip route del default || true
-
-# Auto-detect ADDR4 and ADDR6 from the container if not set
-echo Finding Addr4
-if [[ -z "${TAYGA_ADDR4}" ]]; then
-    IF4=$(ip -o -4 route show scope link | awk '{print $3}' | head -n 1)
-    echo Got IF4 ${IF4}
-    RT4=$(ip -o -4 route show scope link | awk '{print $1}' | head -n 1 | cut -d'/' -f2)
-    echo Got RT4 ${RT4}
-    ADDR4=$(ip addr show ${IF4} | grep -E 'inet ' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
-    if [[ -z "${ADDR4}" ]]; then
-        echo "No IPv4 address found on iface ${IF4}, exiting"
-        exit 1
-    fi
-    TAYGA_ADDR4="${ADDR4}"
-    echo Using Container Addr4 $TAYGA_ADDR4 from ${IF4}
-    # Get MTU of this interface
-    MTU4="$(ip link show ${IF4} | grep -E 'mtu ' | awk '{print $5}')"
-    TAYGA_MTU=$(($TAYGA_MTU > $MTU4 ? $MTU4 : $TAYGA_MTU))
-    echo MTU of IPv4 side is ${MTU4}
-    # If we don't have a subnet mask assigned, calculate it from RT4
-    TAYGA_MASK4="${TAYGA_MASK4:-$RT4}"
-    echo Route Length is $((32-$TAYGA_MASK4))
-
-fi
-echo Finding Addr6
-if [[ -z "${TAYGA_ADDR6}" ]]; then
-    # Get interface with default v6 route
-    IF6=$(ip -o -6 route show to default | awk '{print $5}')
-    ADDR6=$(ip addr show ${IF6} | grep -E 'inet6 ' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
-    if [[ -z "${ADDR6}" ]]; then
-        echo "No IPv6 address found on iface ${IF6}, exiting"
-        exit 1
-    fi
-    TAYGA_ADDR6="${ADDR6}"
-    echo Using Container Addr6 $TAYGA_ADDR6 from ${IF6}
-    # Get MTU of this interface
-    MTU6="$(ip link show ${IF6} | grep -E 'mtu ' | awk '{print $5}')"
-    TAYGA_MTU=$(($TAYGA_MTU > $MTU6 ? $MTU6 : $TAYGA_MTU))
-    echo MTU of IPv6 side is ${MTU6}
-    # Starting address of mapping is ????
-fi
-echo Using Container MTU $TAYGA_MTU
+# Delete default v4 route if we have one
+ip 4 route del default || true
 
 # Generate tayga.conf file
 cat << EOF > /app/tayga.conf.gen
@@ -77,15 +38,8 @@ ipv4-addr ${TAYGA_ADDR4}
 ipv6-addr ${TAYGA_ADDR6}
 prefix ${TAYGA_PREF64}
 log ${TAYGA_LOG}
+map ${TAYGA_MAP4} ${TAYGA_MAP6}
 EOF
-
-# If tayga.conf does not already exist, use our new conf
-if test -f /app/tayga.conf; then
-    echo "tayga.conf already exists, not overwriting"
-else
-    echo "tayga.conf does not exist, creating it from environment variables"
-    mv /app/tayga.conf.gen /app/tayga.conf
-fi
 
 # Make tunnel adapter
 echo "Creating tunnel adapter"
@@ -93,11 +47,17 @@ echo "Creating tunnel adapter"
 
 # Bring up the interface
 echo "Bringing up the interface"
-ip link set dev nat64 up
+ip link set dev clat up
 echo "Setting MTU to ${TAYGA_MTU}"
-ip link set nat64 mtu ${TAYGA_MTU}
+ip link set clat mtu ${TAYGA_MTU}
 echo "Adding default route"
-ip -4 route add default dev nat64
+ip -4 route add default dev clat
+echo "Adding IPv6 map route"
+ip -6 route add ${TAYGA_MAP4} dev clat
+if [ -n "$TAYGA_GW4" ]; then
+    echo "Adding IPv4 map route"
+    ip -4 route add ${TAYGA_MAP4} via ${TAYGA_GW4}
+fi
 
 # Start tayga
 echo "Starting tayga"
@@ -106,4 +66,4 @@ echo "Starting tayga"
 
 # Delete tunnel adapter on exit
 echo "Deleting tunnel adapter on exit"
-ip link del nat64
+ip link del clat
