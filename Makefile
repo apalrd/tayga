@@ -92,8 +92,7 @@ integration: tayga
 
 .PHONY: clean
 clean:
-	$(RM) tayga version.h
-	$(RM) unit_conffile *.gcda *.gcno
+	$(RM) tayga version.h tayga-nat64.tar tayga-clat.tar tayga.tar
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
