@@ -84,7 +84,7 @@ carved out of the NAT64 prefix.)
 The `log dyn` option allows the dynamic mapping assignments to be printed to the
 service log, if your network requires this information
 
-# Installation & Basic Configuration
+## Installation & Basic Configuration
 
 TAYGA requires GNU make to build.
 
@@ -161,7 +161,8 @@ tayga process in the foreground and send all log messages to stdout:
 tayga -d
 ```
 
-# Usage Guides
+## Usage Guides
+
 Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
 
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)

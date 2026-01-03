@@ -1,10 +1,13 @@
-## Tayga on Mikrotik RouterOS
-Using Tayga on Mikrotik RouterOS is currently supported for NAT64. CLAT functionality ('NAT46') is not completely documented yet. 
+# Tayga on Mikrotik RouterOS
 
-This requires Mikrotik RouterOS 7 with the container package enabled. Tayga container images are built for all platforms supported by Alpine, which does not include arm32v5 required by some older Mikrotik hardware. 
+Using Tayga on Mikrotik RouterOS is currently supported for NAT64. CLAT functionality ('NAT46') is not completely documented yet.
+
+This requires Mikrotik RouterOS 7 with the container package enabled. Tayga container images are built for all platforms supported by Alpine, which does not include `arm32v5` required by some older Mikrotik hardware.
 
 ## Speedrun NAT64 Container
+
 Assumptions used in this guide:
+
 - Bridge `nat64`is created only to route packets to/from Tayga
 - You are using 64:ff9b::/96 as your translation prefix
 - 192.168.240.0/20 is to used for dynamic clients (max 4093 clients)
