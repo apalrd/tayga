@@ -231,14 +231,14 @@ def prefix_generic(pref,strict,expect_drop,expect_icmp):
     test_prefix(pref,"198.19.255.255","Benchmarking Space within up",expect_drop,expect_icmp)
     test_prefix(pref,"198.20.0.0","Behchmarking Space over",False,False)
     # These prefixes should not be prevented from translation
-    test_prefix(pref,"192.0.0.0","DSLite Space 0",False,False)
-    test_prefix(pref,"192.0.0.1","DSLite Space 1",False,False)
-    test_prefix(pref,"192.0.0.2","DSLite Space 2",False,False)
-    test_prefix(pref,"192.0.0.3","DSLite Space 3",False,False)
-    test_prefix(pref,"192.0.0.4","DSLite Space 4",False,False)
-    test_prefix(pref,"192.0.0.5","DSLite Space 5",False,False)
-    test_prefix(pref,"192.0.0.6","DSLite Space 6",False,False)
-    test_prefix(pref,"192.0.0.7","DSLite Space 7",False,False)
+    test_prefix(pref,"192.0.0.0","DS-Lite Space 0",False,False)
+    test_prefix(pref,"192.0.0.1","DS-Lite Space 1",False,False)
+    test_prefix(pref,"192.0.0.2","DS-Lite Space 2",False,False)
+    test_prefix(pref,"192.0.0.3","DS-Lite Space 3",False,False)
+    test_prefix(pref,"192.0.0.4","DS-Lite Space 4",False,False)
+    test_prefix(pref,"192.0.0.5","DS-Lite Space 5",False,False)
+    test_prefix(pref,"192.0.0.6","DS-Lite Space 6",False,False)
+    test_prefix(pref,"192.0.0.7","DS-Lite Space 7",False,False)
     test_prefix(pref,"192.88.99.52","6to4 Relay Space",False,False)
 
     #Finished

@@ -8,7 +8,7 @@ In all cases, we require two addresses - one is used along with `tayga`'s `map` 
 
 ## 464XLAT Architecture
 
-CLAT functionality may be seen as a specialized form of SIIT with exactly one mapping usable only by the local system. The translator (TAYGA) performs address translation for exactly one IPv4 address, usually taken from the DSLite range (192.0.0.0/29) to exactly one IPv6 address. The local system is assigned an IP in the DSLite range, and uses this IP to communicate with `tayga` and therefore the rest of the IPv4 internet. 464xlat is only designed to provide access to outgoing connections over IPv4, it is not designed for unsolicited incoming traffic, but traditional NAT traversal methods do work. Generally NAT64 devices can also be configured with explicit address mappings, allowing 464xlat to be used to carry unsolicited incoming traffic as well.
+CLAT functionality may be seen as a specialized form of SIIT with exactly one mapping usable only by the local system. The translator (TAYGA) performs address translation for exactly one IPv4 address, usually taken from the DS-Lite range (192.0.0.0/29) to exactly one IPv6 address. The local system is assigned an IP in the DS-Lite range, and uses this IP to communicate with `tayga` and therefore the rest of the IPv4 internet. 464xlat is only designed to provide access to outgoing connections over IPv4, it is not designed for unsolicited incoming traffic, but traditional NAT traversal methods do work. Generally NAT64 devices can also be configured with explicit address mappings, allowing 464xlat to be used to carry unsolicited incoming traffic as well.
 
 ## Data Path
 
