@@ -1,14 +1,14 @@
-# Test Cases for Tayga
+# Test Cases for TAYGA
 
-Tayga's test suite is broken up into integration tests (which test end-to-end packet processing) and unit tests.
+TAYGA's test suite is broken up into integration tests (which test end-to-end packet processing) and unit tests.
 
 ## Unit Tests
 
-Each unit test is a c file in the test directory. To run all of the unit tests, run `make test`. The Makefile will compile with `-Werror` for unit testing, and then run each test. It will stop on the first failure.
+Each unit test is a `c` file in the test directory. To run all of the unit tests, run `make test`. The Makefile will compile with `-Werror` for unit testing, and then run each test. It will stop on the first failure.
 
 ## Integration Tets
 
-Tayga integration tests are run on Linux using network namespaces. Tayga is developed on Debian. Tayga requires CAP_NET_ADMIN to bind to the tun device and the test suite requires sufficient permissions to create and manage network namespaces.
+`tayga` integration tests are run on Linux using network namespaces. `tayga` is developed on Debian. `tayga` requires CAP_NET_ADMIN to bind to the tun device and the test suite requires sufficient permissions to create and manage network namespaces.
 
 The following packages are required:
 

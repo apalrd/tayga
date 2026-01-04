@@ -43,5 +43,5 @@ ip route add fd64::/64 dev nat64
 # Add pref64 route (distribute this via your routing protocol)
 ip route add 64:ff9b::/96 dev nat64
 
-# Start Tayga
+# Start tayga
 tayga -c nat64-static.conf 

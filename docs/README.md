@@ -1,6 +1,6 @@
-# How to use Tayga
+# How to use TAYGA
 
-If you just want to install / use Tayga, skip down to [Installation](#installation--basic-configuration)
+If you just want to install / use TAYGA, skip down to [Installation](#installation--basic-configuration)
 
 ## Stateless versus Stateful NAT64
 
@@ -86,7 +86,7 @@ service log, if your network requires this information
 
 ## Installation & Basic Configuration
 
-TAYGA requires GNU make to build.
+`tayga` requires GNU `make` to build.
 
 ```sh
 git clone git@github.com:apalrd/tayga.git
@@ -104,8 +104,8 @@ create a directory to store the dynamic.map file:
 mkdir -p /var/db/tayga
 ```
 
-Now create your site-specific tayga.conf configuration file.  The installed
-tayga.conf.example file can be copied to tayga.conf and modified to suit your
+Now create your site-specific `tayga.conf` configuration file.  The installed
+`tayga.conf.example` file can be copied to `tayga.conf` and modified to suit your
 site.  Here is a sample minimal configuration:
 
 ```ini
@@ -118,16 +118,16 @@ data-dir /var/db/tayga          # omit if you do not need persistent
                                 # dynamic address maps
 ```
 
-Before starting the TAYGA daemon, the routing setup on your system will need
-to be changed to send IPv4 and IPv6 packets to TAYGA.  First create the TUN
+Before starting the `tayga` daemon, the routing setup on your system will need
+to be changed to send IPv4 and IPv6 packets to `tayga`.  First create the TUN
 network interface:
 
 ```sh
 tayga --mktun
 ```
 
-If TAYGA prints any errors, you will need to fix your config file before
-continuing.  Otherwise, the new nat64 interface can be configured and the
+If `tayga` prints any errors, you will need to fix your config file before
+continuing.  Otherwise, the new `nat64` interface can be configured and the
 proper routes can be added to your system:
 
 ```sh
@@ -145,7 +145,7 @@ ip6tables -A FORWARD -s 2001:db8:1::/48 -d 2001:db8:1:ffff::/96 -j ACCEPT
 ip6tables -A FORWARD -d 2001:db8:1:ffff::/96 -j DROP
 ```
 
-At this point, you may start the tayga process:
+At this point, you may start the `tayga` process:
 
 ```sh
 tayga
@@ -154,8 +154,8 @@ tayga
 Check your system log (`/var/log/syslog` or `/var/log/messages`) for status
 information.
 
-If you are having difficulty configuring TAYGA, use the -d option to run the
-tayga process in the foreground and send all log messages to stdout:
+If you are having difficulty configuring `tayga`, use the `-d` option to run the
+`tayga` process in the foreground and send all log messages to stdout:
 
 ```sh
 tayga -d
@@ -168,4 +168,4 @@ Many example configurations are provided, each with an example `tayga.conf` as w
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
 * [Stateless 464XLAT CLAT](clat/README.md)
 * [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
-* [Container Docs](container/README.md) for using prebuilt Tayga containers
+* [Container Docs](container/README.md) for using prebuilt TAYGA containers

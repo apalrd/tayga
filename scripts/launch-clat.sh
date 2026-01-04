@@ -1,4 +1,4 @@
-## Launch Tayga within a container
+## Launch tayga within a container
 
 
 # Enable Forwarding
@@ -12,7 +12,7 @@ TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
 TAYGA_MTU="${TAYGA_MTU:-65535}"
 TAYGA_LOG="${TAYGA_LOG:-drop reject icmp self dyn}"
-#Default address for Tayga s in the DS-Lite range for CLAT use
+#Default address for tayga s in the DS-Lite range for CLAT use
 TAYGA_ADDR4="${TAYGA_ADDR:-192.0.0.2}"
 #Must specify ADDR6 for clat
 WILLEXIT=""

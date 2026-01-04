@@ -45,14 +45,14 @@ The
 .B \-\-mktun
 and
 .B \-\-rmtun
-options instruct TAYGA to create or destroy, respectively, its configured TUN
+options instruct `tayga` to create or destroy, respectively, its configured TUN
 device as a "persistent" interface and then immediately exit.
 .P
-Persistent TUN devices remain present on the host system even when TAYGA is
+Persistent TUN devices remain present on the host system even when `tayga` is
 not running.  This allows host-side network parameters and firewall rules to
 be configured prior to commencement of packet translation.  This may simplify
 network configuration on the host; for example, systems which use a
-Debian-style /etc/network/interfaces file may configure TAYGA's TUN device at
+Debian-style /etc/network/interfaces file may configure tayga's TUN device at
 boot by running `tayga \-\-mktun` as a "pre-up" command and then configuring the
 TUN device as any other network interface.
 

@@ -1,4 +1,4 @@
-## Launch Tayga within a container
+## Launch tayga within a container
 
 # Enable Forwarding
 echo "Enabling IPv4 and IPv6 forwarding"
@@ -9,7 +9,7 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 TAYGA_PREF64="${TAYGA_PREF64:-64:ff9b::/96}"
 TAYGA_POOL4="${TAYGA_POOL4:-192.168.240.0/20}"
 TAYGA_ADDR4="${TAYGA_ADDR:-192.168.240.1}"
-#Addr6 not set, Tayga will choose on its own
+#Addr6 not set, tayga will choose on its own
 TAYGA_WKPF_STRICT="${TAYGA_WKPF_STRICT:-no}"
 TAYGA_LOG="${TAYGA_LOG:-drop reject icmp self dyn}"
 

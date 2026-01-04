@@ -83,7 +83,7 @@ def rfc6052_mapping():
     rt.apply()
 
     # /32
-    # Reconfigure Tayga:
+    # Reconfigure tayga:
     test.tayga_conf.default()
     test.tayga_conf.prefix = "3fff:6464::/32"
     test.reload() 
@@ -116,7 +116,7 @@ def rfc6052_mapping():
 
 
     # /40
-    # Reconfigure Tayga:
+    # Reconfigure tayga:
     test.tayga_conf.prefix = "3fff:6464::/40"
     test.reload()
     #v6 -> v4
@@ -148,7 +148,7 @@ def rfc6052_mapping():
 
 
     # /48
-    # Reconfigure Tayga:
+    # Reconfigure tayga:
     test.tayga_conf.prefix = "3fff:6464::/48"
     test.reload()
     #v6 -> v4
@@ -179,7 +179,7 @@ def rfc6052_mapping():
     test.send_and_check(send_pkt,ip6_val, "/48 v4->v6")
 
     # /56
-    # Reconfigure Tayga:
+    # Reconfigure tayga:
     test.tayga_conf.prefix = "3fff:6464::/56"
     test.reload()
     #v6 -> v4
@@ -210,7 +210,7 @@ def rfc6052_mapping():
     test.send_and_check(send_pkt,ip6_val, "/56 v4->v6")
 
     # /64
-    # Reconfigure Tayga:
+    # Reconfigure tayga:
     test.tayga_conf.prefix = "3fff:6464::/64"
     test.reload()
     #v6 -> v4
@@ -241,7 +241,7 @@ def rfc6052_mapping():
     test.send_and_check(send_pkt,ip6_val, "/64 v4->v6")
 
     # /96
-    #reconfigure tayga
+    # Reconfigure tayga
     test.tayga_conf.default()
     test.reload()
     expect_sa = test.public_ipv6_xlate
@@ -371,7 +371,7 @@ def rfc7757_eam():
             send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(this_net4.broadcast_address+1),proto=16) / Raw(expect_data)
             test.send_and_check(send_pkt,ip6_val, test_nm+" src over v4->v6")
 
-            # Restart Tayga to catch any caching issues here
+            # Restart tayga to catch any caching issues here
             test.reload()
             rt_v6.apply()
             #v6 -> v4
@@ -435,7 +435,7 @@ def rfc7757_eam():
             expect_proto = 16
 
     # Fail unequal lengths until #37 is resolved
-    # That is commented out as it Tayga will exit with error
+    # That is commented out as it tayga will exit with error
     test.tfail("Unequal Suffix Legnths","See Issue #37")
 
     ####
@@ -542,7 +542,7 @@ def rfc7757_eam():
     test.send_and_check(send_pkt,ip6_val, "overlap src over net2 v4->v6")
 
 
-    ## This section will crash Tayga
+    ## This section will crash tayga
     ## So it has been commented out
     test.tfail("IPv6 Overlapping Ranges","See Issue #10")
     test.section("Explicit Address Mapping (RFC 7757 3.2)")
@@ -616,7 +616,7 @@ def dynamic_pool():
     test.send_and_check(send_pkt,ip_val, "send packet to map range without mapping")
 
     # Send a packet to establish the mapping
-    expect_sa = "169.254.0.80" #This depends on Tayga's hashing algorithm
+    expect_sa = "169.254.0.80" #This depends on tayga's hashing algorithm
     expect_da = test.public_ipv4
     expect_data = randbytes(128)
     expect_len = 128+20

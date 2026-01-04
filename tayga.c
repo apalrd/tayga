@@ -377,9 +377,9 @@ static void print_op_info(void)
 	char addrbuf[64],addrbuf2[64];
 
 	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
+	slog(LOG_INFO, "tayga's IPv4 address: %s\n", addrbuf);
 	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
+	slog(LOG_INFO, "tayga's IPv6 address: %s\n", addrbuf);
 	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
 	if (m6->type == MAP_TYPE_RFC6052) {
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
@@ -672,7 +672,7 @@ int main(int argc, char **argv)
 		close(pidfd);
 	}
 
-	slog(LOG_INFO, "Starting TAYGA " TAYGA_VERSION "\n");
+	slog(LOG_INFO, "Starting tayga " TAYGA_VERSION "\n");
 	slog(LOG_DEBUG, "Compiled from " TAYGA_BRANCH "\n");
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 

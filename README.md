@@ -12,7 +12,7 @@ Pre-built statically linked binaries are available from [Releases](https://githu
 
 ## Compiling
 
-TAYGA requires GNU make to build. If you would like to run the test suite, see [Test Documentation](test/index.md) for additional dependencies.
+`tayga` requires GNU `make` to build. If you would like to run the test suite, see [Test Documentation](test/index.md) for additional dependencies.
 
 ```sh
 git clone git@github.com:apalrd/tayga.git
@@ -22,21 +22,21 @@ make
 
 This will build the `tayga` executable in the current directory.
 
-Next, if you would like dynamic maps to be persistent between TAYGA restarts, create a directory to store the dynamic.map file:
+Next, if you would like dynamic maps to be persistent between `tayga` restarts, create a directory to store the dynamic.map file:
 
 ```sh
 mkdir -p /var/db/tayga
 ```
 
-Now create your site-specific tayga.conf configuration file.  The installed tayga.conf.example file can be copied to tayga.conf and modified to suit your site. Additionally, many example configurations are available in the [docs](docs/README.md))
+Now create your site-specific `tayga.conf` configuration file.  The installed `tayga.conf.example` file can be copied to `tayga.conf` and modified to suit your site. Additionally, many example configurations are available in the [docs](docs/README.md))
 
-Before starting the TAYGA daemon, the routing setup on your system will need to be changed to send IPv4 and IPv6 packets to TAYGA.  First create the TUN network interface:
+Before starting the `tayga` daemon, the routing setup on your system will need to be changed to send IPv4 and IPv6 packets to `tayga`.  First create the TUN network interface:
 
 ```sh
 tayga --mktun
 ```
 
-If TAYGA prints any errors, you will need to fix your config file before continuing. Otherwise, the new interface (`nat64` in this example) can be configured and the proper routes can be added to your system.
+If `tayga` prints any errors, you will need to fix your config file before continuing. Otherwise, the new interface (`nat64` in this example) can be configured and the proper routes can be added to your system.
 
 Firewalling your NAT64 prefix from outside access is highly recommended:
 
@@ -45,7 +45,7 @@ ip6tables -A FORWARD -s 2001:db8:1::/48 -d 2001:db8:1:ffff::/96 -j ACCEPT
 ip6tables -A FORWARD -d 2001:db8:1:ffff::/96 -j DROP
 ```
 
-At this point, you may start the tayga process:
+At this point, you may start the `tayga` process:
 
 ```sh
 tayga
@@ -54,8 +54,8 @@ tayga
 Check your system log (`/var/log/syslog` or `/var/log/messages`) for status
 information.
 
-If you are having difficulty configuring TAYGA, use the -d option to run the
-tayga process in the foreground and send all log messages to stdout:
+If you are having difficulty configuring `tayga`, use the `-d` option to run the
+`tayga` process in the foreground and send all log messages to stdout:
 
 ```sh
 tayga -d
