@@ -40,6 +40,14 @@ help:
 	@echo 'test            - Run the test suite'
 	@echo 'integration     - Run integration tests. Requires root permissions'
 	@echo 'install         - Installs tayga and manpages'
+	@echo 'clean           - Remove compiled files'
+	@echo
+	@echo 'Compilation Variables:'
+	@echo 'WITH_EBPF	    - Compile with eBPF support (Linux only)'
+	@echo 'WITH_MULTIQUEUE  - Compile with multi-queue support (Linux only)'
+	@echo 'WITH_SEG_OFFLOAD - Compile with segmentation offload support (Linux only)'
+	@echo 'WITH_URING       - Compile with io_uring support (Linux only)'
+#TBD which optimizations we will support on BSD
 	@echo
 	@echo 'Installation Variables:'
 	@echo 'LIVE            - Install on a live system (daemon-reload)'
@@ -54,6 +62,10 @@ define VERSION_HEADER
 #define TAYGA_VERSION "$(TAYGA_VERSION)"
 #define TAYGA_BRANCH  "$(TAYGA_BRANCH)"
 #define TAYGA_COMMIT  "$(TAYGA_COMMIT)"
+#define WITH_EBPF	$(if $(WITH_EBPF),1,0)
+#define WITH_MULTIQUEUE	$(if $(WITH_MULTIQUEUE),1,0)
+#define WITH_SEG_OFFLOAD $(if $(WITH_SEG_OFFLOAD),1,0)
+#define WITH_URING	$(if $(WITH_URING),1,0)
 
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
