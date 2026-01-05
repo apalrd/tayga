@@ -110,7 +110,7 @@ struct tun_pi {
 #if WITH_MULTIQUEUE
 #define MAX_THREADS 64
 #else
-#define MAX_THREADS 1
+#define MAX_THREADS 0
 #endif
 
 
@@ -196,6 +196,7 @@ struct pkt {
 	uint8_t *data;
 	uint32_t data_len;
 	uint32_t header_len; /* inc IP hdr for v4 but excl IP hdr for v6 */
+	int tun_fd;
 };
 
 // Ensure that the data field has enough alignment for ip4 and ip6 structs
@@ -335,6 +336,7 @@ struct config {
 	pthread_mutex_t cache_mutex;
 	pthread_mutex_t map_mutex;
 	pthread_t threads[MAX_THREADS];
+	int tun_fd_addl[MAX_THREADS];
 };
 
 /// Logging flags

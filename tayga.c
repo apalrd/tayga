@@ -99,6 +99,9 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN;
+#if WITH_MULTIQUEUE
+	ifr.ifr_flags |= IFF_MULTI_QUEUE;
+#endif
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
@@ -169,6 +172,31 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
+
+	/* Setup multiqueue additional queues */
+#if WITH_MULTIQUEUE
+	slog(LOG_DEBUG,"Main tun fd is %d\n",gcfg->tun_fd);
+	for(int i = 0; i < gcfg->num_threads; i++) {
+		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
+		if (gcfg->tun_fd_addl[i] < 0) {
+			slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
+					strerror(errno));
+			exit(1);
+		}
+		slog(LOG_DEBUG,"Addl tun fd %d is %d\n",i,gcfg->tun_fd_addl[i]);
+
+		memset(&ifr, 0, sizeof(ifr));
+		ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
+		strcpy(ifr.ifr_name, gcfg->tundev);
+		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
+			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
+					"%s\n", gcfg->tundev, strerror(errno));
+			exit(1);
+			}
+		slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
+	}
+
+#endif
 }
 #endif /* ifdef __linux__ */
 
@@ -304,13 +332,14 @@ static void signal_setup(void)
 	sigaction(SIGTERM, &act, NULL);
 }
 
-static void read_from_tun(uint8_t * recv_buf)
+static void read_from_tun(uint8_t * recv_buf,int tun_fd)
 {
 	int ret;
 	struct tun_pi *pi = (struct tun_pi *)recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(gcfg->tun_fd, recv_buf, gcfg->recv_buf_size);
+	ret = read(tun_fd, recv_buf, gcfg->recv_buf_size);
+	//slog(LOG_DEBUG,"Processing %d bytes from tun %d\n",ret,tun_fd);
 	if (ret < 0) {
 		if (errno == EAGAIN)
 			return;
@@ -330,6 +359,7 @@ static void read_from_tun(uint8_t * recv_buf)
 	memset(p, 0, sizeof(struct pkt));
 	p->data = recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
+	p->tun_fd = tun_fd;
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
 		handle_ip4(p);
@@ -444,11 +474,21 @@ static void print_op_info(void)
 
 /* Worker thread for multiqueue tun interface */
 #if WITH_MULTIQUEUE
-static void worker(void)
+static void * worker(void * arg)
 {
-	/* Open tun adapter with multiqueue */
+
+	uint8_t * recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
+	if (!recv_buf) {
+		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
+				"receive buffer\n", gcfg->recv_buf_size);
+		exit(1);
+	}
 
 	/* Enter worker loop */
+	slog(LOG_DEBUG,"Starting worker thread\n");
+	for (;;) {
+		read_from_tun(recv_buf,gcfg->tun_fd_addl[0]);
+	}	
 }
 #endif
 
@@ -716,6 +756,8 @@ int main(int argc, char **argv)
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 
+	/* Set addl threads to 1 */
+	gcfg->num_threads = 1;
 	tun_setup(0, 0);
 
 	if (do_chroot) {
@@ -789,6 +831,22 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+	
+	/* Launch worker threads */
+	ret = pthread_create(&gcfg->threads[0], NULL, worker, NULL);
+	if (ret != 0) {
+		int i = 0;
+		slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
+			i, strerror(ret));
+		/* Clean up already created threads? */
+		//atomic_store(&pool->shutdown, 1);
+		//for (int j = 0; j < i; j++) {
+		//	pthread_join(pool->threads[j], NULL);
+		//}
+		//free(pool->threads);
+		//pool->threads = NULL;
+		//return -1;
+	}
 
 	/* Main loop */
 	for (;;) {
@@ -804,7 +862,7 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			read_from_tun(recv_buf);
+			read_from_tun(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
