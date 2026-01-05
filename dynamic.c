@@ -338,9 +338,9 @@ static void write_to_file(struct dynamic_pool *pool)
 				strerror(errno));
 		return;
 	}
-	fprintf(out, "###\n###\n### TAYGA dynamic map database\n###\n"
+	fprintf(out, "###\n###\n### tayga dynamic map database\n###\n"
 			"### You can edit this (carefully!) as long as "
-			"you shut down TAYGA first\n###\n###\n"
+			"you shut down tayga first\n###\n###\n"
 			"### Last written: %s###\n###\n\n",
 			asctime(gmtime(&now)));
 	entry = pool->mapped_list.next;

@@ -20,5 +20,5 @@ ip route add default dev clat mtu 1260
 # Add IPv6 address (implicitly adds /64 route)
 ip addr add fd64::/64 dev clat
 
-# Start Tayga
+# Start tayga
 tayga -c clat-masq.conf 

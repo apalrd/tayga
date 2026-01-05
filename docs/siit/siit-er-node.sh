@@ -11,7 +11,7 @@ ip link set dev siit up
 ip route add default dev siit
 # Add global IPv4 address 
 ip addr add 192.51.0.27/32 dev siit
-# Add route to Tayga's v6 address, and the node's v4-translated address
+# Add route to tayga's v6 address, and the node's v4-translated address
 ip route add 2001:db8:beef::1679/128 dev siit
 ip route add 2001:db8:beef::ff92/128 dev siit
 
@@ -21,5 +21,5 @@ echo 1 > /proc/sys/net/ipv6/conf/eth0/proxy_ndp
 ip neigh add proxy 2001:db8:beef::1679 dev eth0
 ip neigh add proxy 2001:db8:beef::ff92 dev eth0
 
-# Start Tayga
+# Start tayga
 tayga -c siit-er-node.conf 

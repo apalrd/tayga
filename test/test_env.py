@@ -11,7 +11,7 @@ from enum import Enum
 import socket
 
 class route_dest(Enum):
-    ROUTE_NORMAL = 0 # route to Tayga
+    ROUTE_NORMAL = 0 # route to tayga
     ROUTE_TEST = 1 #route to test system
     ROUTE_BLACKHOLE = 2
     ROUTE_UNREACHABLE = 3
@@ -112,7 +112,7 @@ class test_result:
                 err.append(result.msg)
         return ','.join(err)
     
-#Tayga conf file generator
+#tayga conf file generator
 class confgen:
     def __init__(self):
         self.default()
@@ -158,7 +158,7 @@ class confgen:
 
 class test_env:
     def cleanup(self):
-        print("Stopping Tayga")
+        print("Stopping tayga")
         
         # Kill tcpdump process using the subprocess object
         if hasattr(self, 'tcpdump_proc') and self.tcpdump_proc:
@@ -170,17 +170,17 @@ class test_env:
                 self.tcpdump_proc.kill()
                 print("Tcpdump process did not terminate gracefully, force killed")
 
-        # Kill Tayga process using the subprocess object
+        # Kill tayga process using the subprocess object
         if hasattr(self, 'tayga_proc') and self.tayga_proc:
             try:
                 self.tayga_proc.terminate()
                 self.tayga_proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.tayga_proc.kill()
-                print("Tayga process did not terminate gracefully, force killed")
+                print("tayga process did not terminate gracefully, force killed")
         else:
             if self.debug:
-                print("Tayga process not found, skipping process termination")
+                print("tayga process not found, skipping process termination")
 
         #Close tayga log file
         if hasattr(self, 'tayga_log') and self.tayga_log is not None:
@@ -238,8 +238,8 @@ class test_env:
     def setup_tayga(self):
         # Generate configl
         self.tayga_conf.generate()
-        print("Starting Tayga")
-        # Start Tayga asynchronously and capture output to a file if specified
+        print("Starting tayga")
+        # Start tayga asynchronously and capture output to a file if specified
         if self.tayga_log_file and not hasattr(self, 'tayga_log'):
             try:
                 self.tayga_log = open(self.tayga_log_file, "w")
@@ -255,9 +255,9 @@ class test_env:
             if self.use_valgrind:
                 #Append valgrind command
                 total_args.extend(self.valgrind_opts)
-            # Append Tayga command
+            # Append ayga command
             total_args.append(self.tayga_bin)
-            # Append args to Tayga
+            # Append args to tayga
             total_args.extend(new_args)
             self.tayga_proc = subprocess.Popen(
             total_args,
@@ -265,17 +265,17 @@ class test_env:
             stderr=subprocess.STDOUT
             )
         except subprocess.SubprocessError as e:
-            print(f"Error while starting Tayga: {e}")
+            print(f"Error while starting tayga: {e}")
             if self.tayga_log:
                 self.tayga_log.close()
             sys.exit(1)
 
-        # Wait for a short time to ensure Tayga starts
+        # Wait for a short time to ensure tayga starts
         time.sleep(1)
 
-        # Check if Tayga started successfully
+        # Check if tayga started successfully
         if self.tayga_proc.poll() is not None:  # Check if the process has already terminated
-            print("Tayga failed to start")
+            print("tayga failed to start")
             sys.exit(1)
 
     def setup_tun(self):
@@ -345,18 +345,18 @@ class test_env:
         self.setup_tcpdump()
 
     def reload(self):
-        print("Restarting Tayga with new configuration")
-        # Kill Tayga process using the subprocess object
+        print("Restarting tayga with new configuration")
+        # Kill tayga process using the subprocess object
         if hasattr(self, 'tayga_proc') and self.tayga_proc:
             try:
                 self.tayga_proc.terminate()
                 self.tayga_proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.tayga_proc.kill()
-                print("Tayga process did not terminate gracefully, force killed")
+                print("tayga process did not terminate gracefully, force killed")
         else:
             if self.debug:
-                print("Tayga process not found, skipping process termination")
+                print("tayga process not found, skipping process termination")
 
         # Reset link MTU
         ifi = ipr.link_lookup(ifname='nat64')[0]

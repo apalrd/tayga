@@ -18,5 +18,5 @@ ip route add default dev clat mtu 1260
 # Add IPv6 route (/127 adds both ::64 and ::65)
 ip route add 2001:db8:feed::64/127 dev clat 
 
-# Start Tayga
+# Start tayga
 tayga -c clat-route.conf 
