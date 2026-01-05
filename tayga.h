@@ -39,6 +39,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <pthread.h>
+#include "version.h"
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
@@ -103,6 +104,13 @@ struct tun_pi {
 /// Default configuration path
 #ifndef TAYGA_CONF_PATH
 #define TAYGA_CONF_PATH "/etc/tayga.conf"
+#endif
+
+/* Maximum number of threads (sizes thread pool array) */
+#if WITH_MULTIQUEUE
+#define MAX_THREADS 64
+#else
+#define MAX_THREADS 1
 #endif
 
 
@@ -302,7 +310,6 @@ struct config {
 	int tun_fd;
 
 	uint16_t mtu;
-	uint8_t *recv_buf;
 
 	uint32_t rand[8];
 	struct list_head cache_pool;
@@ -324,9 +331,10 @@ struct config {
 		LOG_TO_JOURNAL = 2,
 	} log_out;
 
+	int num_threads;
 	pthread_mutex_t cache_mutex;
 	pthread_mutex_t map_mutex;
-	pthread_mutex_t dynamic_mutex;
+	pthread_t threads[MAX_THREADS];
 };
 
 /// Logging flags

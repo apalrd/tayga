@@ -17,7 +17,6 @@
  */
 
 #include "tayga.h"
-#include "version.h"
 
 #include <stdarg.h>
 #include <signal.h>
@@ -305,13 +304,13 @@ static void signal_setup(void)
 	sigaction(SIGTERM, &act, NULL);
 }
 
-static void read_from_tun(void)
+static void read_from_tun(uint8_t * recv_buf)
 {
 	int ret;
-	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
+	struct tun_pi *pi = (struct tun_pi *)recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
+	ret = read(gcfg->tun_fd, recv_buf, gcfg->recv_buf_size);
 	if (ret < 0) {
 		if (errno == EAGAIN)
 			return;
@@ -329,7 +328,7 @@ static void read_from_tun(void)
 		return;
 	}
 	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
+	p->data = recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
@@ -362,8 +361,11 @@ static void read_from_signalfd(void)
 			slog(LOG_CRIT, "signal fd was closed\n");
 			exit(1);
 		}
-		if (gcfg->dynamic_pool)
+		if (gcfg->dynamic_pool) {
+			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 1);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		if (gcfg->log_out == LOG_TO_SYSLOG) {
 			closelog();
@@ -439,6 +441,16 @@ static void print_op_info(void)
 			s6->prefix_len,s6->type);
 	}
 }
+
+/* Worker thread for multiqueue tun interface */
+#if WITH_MULTIQUEUE
+static void worker(void)
+{
+	/* Open tun adapter with multiqueue */
+
+	/* Enter worker loop */
+}
+#endif
 
 int main(int argc, char **argv)
 {
@@ -755,13 +767,9 @@ int main(int argc, char **argv)
 		slog(LOG_CRIT, "Failed to initialize map mutex\n");
 		exit(1);
 	}
-	if (pthread_mutex_init(&gcfg->dynamic_mutex, NULL) != 0) {
-		slog(LOG_CRIT, "Failed to initialize dynamic mutex\n");
-		exit(1);
-	}
 
-	gcfg->recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
-	if (!gcfg->recv_buf) {
+	uint8_t * recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
+	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
 				"receive buffer\n", gcfg->recv_buf_size);
 		exit(1);
@@ -796,7 +804,7 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			read_from_tun();
+			read_from_tun(recv_buf);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
@@ -806,8 +814,10 @@ int main(int argc, char **argv)
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
 					gcfg->last_dynamic_maint > now)) {
+			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
+			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 	}
 	return 0;
