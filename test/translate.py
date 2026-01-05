@@ -699,7 +699,7 @@ def sec_4_2():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=2) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     test.send_and_check(send_pkt,icmp6_val, "Destination Unreachable Protocol Unreachable")
 
-    # ICMPv4 Fragmentation Needed (and MTU is lower on Tayga)
+    # ICMPv4 Fragmentation Needed (and MTU is lower on tayga)
     expect_class = ICMPv6PacketTooBig()
     expect_type = 2
     expect_code = 0
@@ -718,7 +718,7 @@ def sec_4_2():
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1024) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Small MTU)")
 
-    # ICMPv4 Fragmentation Needed (and MTU is higher on Tayga)
+    # ICMPv4 Fragmentation Needed (and MTU is higher on tayga)
     expect_mtu = 1500
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4)) / ICMP(type=3,code=4,nexthopmtu=1600) / IP(dst=str(test.public_ipv4),src=str(test.public_ipv6_xlate)) / ICMP(type=8,code=0,id=221,seq=19)
     test.send_and_check(send_pkt,icmp6_val, "Fragmentation Needed (Large MTU)")
@@ -1081,21 +1081,21 @@ def sec_4_4():
     test.tayga_conf.default()
     test.reload()
 
-    # Hop Limit Exceeded in Tayga (Data payload)
+    # Hop Limit Exceeded in tayga (Data payload)
     expect_sa = str(test.tayga_ipv4)
     expect_da = str(test.public_ipv4)
     expect_type = 11
     expect_code = 0
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
-    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (UDP)")
+    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in tayga (UDP)")
 
-    # Hop Limit Exceeded in Tayga (ICMP payload)
+    # Hop Limit Exceeded in tayga (ICMP payload)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / ICMP(type=8,code=0,id=24,seq=71)
-    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in Tayga (ICMP Echo)")
+    test.send_and_check(send_pkt,icmp4_val, "Hop Limit Exceeded in tayga (ICMP Echo)")
 
-    # Hop Limit Exceeded in Tayga (ICMP error)
+    # Hop Limit Exceeded in tayga (ICMP error)
     send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4),ttl=2) / ICMP(type=3,code=0,id=24,seq=71)
-    test.send_and_none(send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
+    test.send_and_none(send_pkt, "Hop Limit Exceeded in tayga (ICMP Error)")
 
     
     # IPv4 Requires Fragmentation - DF Bit Set
@@ -1107,9 +1107,9 @@ def sec_4_4():
     test.send_and_check(send_pkt,icmp4_val, "Frag Required and DF Bit Set")
 
 
-    # Host Unrech - within Tayga pool4 but not allocated
+    # Host Unrech - within tayga pool4 but not allocated
 
-    # Proto Unrech - addressed to Tayga itself but not ICMP
+    # Proto Unrech - addressed to tayga itself but not ICMP
 
     # Invalid Addressing must be done with wkpf-strict
     test.tayga_conf.default()
@@ -1408,10 +1408,10 @@ def sec_5_2():
     test.send_and_check(send_pkt,icmp4_val, "Packet Too Big")
 
 
-    # Packet Too Big (w/ MTU above Tayga's MTU)
+    # Packet Too Big (w/ MTU above tayga's MTU)
     expect_type = 3
     expect_code = 4
-    expect_mtu = 1480 # clamped from 1500 mtu on Tayga tun adapter
+    expect_mtu = 1480 # clamped from 1500 mtu on tayga tun adapter
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6PacketTooBig(mtu=1600) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Packet Really Too Big")
     expect_mtu = -1
@@ -1470,7 +1470,7 @@ def sec_5_2():
     #  if the ICMPv6 error is from an IPv6 router on path
     #############################################
 
-    # Expected source address is Tayga's own address
+    # Expected source address is tayga's own address
     expect_sa = test.tayga_ipv4
 
     # No Route to Destination
@@ -1520,10 +1520,10 @@ def sec_5_2():
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6PacketTooBig(mtu=expect_mtu+20) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Packet Too Big")
 
-    # Packet Too Big (w/ MTU above Tayga's MTU)
+    # Packet Too Big (w/ MTU above tayga's MTU)
     expect_type = 3
     expect_code = 4
-    expect_mtu = 1480 # clamped from 1500 mtu on Tayga tun adapter
+    expect_mtu = 1480 # clamped from 1500 mtu on tayga tun adapter
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.icmp_router_ipv6)) / ICMPv6PacketTooBig(mtu=1600) / IPv6(dst=str(test.public_ipv6),src=str(test.public_ipv4_xlate)) / ICMPv6EchoRequest()
     test.send_and_check(send_pkt,icmp4_val, "Packet Really Too Big")
     expect_mtu = -1
@@ -1653,21 +1653,21 @@ def sec_5_4():
     test.tayga_conf.default()
     test.reload()
 
-    # Hop Limit Exceeded In Tayga (UDP)
+    # Hop Limit Exceeded In tayga (UDP)
     expect_class = ICMPv6TimeExceeded()
     expect_sa = test.tayga_ipv6
     expect_type = 3
     expect_code = 0
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / UDP(sport=6969,dport=69,len=72) / Raw(randbytes(64))
-    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (UDP)")
+    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in tayga (UDP)")
    
-    # Hop Limit Exceeded In Tayga (ICMP)
+    # Hop Limit Exceeded In tayga (ICMP)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoRequest(id=42,seq=89)
-    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in Tayga (ICMP)")
+    test.send_and_check(send_pkt,icmp6_val, "Hop Limit Exceeded in tayga (ICMP)")
    
-    # Hop Limit Exceeded In Tayga (ICMP Error)
+    # Hop Limit Exceeded In tayga (ICMP Error)
     send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),hlim=2) / ICMPv6EchoReply(id=43,seq=88)
-    test.send_and_none(send_pkt, "Hop Limit Exceeded in Tayga (ICMP Error)")
+    test.send_and_none(send_pkt, "Hop Limit Exceeded in tayga (ICMP Error)")
     
     # Packet Too Big (Linux masks this one)
     #expect_class = ICMPv6PacketTooBig()
@@ -1675,7 +1675,7 @@ def sec_5_4():
     #test.send_and_check(send_pkt,icmp6_val, "Packet Too Big")
 
 
-    # Protocol addressed to Tayga
+    # Protocol addressed to tayga
     expect_class = ICMPv6ParamProblem()
     expect_type = 4
     expect_code = 1

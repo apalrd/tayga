@@ -16,5 +16,5 @@ ip addr add 2001:db8:beef:6464::/64 dev nat64
 # Add pref64 route (distribute this via your routing protocol)
 ip route add 64:ff9b::/96 dev nat64
 
-# Start Tayga
+# Start tayga
 tayga -c siit-br.conf 

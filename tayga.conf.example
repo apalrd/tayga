@@ -1,11 +1,11 @@
 #
-# Sample configuration file for TAYGA 0.9.6
+# Sample configuration file for tayga 0.9.6
 #
 # Modify this to use your own addresses!!
 #
 
 #
-# TUN device that TAYGA will use to exchange IPv4 and IPv6 packets with the
+# TUN device that tayga will use to exchange IPv4 and IPv6 packets with the
 # kernel.  You may use any name you like, but `nat64' is recommended.
 #
 # This device may be created before starting the tayga daemon by running
@@ -17,9 +17,9 @@
 tun-device nat64
 
 #
-# TAYGA's IPv4 address.  This is NOT your router's IPv4 address!  TAYGA
+# tayga's IPv4 address.  This is NOT your router's IPv4 address!  tayga
 # requires its own address because it acts as an IPv4 and IPv6 router, and
-# needs to be able to send ICMP messages.  TAYGA will also respond to ICMP
+# needs to be able to send ICMP messages.  tayga will also respond to ICMP
 # echo requests (ping) at this address.
 #
 # This address can safely be located inside the dynamic-pool prefix.
@@ -29,12 +29,12 @@ tun-device nat64
 ipv4-addr 192.168.255.1
 
 #
-# TAYGA's IPv6 address.  This is NOT your router's IPv6 address!  TAYGA
+# tayga's IPv6 address.  This is NOT your router's IPv6 address!  tayga
 # requires its own address because it acts as an IPv4 and IPv6 router, and
-# needs to be able to send ICMP messages.  TAYGA will also respond to ICMP
+# needs to be able to send ICMP messages.  tayga will also respond to ICMP
 # echo requests (ping6) at this address.
 #
-# You can leave ipv6-addr unspecified and TAYGA will construct its IPv6
+# You can leave ipv6-addr unspecified and tayga will construct its IPv6
 # address using ipv4-addr and the NAT64 prefix.
 #
 # Optional if the NAT64 prefix is specified, otherwise mandatory.  It is also
@@ -72,7 +72,7 @@ prefix 2001:db8:1:ffff::/96
 wkpf-strict no
 
 #
-# Dynamic pool prefix.  IPv6 hosts which send traffic through TAYGA (and do
+# Dynamic pool prefix. IPv6 hosts which send traffic through tayga (and do
 # not correspond to a static map or an IPv4-translatable address in the NAT64
 # prefix) will be assigned an IPv4 address from the dynamic pool.  Dynamic
 # maps are valid for 124 minutes after the last matching packet is seen.
@@ -86,12 +86,12 @@ wkpf-strict no
 dynamic-pool 192.168.255.0/24
 
 #
-# Persistent data storage directory.  The dynamic.map file, which saves the
+# Persistent data storage directory. The dynamic.map file, which saves the
 # dynamic maps that are created from dynamic-pool, is stored in this 
 # directory.  Omit if you do not need these maps to be persistent between
-# instances of TAYGA.
+# instances of tayga.
 #
-# Tayga will also respect the environment variable STATE_DIRECTORY if
+# tayga will also respect the environment variable STATE_DIRECTORY if
 # this configuration flag is not set
 #
 # Optional.
@@ -99,7 +99,7 @@ dynamic-pool 192.168.255.0/24
 #data-dir /var/lib/tayga
 
 #
-# Establishes a single-host map.  If an IPv6 host should be consistently
+# Establishes a single-host map. If an IPv6 host should be consistently
 # reachable at a specific IPv4 address, the mapping can be specified in a
 # `map' directive.  (IPv6 hosts numbered with an IPv4-translatable address do
 # not need map directives.)
@@ -117,7 +117,7 @@ dynamic-pool 192.168.255.0/24
 #
 # Handling of UDP packets with zero checksum
 # Per RFC7915, we can either drop the packet, or calculate a new checksum
-# Additionally, Tayga also allows the option of forwarding the packet anyway
+# Additionally, tayga also allows the option of forwarding the packet anyway
 #
 # Valid values:
 #   drop
@@ -137,7 +137,7 @@ dynamic-pool 192.168.255.0/24
 #   drop - packets which were DROPPED
 #   reject - packets which were REJECTED (ICMP returned)
 #   icmp - packets which returned an ICMP for any other reason
-#   self - packets which were addressed to Tayga itself
+#   self - packets which were addressed to tayga itself
 #   dyn - log dynamic pool mapping events
 #
 # Default value: none
@@ -147,7 +147,7 @@ dynamic-pool 192.168.255.0/24
 #
 # Off-Link MTU
 #
-# Tayga will fragment IPv4->IPv6 packets which are larger than this size,
+# tayga will fragment IPv4->IPv6 packets which are larger than this size,
 # unless the Don't Fragment bit is set. 
 #
 # IPv6 guarantees delivery of packets which are 1280 bytes or less. This
@@ -155,7 +155,7 @@ dynamic-pool 192.168.255.0/24
 # MTU on subsequent links. IPv6 routers do not fragment packets which are
 # too large, and IPv4 does not require Path MTU Discovery be used. 
 #
-# Increasing this limit will allow Tayga to translate packets which are larger
+# Increasing this limit will allow tayga to translate packets which are larger
 # than 1280 bytes, which may increase performance if you can guarantee that
 # your network can transport packets up to this MTU end to end.
 #

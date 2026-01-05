@@ -21,7 +21,7 @@ ip addr add 2001:db8:beef:6464::/64 dev nat64
 # Add pref64 route (distribute this via your routing protocol)
 ip route add 64:ff9b::/96 dev nat64
 
-# Start Tayga
+# Start tayga
 tayga -c nat64-dynpool.conf 
 # Alternatively, start the service with systmed
 #systemctl start tayga@nat64-dynpool

@@ -1,3 +1,7 @@
+# How to use TAYGA
+
+If you just want to install / use TAYGA, skip down to [Installation](#installation--basic-configuration)
+
 ## Stateless versus Stateful NAT64
 
 Most people are familiar with stateful NAT, which allows N:1 address mapping
@@ -80,9 +84,9 @@ carved out of the NAT64 prefix.)
 The `log dyn` option allows the dynamic mapping assignments to be printed to the
 service log, if your network requires this information
 
-# Installation & Basic Configuration
+## Installation & Basic Configuration
 
-TAYGA requires GNU make to build.
+`tayga` requires GNU `make` to build.
 
 ```sh
 git clone git@github.com:apalrd/tayga.git
@@ -100,8 +104,8 @@ create a directory to store the dynamic.map file:
 mkdir -p /var/db/tayga
 ```
 
-Now create your site-specific tayga.conf configuration file.  The installed
-tayga.conf.example file can be copied to tayga.conf and modified to suit your
+Now create your site-specific `tayga.conf` configuration file.  The installed
+`tayga.conf.example` file can be copied to `tayga.conf` and modified to suit your
 site.  Here is a sample minimal configuration:
 
 ```ini
@@ -114,16 +118,16 @@ data-dir /var/db/tayga          # omit if you do not need persistent
                                 # dynamic address maps
 ```
 
-Before starting the TAYGA daemon, the routing setup on your system will need
-to be changed to send IPv4 and IPv6 packets to TAYGA.  First create the TUN
+Before starting the `tayga` daemon, the routing setup on your system will need
+to be changed to send IPv4 and IPv6 packets to `tayga`.  First create the TUN
 network interface:
 
 ```sh
 tayga --mktun
 ```
 
-If TAYGA prints any errors, you will need to fix your config file before
-continuing.  Otherwise, the new nat64 interface can be configured and the
+If `tayga` prints any errors, you will need to fix your config file before
+continuing.  Otherwise, the new `nat64` interface can be configured and the
 proper routes can be added to your system:
 
 ```sh
@@ -141,7 +145,7 @@ ip6tables -A FORWARD -s 2001:db8:1::/48 -d 2001:db8:1:ffff::/96 -j ACCEPT
 ip6tables -A FORWARD -d 2001:db8:1:ffff::/96 -j DROP
 ```
 
-At this point, you may start the tayga process:
+At this point, you may start the `tayga` process:
 
 ```sh
 tayga
@@ -150,30 +154,18 @@ tayga
 Check your system log (`/var/log/syslog` or `/var/log/messages`) for status
 information.
 
-If you are having difficulty configuring TAYGA, use the -d option to run the
-tayga process in the foreground and send all log messages to stdout:
+If you are having difficulty configuring `tayga`, use the `-d` option to run the
+`tayga` process in the foreground and send all log messages to stdout:
 
 ```sh
 tayga -d
 ```
 
-# Container Usage
-Tayga provides a `Containerfile` which may be used in containerized environments. Tayga relies on the kernel tun/tap interface, as such, the container environment must provide access to `/dev/net/tun` with adequate permissions. The container launch script relies on several environment variables to configure the tun adapter within the container:
+## Usage Guides
 
-| Environment Variable | Description                                                                 |
-|-----------------------|-----------------------------------------------------------------------------|
-| `TAYGA_POOL4`     | IPv4 pool for dynamic use by Tayga (CIDR notation, default `192.168.255.0/24`)            |
-| `TAYGA_POOL6`   | IPv6 prefix to be used for NAT64 translation (CIDR notation, default `64:ff9b::/96`)                    |
-| `TAYGA_WKPF_STRICT`   | Select if the RFC6052 limitations on use of the well-known prefix (`64:ff9b::/96`) along with non-global IPv4 addresses should be enforced (default `no`)                   |
-| `TAYGA_ADDR4`   | The IPv4 address used by Tayga to source ICMPv4 packets. If not provided, the container launch script will choose the first IPv4 address assigned to the container's `eth0` interface.                    |
-| `TAYGA_ADDR6`   | The IPv6 address used by Tayga to source ICMPv6 packets. If not provided, the container launch script will choose the first IPv6 address assigned to the container's `eth0` interface.                    |
-
-If you wish to provide a custom `tayga.conf`, you may override `/app/tayga.conf` and the launch script will not overwrite it. The variables `pool4` and `pool6` are still required to configure the tunnel interface.
-
-
-# Example Configurations
 Many example configurations are provided, each with an example `tayga.conf` as well as a shell script to launch the configuraton on Linux (assuming basic `iproute2` network setup and `iptables`). Feel free to reference all of these examples for your own configuration.
 
 * [Stateful NAT64 and 464XLAT PLAT](nat64/README.md)
 * [Stateless 464XLAT CLAT](clat/README.md)
 * [Statelsss IP/ICMP Translation (SIIT-DC)](siit/README.md)
+* [Container Docs](container/README.md) for using prebuilt TAYGA containers

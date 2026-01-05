@@ -8,7 +8,7 @@ echo 2 > /proc/sys/net/ipv6/conf/eth0/accept_ra
 #Proxy NDP the CLAT address
 echo 1 > /proc/sys/net/ipv6/conf/eth0/proxy_ndp
 
-#Proxy both Tayga's address and mapped address
+#Proxy both tayga's address and mapped address
 #You will need to genreate two addresses in your LAN subnet!
 ip neigh add proxy 2001:db8:feed::6 dev eth0
 ip neigh add proxy 2001:db8:feed::7 dev eth0
@@ -25,5 +25,5 @@ ip route add default dev clat mtu 1260
 # Add IPv6 route (/127 adds both ::7 and ::6)
 ip route add 2001:db8:feed::6/127 dev clat 
 
-# Start Tayga
+# Start tayga
 tayga -c clat-proxynd.conf

@@ -92,8 +92,7 @@ integration: tayga
 
 .PHONY: clean
 clean:
-	$(RM) tayga version.h
-	$(RM) unit_conffile *.gcda *.gcno
+	$(RM) tayga version.h tayga-nat64.tar tayga-clat.tar tayga.tar
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
@@ -123,3 +122,49 @@ ifdef WITH_OPENRC
 	$(INSTALL_DATA) scripts/tayga.confd $(DESTDIR)$(sysconfdir)/conf.d/tayga
 	test -e $(DESTDIR)$(sysconfdir)/tayga.conf || $(INSTALL_DATA) tayga.conf.example $(DESTDIR)$(sysconfdir)/tayga.conf
 endif
+
+
+# Container images
+# As these are multi-arch containers,
+# the build env requires qemu-user-static
+# These are not listed in help as they are intended
+# only for use by the build github actions
+container: tayga-clat.tar tayga-nat64.tar tayga.tar
+.PHONY: container
+
+# Flags for Podman
+PODMAN_FLAGS := --cgroup-manager=cgroupfs
+ifdef CONT_ALL
+#Option to build for all platforms
+PODMAN_FLAGS += --all-platforms
+endif
+
+tayga.tar: scripts/launch.sh
+	$(RM) $@
+	podman manifest create tayga
+	podman build $(PODMAN_FLAGS) . --manifest tayga
+ifdef CONT_PUSH
+	podman manifest push --all tayga ghcr.io/apalrd/tayga:latest
+endif
+	podman save -o $@ tayga
+
+
+tayga-clat.tar: scripts/launch-clat.sh
+	$(RM) $@
+	podman manifest create tayga-clat
+	podman build $(PODMAN_FLAGS) . --manifest tayga-clat --target final-clat
+ifdef CONT_PUSH
+	podman manifest push --all tayga-clat ghcr.io/apalrd/tayga-clat:latest
+endif
+	podman save -o $@ tayga-clat
+	podman manifest rm tayga-clat
+
+tayga-nat64.tar: scripts/launch-nat64.sh
+	$(RM) $@
+	podman manifest create tayga-nat64
+	podman build $(PODMAN_FLAGS) . --manifest tayga-nat64 --target final-nat64
+ifdef CONT_PUSH
+	podman manifest push --all tayga-nat64 ghcr.io/apalrd/tayga-nat64:latest
+endif
+	podman save -o $@ tayga-nat64
+	podman manifest rm tayga-nat64
