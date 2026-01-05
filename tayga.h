@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <time.h>
 #include <stdarg.h>
+#include <pthread.h>
 #if defined(__linux__)
 #include <linux/if.h>
 #include <linux/if_tun.h>
@@ -322,6 +323,10 @@ struct config {
 		LOG_TO_STDOUT = 1,
 		LOG_TO_JOURNAL = 2,
 	} log_out;
+
+	pthread_mutex_t cache_mutex;
+	pthread_mutex_t map_mutex;
+	pthread_mutex_t dynamic_mutex;
 };
 
 /// Logging flags
@@ -379,10 +384,8 @@ struct map4 *find_map4(const struct in_addr *addr4);
 struct map6 *find_map6(const struct in6_addr *addr6);
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len);
-int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
-		struct cache_entry **c_ptr);
-int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
-		struct cache_entry **c_ptr, int dyn_alloc);
+int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4);
+int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6, int dyn_alloc);
 void addrmap_maint(void);
 
 /* conffile.c */

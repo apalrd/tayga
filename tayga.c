@@ -746,6 +746,20 @@ int main(int argc, char **argv)
 	if (gcfg->cache_size)
 		create_cache();
 
+	/* Initialize mutexes */
+	if (pthread_mutex_init(&gcfg->cache_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize cache mutex\n");
+		exit(1);
+	}
+	if (pthread_mutex_init(&gcfg->map_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize map mutex\n");
+		exit(1);
+	}
+	if (pthread_mutex_init(&gcfg->dynamic_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize dynamic mutex\n");
+		exit(1);
+	}
+
 	gcfg->recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
 	if (!gcfg->recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "

@@ -287,6 +287,7 @@ void create_cache(void)
 	}
 }
 
+/* This must be called within cache mutex lock */
 static struct cache_entry *cache_insert(const struct in_addr *addr4,
 		const struct in6_addr *addr6,
 		uint32_t hash4, uint32_t hash6)
@@ -489,8 +490,7 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
  * @param[out] c_ptr Cache entry
  * @returns ERROR_REJECT or ERROR_DROP on error
  */
-int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
-		struct cache_entry **c_ptr)
+int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4)
 {
 	uint32_t hash = 0;
 	int ret;
@@ -503,21 +503,25 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	if (gcfg->cache_size) {
 		hash = hash_ip4(addr4);
 
+		pthread_mutex_lock(&gcfg->cache_mutex);
 		list_for_each(entry, &gcfg->hash_table4[hash]) {
 			c = list_entry(entry, struct cache_entry, hash4);
 			if (addr4->s_addr == c->addr4.s_addr) {
 				*addr6 = c->addr6;
 				c->last_use = now;
-				if (c_ptr)
-					*c_ptr = c;
+				pthread_mutex_unlock(&gcfg->cache_mutex);
 				return 0;
 			}
 		}
+		pthread_mutex_unlock(&gcfg->cache_mutex);
 	}
 
+
+	pthread_mutex_lock(&gcfg->map_mutex);
 	map4 = find_map4(addr4);
 
 	if (!map4) {
+		pthread_mutex_unlock(&gcfg->map_mutex);
 		return ERROR_REJECT;
 	}
 
@@ -532,10 +536,14 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	case MAP_TYPE_RFC6052:
 		s = container_of(map4, struct map_static, map4);
 		ret = append_to_prefix(addr6, addr4, &s->map6.addr,s->map6.prefix_len);
-		if (ret < 0) return ret;
+		if (ret < 0) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
+			return ret;
+		}
 		break;
 	case MAP_TYPE_DYNAMIC_POOL:
 		slog(LOG_DEBUG,"%s:%d Address map is dynamic pool\n",__FUNCTION__,__LINE__);
+		pthread_mutex_unlock(&gcfg->map_mutex);
 		return ERROR_REJECT;
 	case MAP_TYPE_DYNAMIC_HOST:
 		d = container_of(map4, struct map_dynamic, map4);
@@ -544,19 +552,22 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 		break;
 	default:
 		slog(LOG_DEBUG,"%s:%d Hit default case\n",__FUNCTION__,__LINE__);
+		pthread_mutex_unlock(&gcfg->map_mutex);
 		return ERROR_DROP;
 	}
+	pthread_mutex_unlock(&gcfg->map_mutex);
 
-	if (gcfg->cache_size) {
+	if (gcfg->cache_size) {		
+		pthread_mutex_lock(&gcfg->cache_mutex);
 		c = cache_insert(addr4, addr6, hash, hash_ip6(addr6));
 
-		if (c_ptr)
-			*c_ptr = c;
+		/* Alloc Dynamic */
 		if (d) {
 			d->cache_entry = c;
 			if (c)
 				c->flags |= CACHE_F_REP_AGEOUT;
 		}
+		pthread_mutex_unlock(&gcfg->cache_mutex);
 	}
 
 	return ERROR_NONE;
@@ -616,12 +627,10 @@ static int extract_from_prefix(struct in_addr *addr4,
  *
  * @param[out] addr4 Return IPv6 address
  * @param[in] addr6 IPv4 address
- * @param[out] c_ptr Cache entry
  * @param[in] dyn_allow Allow dynamic allocation for this mapping
  * @returns ERROR_REJECT or ERROR_DROP on error
  */
-int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
-		struct cache_entry **c_ptr, int dyn_alloc)
+int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6, int dyn_alloc)
 {
 	uint32_t hash = 0;
 	int ret = 0;
@@ -634,25 +643,28 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 	if (gcfg->cache_size) {
 		hash = hash_ip6(addr6);
 
+		pthread_mutex_lock(&gcfg->cache_mutex);
 		list_for_each(entry, &gcfg->hash_table6[hash]) {
 			c = list_entry(entry, struct cache_entry, hash6);
 			if (IN6_ARE_ADDR_EQUAL(addr6, &c->addr6)) {
 				*addr4 = c->addr4;
 				c->last_use = now;
-				if (c_ptr)
-					*c_ptr = c;
+				pthread_mutex_unlock(&gcfg->cache_mutex);
 				return 0;
 			}
 		}
+		pthread_mutex_unlock(&gcfg->cache_mutex);
 	}
-
+	pthread_mutex_lock(&gcfg->map_mutex);
 	map6 = find_map6(addr6);
 
 	if (!map6) {
 		if (dyn_alloc)
 			map6 = assign_dynamic(addr6);
-		if (!map6)
+		if (!map6) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT; //TODO what's the right behavior here
+		}
 	}
 
 	switch (map6->type) {
@@ -668,17 +680,22 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		break;
 	case MAP_TYPE_RFC6052:
 		ret = extract_from_prefix(addr4, addr6, map6->prefix_len);
-		if (ret < 0)
+		if (ret < 0) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_DROP;
+		}
 		if (map6->addr.s6_addr32[0] == WKPF &&
 			map6->addr.s6_addr32[1] == 0 &&
 			map6->addr.s6_addr32[2] == 0 &&
 			gcfg->wkpf_strict &&
-				is_private_ip4_addr(addr4))
+				is_private_ip4_addr(addr4)) {
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT;
+		}
 		s = container_of(map6, struct map_static, map6);
 		if (find_map4(addr4) != &s->map4){
 			slog(LOG_DEBUG,"%s:%d Dropping packet due to hairpin condition",__FUNCTION__,__LINE__);
+			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_DROP;
 		}
 		break;
@@ -689,19 +706,22 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		break;
 	default:
 		slog(LOG_DEBUG,"%s:%d Dropping packet due to default case",__FUNCTION__,__LINE__);
+		pthread_mutex_unlock(&gcfg->map_mutex);
 		return ERROR_DROP;
 	}
+	pthread_mutex_unlock(&gcfg->map_mutex);
 
 	if (gcfg->cache_size) {
+		pthread_mutex_lock(&gcfg->cache_mutex);
 		c = cache_insert(addr4, addr6, hash_ip4(addr4), hash);
 
-		if (c_ptr)
-			*c_ptr = c;
+		/* Is Dynamic */
 		if (d) {
 			d->cache_entry = c;
 			if (c)
 				c->flags |= CACHE_F_REP_AGEOUT;
 		}
+		pthread_mutex_unlock(&gcfg->cache_mutex);
 	}
 
 	return ERROR_NONE;
@@ -728,6 +748,7 @@ void addrmap_maint(void)
 {
 	struct list_head *entry, *next;
 	struct cache_entry *c;
+	pthread_mutex_lock(&gcfg->cache_mutex);
 
 	list_for_each_safe(entry, next, &gcfg->cache_active) {
 		c = list_entry(entry, struct cache_entry, list);
@@ -739,4 +760,5 @@ void addrmap_maint(void)
 			list_del(&c->hash6);
 		}
 	}
+	pthread_mutex_unlock(&gcfg->cache_mutex);
 }
