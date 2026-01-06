@@ -174,32 +174,34 @@ static void tun_setup(int do_mktun, int do_rmtun)
 
 	/* Setup multiqueue additional queues */
 #if WITH_MULTIQUEUE
-	slog(LOG_DEBUG,"Main tun fd is %d\n",gcfg->tun_fd);
+	//slog(LOG_DEBUG,"Main tun fd is %d\n",gcfg->tun_fd);
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
 	strcpy(ifr.ifr_name, gcfg->tundev);
-	for(int i = 0; i < gcfg->num_threads; i++) {
+	for(int i = 0; i < gcfg->workers; i++) {
 		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
 		if (gcfg->tun_fd_addl[i] < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 					strerror(errno));
 			exit(1);
 		}
-		slog(LOG_DEBUG,"Addl tun fd %d is %d\n",i,gcfg->tun_fd_addl[i]);
+		//slog(LOG_DEBUG,"Addl tun fd %d is %d\n",i,gcfg->tun_fd_addl[i]);
 		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
 					"%s\n", gcfg->tundev, strerror(errno));
 			exit(1);
 		}
-		slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
+		//slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
 	}
 
 
-	/* Disable queue of main tun */
-	memset(&ifr, 0, sizeof(ifr));
-    ifr.ifr_flags = IFF_DETACH_QUEUE;
-	if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
+	/* Disable queue of main tun if we have >0 workers */
+	if(gcfg->workers > 0) {
+		memset(&ifr, 0, sizeof(ifr));
+		ifr.ifr_flags = IFF_DETACH_QUEUE;
+		if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
+	}
 
 #endif
 
@@ -489,7 +491,6 @@ static void print_op_info(void)
 
 /* Worker thread for multiqueue tun interface */
 #if WITH_MULTIQUEUE
-static int worker_bytes[MAX_THREADS] = {0};
 static void * worker(void * arg)
 {
 	int idx = (int)arg;
@@ -503,7 +504,7 @@ static void * worker(void * arg)
 	/* Enter worker loop */
 	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		worker_bytes[idx] += read_from_tun(recv_buf,gcfg->tun_fd_addl[idx]);
+		read_from_tun(recv_buf,gcfg->tun_fd_addl[idx]);
 	}	
 }
 #endif
@@ -771,9 +772,22 @@ int main(int argc, char **argv)
 
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
+	
+	/* If workers is -1 (default), set to cpu cores */
+	if(gcfg->workers < 0) {
+		int cpu_cores = sysconf(_SC_NPROCESSORS_ONLN);
+		if(cpu_cores > MAX_WORKERS) cpu_cores = MAX_WORKERS;
+		if(cpu_cores < 0) {
+			slog(LOG_WARNING,"Unable to detect CPU cores, defaulting to 4\n");
+			cpu_cores = 4;
+		}
+		else {
+			slog(LOG_DEBUG,"Using %d workers based on CPU core count\n",cpu_cores);
+		}
+		gcfg->workers = cpu_cores;
+	}
 
-	/* Set addl threads to 1 */
-	gcfg->num_threads = 1;
+	/* Setup tun adapter */
 	tun_setup(0, 0);
 
 	if (do_chroot) {
@@ -850,7 +864,7 @@ int main(int argc, char **argv)
 	
 #if WITH_MULTIQUEUE
 	/* Launch worker threads */
-	for(int i = 0; i < gcfg->num_threads; i++) {
+	for(int i = 0; i < gcfg->workers; i++) {
 		ret = pthread_create(&gcfg->threads[i], NULL, worker, (void *)(i));
 		if (ret != 0) {
 			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
@@ -863,6 +877,7 @@ int main(int argc, char **argv)
 			//free(pool->threads);
 			//pool->threads = NULL;
 			//return -1;
+			//TBD
 		}
 	}
 #endif
@@ -887,11 +902,6 @@ int main(int argc, char **argv)
 					gcfg->last_cache_maint > now)) {
 			addrmap_maint();
 			gcfg->last_cache_maint = now;
-#if WITH_MULTIQUEUE
-			for(int i = 0; i < gcfg->num_threads; i++) {
-				slog(LOG_DEBUG,"Worker %d handled %d bytes\n",i,worker_bytes[i]);
-			}
-#endif
 		}
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||

@@ -492,6 +492,38 @@ static int config_offlink_mtu(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_workers(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+	
+	/* Offlink MTU already set? */
+	if (gcfg->workers != -1) {
+		slog(LOG_CRIT, "Error: duplicate workers directive on "
+				"line %d\n", ln);
+		return ERROR_REJECT;
+	}
+	/* Try to convert the argument to an integer */
+	char *endptr;
+	long int workers = strtol(args[0], &endptr, 10);
+	if (*endptr != '\0') {
+		slog(LOG_CRIT, "Error: unable to parse workers on line %d\n", ln);
+		return ERROR_REJECT;
+	} else if(workers < 0) {
+		slog(LOG_CRIT, "Error: invalid value for workers on line (must be"
+			" at least zero) on line %d\n", ln);
+		return ERROR_REJECT;
+
+	} else if(workers > MAX_WORKERS) {
+		slog(LOG_CRIT, "Error: invalid value for workers on line (must be"
+			" at most %d) on line %d\n", MAX_WORKERS, ln);
+		return ERROR_REJECT;
+	}
+	/* Set the offlink MTU */
+	gcfg->workers = workers;
+	return ERROR_NONE;
+}
+
 
 struct {
 	/* Long name */
@@ -513,6 +545,7 @@ struct {
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
+	{ "workers"	,  		config_workers,			1 },
 	{ NULL, NULL, 0 }
 };
 
@@ -536,6 +569,7 @@ int config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	gcfg->workers = -1;
 	return ERROR_NONE;
 }
 

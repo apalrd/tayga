@@ -110,11 +110,7 @@ struct tun_pi {
 #endif
 
 /* Maximum number of threads (sizes thread pool array) */
-#if WITH_MULTIQUEUE
-#define MAX_THREADS 64
-#else
-#define MAX_THREADS 0
-#endif
+#define MAX_WORKERS 64
 
 /* Queue Depth for uring */
 #if WITH_URING
@@ -353,11 +349,11 @@ struct config {
 		LOG_TO_JOURNAL = 2,
 	} log_out;
 
-	int num_threads;
+	int workers;
 	pthread_mutex_t cache_mutex;
 	pthread_mutex_t map_mutex;
-	pthread_t threads[MAX_THREADS];
-	int tun_fd_addl[MAX_THREADS];
+	pthread_t threads[MAX_WORKERS];
+	int tun_fd_addl[MAX_WORKERS];
 #if WITH_URING
 	struct io_uring ring;
 #endif
