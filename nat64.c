@@ -196,7 +196,7 @@ static uint16_t convert_cksum(struct ip6 *ip6, struct ip4 *ip4)
 
 static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 		struct in_addr *dest, struct icmp *icmp,
-		uint8_t *data, uint32_t data_len, int tun_fd)
+		uint8_t *data, uint32_t data_len)
 {
 	struct ip4_icmp header;
 	struct iovec iov[2];
@@ -222,7 +222,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -245,7 +245,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.code = code;
 	icmp.word = htonl(word);
 	host_send_icmp4(0, &gcfg->local_addr4, &orig->ip4->src, &icmp,
-			(uint8_t *)orig->ip4, orig_len,orig->tun_fd);
+			(uint8_t *)orig->ip4, orig_len);
 }
 
 static void host_handle_icmp4(struct pkt *p)
@@ -259,7 +259,7 @@ static void host_handle_icmp4(struct pkt *p)
 		p->icmp->type = 0;
 		log_pkt4(LOG_OPT_SELF,p,"Echo Request");
 		host_send_icmp4(p->ip4->tos, &p->ip4->dest, &p->ip4->src,
-				p->icmp, p->data, p->data_len,p->tun_fd);
+				p->icmp, p->data, p->data_len);
 		break;
 	default:
 		sprintf(temp,"ICMP Unknown Type %d",p->icmp->type);
@@ -451,7 +451,7 @@ static void xlate_4to6_data(struct pkt *p)
 							htons(IP4_F_MF)))
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
 
-			if (writev(p->tun_fd, iov, 2) < 0) {
+			if (writev(gcfg->tun_fd, iov, 2) < 0) {
 				slog(LOG_WARNING, "error writing packet to "
 						"tun device: %s\n",
 						strerror(errno));
@@ -713,7 +713,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(p->tun_fd, iov, 2) < 0)
+	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -758,7 +758,7 @@ void handle_ip4(struct pkt *p)
 
 static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 		struct in6_addr *dest, struct icmp *icmp,
-		uint8_t *data, uint32_t data_len,int tun_fd)
+		uint8_t *data, uint32_t data_len)
 {
 	struct ip6_icmp header;
 	struct iovec iov[2];
@@ -781,7 +781,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -804,7 +804,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.code = code;
 	icmp.word = htonl(word);
 	host_send_icmp6(0, &gcfg->local_addr6, &orig->ip6->src, &icmp,
-			(uint8_t *)orig->ip6, orig_len, orig->tun_fd);
+			(uint8_t *)orig->ip6, orig_len);
 }
 
 static void host_handle_icmp6(struct pkt *p)
@@ -819,7 +819,7 @@ static void host_handle_icmp6(struct pkt *p)
 		log_pkt6(LOG_OPT_SELF,p,"Echo Request");
 		host_send_icmp6((ntohl(p->ip6->ver_tc_fl) >> 20) & 0xff,
 				&p->ip6->dest, &p->ip6->src,
-				p->icmp, p->data, p->data_len,p->tun_fd);
+				p->icmp, p->data, p->data_len);
 		break;
 	default:
 		sprintf(temp,"ICMP Unknown Type %d",p->icmp->type);
@@ -982,7 +982,7 @@ static void xlate_6to4_data(struct pkt *p)
 	iov[1].iov_base = p->data;
 	iov[1].iov_len = p->data_len;
 
-	if (writev(p->tun_fd, iov, 2) < 0)
+	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -1254,7 +1254,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(p->tun_fd, iov, 2) < 0)
+	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }

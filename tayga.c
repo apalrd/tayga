@@ -176,6 +176,10 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	/* Setup multiqueue additional queues */
 #if WITH_MULTIQUEUE
 	slog(LOG_DEBUG,"Main tun fd is %d\n",gcfg->tun_fd);
+
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
+	strcpy(ifr.ifr_name, gcfg->tundev);
 	for(int i = 0; i < gcfg->num_threads; i++) {
 		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
 		if (gcfg->tun_fd_addl[i] < 0) {
@@ -184,17 +188,19 @@ static void tun_setup(int do_mktun, int do_rmtun)
 			exit(1);
 		}
 		slog(LOG_DEBUG,"Addl tun fd %d is %d\n",i,gcfg->tun_fd_addl[i]);
-
-		memset(&ifr, 0, sizeof(ifr));
-		ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
-		strcpy(ifr.ifr_name, gcfg->tundev);
 		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
 					"%s\n", gcfg->tundev, strerror(errno));
 			exit(1);
-			}
+		}
 		slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
 	}
+
+
+	/* Disable queue of main tun */
+	memset(&ifr, 0, sizeof(ifr));
+    ifr.ifr_flags = IFF_DETACH_QUEUE;
+	if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
 
 #endif
 }
@@ -332,7 +338,7 @@ static void signal_setup(void)
 	sigaction(SIGTERM, &act, NULL);
 }
 
-static void read_from_tun(uint8_t * recv_buf,int tun_fd)
+static int read_from_tun(uint8_t * recv_buf,int tun_fd)
 {
 	int ret;
 	struct tun_pi *pi = (struct tun_pi *)recv_buf;
@@ -342,36 +348,38 @@ static void read_from_tun(uint8_t * recv_buf,int tun_fd)
 	//slog(LOG_DEBUG,"Processing %d bytes from tun %d\n",ret,tun_fd);
 	if (ret < 0) {
 		if (errno == EAGAIN)
-			return;
+			return 0;
 		slog(LOG_ERR, "received error when reading from tun "
 				"device: %s\n", strerror(errno));
-		return;
+		return 0;
 	}
 	if ((size_t)ret < sizeof(struct tun_pi)) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
-		return;
+		return 0;
 	}
 	if ((uint32_t)ret == gcfg->recv_buf_size) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
-		return;
+		return 0;
 	}
 	memset(p, 0, sizeof(struct pkt));
 	p->data = recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
-	p->tun_fd = tun_fd;
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
 		handle_ip4(p);
+		return ret - sizeof(struct tun_pi);
 		break;
 	case ETH_P_IPV6:
 		handle_ip6(p);
+		return ret - sizeof(struct tun_pi);
 		break;
 	default:
 		slog(LOG_WARNING, "Dropping unknown proto %04x from "
 				"tun device\n", ntohs(pi->proto));
 		break;
 	}
+	return 0;
 }
 
 static void read_from_signalfd(void)
@@ -474,9 +482,10 @@ static void print_op_info(void)
 
 /* Worker thread for multiqueue tun interface */
 #if WITH_MULTIQUEUE
+static int worker_bytes[MAX_THREADS] = {0};
 static void * worker(void * arg)
 {
-
+	int idx = (int)arg;
 	uint8_t * recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
 	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
@@ -485,9 +494,9 @@ static void * worker(void * arg)
 	}
 
 	/* Enter worker loop */
-	slog(LOG_DEBUG,"Starting worker thread\n");
+	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		read_from_tun(recv_buf,gcfg->tun_fd_addl[0]);
+		worker_bytes[idx] += read_from_tun(recv_buf,gcfg->tun_fd_addl[idx]);
 	}	
 }
 #endif
@@ -832,21 +841,24 @@ int main(int argc, char **argv)
 		}
 	}
 	
+#if WITH_MULTIQUEUE
 	/* Launch worker threads */
-	ret = pthread_create(&gcfg->threads[0], NULL, worker, NULL);
-	if (ret != 0) {
-		int i = 0;
-		slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
-			i, strerror(ret));
-		/* Clean up already created threads? */
-		//atomic_store(&pool->shutdown, 1);
-		//for (int j = 0; j < i; j++) {
-		//	pthread_join(pool->threads[j], NULL);
-		//}
-		//free(pool->threads);
-		//pool->threads = NULL;
-		//return -1;
+	for(int i = 0; i < gcfg->num_threads; i++) {
+		ret = pthread_create(&gcfg->threads[i], NULL, worker, (void *)(i));
+		if (ret != 0) {
+			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
+				i, strerror(ret));
+			/* Clean up already created threads? */
+			//atomic_store(&pool->shutdown, 1);
+			//for (int j = 0; j < i; j++) {
+			//	pthread_join(pool->threads[j], NULL);
+			//}
+			//free(pool->threads);
+			//pool->threads = NULL;
+			//return -1;
+		}
 	}
+#endif
 
 	/* Main loop */
 	for (;;) {
@@ -868,6 +880,11 @@ int main(int argc, char **argv)
 					gcfg->last_cache_maint > now)) {
 			addrmap_maint();
 			gcfg->last_cache_maint = now;
+#if WITH_MULTIQUEUE
+			for(int i = 0; i < gcfg->num_threads; i++) {
+				slog(LOG_DEBUG,"Worker %d handled %d bytes\n",i,worker_bytes[i]);
+			}
+#endif
 		}
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
