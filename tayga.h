@@ -44,6 +44,9 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
+#if WITH_URING
+#include "liburing.h"
+#endif
 #elif defined(__FreeBSD__)
 #include <net/if.h>
 #include <net/if_tun.h>
@@ -116,8 +119,6 @@ struct tun_pi {
 /* Queue Depth for uring */
 #if WITH_URING
 #define MAX_QUEUE_DEPTH 64
-//bytes in the read buffer to 'save' for write headers
-#define URING_HEADER_OFFSET 128
 #else
 #define MAX_QUEUE_DEPTH 0
 #endif
@@ -127,8 +128,15 @@ struct tun_pi {
 #error "Cannot enable Multiqueue and Uring together"
 #endif
 
+/* Do not allow uring or multiqueue if not Linux */
+#if !defined(__linux__) && (WITH_MULTIQUEUE || WITH_URING)
+#error "Cannot enable Multiqueue and Uring on non-Linux platforms"
+#endif
+
 /* Size of receive buffer(s) */
-#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+URING_HEADER_OFFSET)
+//'save' some bytes in the beginning of the buffer for headers later
+#define RECV_HEADER_OFFSET 128
+#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+RECV_HEADER_OFFSET)
 /* Protocol structures */
 
 struct ip4 {
@@ -350,6 +358,9 @@ struct config {
 	pthread_mutex_t map_mutex;
 	pthread_t threads[MAX_THREADS];
 	int tun_fd_addl[MAX_THREADS];
+#if WITH_URING
+	struct io_uring ring;
+#endif
 };
 
 /// Logging flags

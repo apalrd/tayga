@@ -27,7 +27,6 @@
 extern struct config *gcfg;
 time_t now;
 static const char *progname;
-static const char *progname;
 static int signalfds[2];
 
 void usage(int code) {
@@ -203,6 +202,14 @@ static void tun_setup(int do_mktun, int do_rmtun)
 	if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
 
 #endif
+
+#if WITH_URING
+	/* Initialize uring */
+    if(io_uring_queue_init(MAX_QUEUE_DEPTH, &gcfg->ring, 0)) {
+        fprintf(stderr, "Unable to setup io_uring: %s\n", strerror(errno));
+        exit(1);
+    }
+#endif
 }
 #endif /* ifdef __linux__ */
 
@@ -341,10 +348,10 @@ static void signal_setup(void)
 static int read_from_tun(uint8_t * recv_buf,int tun_fd)
 {
 	int ret;
-	struct tun_pi *pi = (struct tun_pi *)recv_buf;
+	struct tun_pi *pi = (struct tun_pi *)(recv_buf+RECV_HEADER_OFFSET);
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(tun_fd, recv_buf, RECV_BUF_SIZE);
+	ret = read(tun_fd, recv_buf+RECV_HEADER_OFFSET, RECV_BUF_SIZE-RECV_HEADER_OFFSET);
 	//slog(LOG_DEBUG,"Processing %d bytes from tun %d\n",ret,tun_fd);
 	if (ret < 0) {
 		if (errno == EAGAIN)
@@ -363,7 +370,7 @@ static int read_from_tun(uint8_t * recv_buf,int tun_fd)
 		return 0;
 	}
 	memset(p, 0, sizeof(struct pkt));
-	p->data = recv_buf + sizeof(struct tun_pi);
+	p->data = recv_buf + sizeof(struct tun_pi)+RECV_HEADER_OFFSET;
 	p->data_len = ret - sizeof(struct tun_pi);
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:

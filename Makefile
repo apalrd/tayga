@@ -3,7 +3,7 @@ CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
-LDLIBS := -lpthread
+LDLIBS := 
 
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
@@ -55,6 +55,13 @@ help:
 	@echo 'WITH_SYSTEMD    - Install systemd scripts'
 	@echo 'WITH_OPENRC     - Install OpenRC scripts and example config'
 
+# Library options based on with flags
+ifdef WITH_MULTIQUEUE
+LDLIBS += -lpthread
+endif
+ifdef WITH_URING
+LDLIBS += -luring
+endif
 # Synthesize the version.h header from Git
 define VERSION_HEADER
 #ifndef __TAYGA_VERSION_H__
