@@ -77,7 +77,6 @@ void test_config_compare(void) {
     /* Compare every field in the struct */
     expects(gcfg->tundev, tcfg.tundev, IFNAMSIZ, "tundev");
     expects(gcfg->data_dir, tcfg.data_dir, 512, "data_dir");
-    expectl(gcfg->recv_buf_size, tcfg.recv_buf_size, "recv_buf_size");
     expectl(gcfg->local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
     expectl(gcfg->local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
     expectl(gcfg->local_addr6.s6_addr32[1],tcfg.local_addr6.s6_addr32[1], "local_addr6[1]");
@@ -96,7 +95,6 @@ void test_config_compare(void) {
 
     /* Pointers in gcfg which are not touched by conffile.c */
     expectl(gcfg->tun_fd, 0, "tun_fd");
-    expectl((long)gcfg->recv_buf, 0, "recv_buf");
 
     int count = 0, expect_count = 0;
 	struct list_head *entry;
@@ -171,7 +169,6 @@ void test_config_init(void) {
     config_init();
 
     /* Setup expected outputs */
-    tcfg.recv_buf_size = 65540;
     tcfg.dyn_min_lease = 7440;
     tcfg.dyn_max_lease = 1209600;
     tcfg.max_commit_delay = 302400;
@@ -183,7 +180,7 @@ void test_config_init(void) {
      * This ensures the test has been updated for new variables
      */
     printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),768,"sizeof");
+    expectl(sizeof(struct config),840,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");

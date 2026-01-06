@@ -525,7 +525,6 @@ int config_init(void)
 		return ERROR_REJECT;
 	}
 	memset(gcfg, 0, sizeof(struct config));
-	gcfg->recv_buf_size = 65536 + sizeof(struct tun_pi);
 	INIT_LIST_HEAD(&gcfg->map4_list);
 	INIT_LIST_HEAD(&gcfg->map6_list);
 	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */

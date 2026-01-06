@@ -113,7 +113,22 @@ struct tun_pi {
 #define MAX_THREADS 0
 #endif
 
+/* Queue Depth for uring */
+#if WITH_URING
+#define MAX_QUEUE_DEPTH 64
+//bytes in the read buffer to 'save' for write headers
+#define URING_HEADER_OFFSET 128
+#else
+#define MAX_QUEUE_DEPTH 0
+#endif
 
+/* Do not alow uring and multiqueue at the same time */
+#if WITH_MULTIQUEUE && WITH_URING
+#error "Cannot enable Multiqueue and Uring together"
+#endif
+
+/* Size of receive buffer(s) */
+#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+URING_HEADER_OFFSET)
 /* Protocol structures */
 
 struct ip4 {
@@ -294,7 +309,6 @@ enum udp_cksum_mode {
 struct config {
 	char tundev[IFNAMSIZ];
 	char data_dir[512];
-	uint32_t recv_buf_size;
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
 	struct list_head map4_list;

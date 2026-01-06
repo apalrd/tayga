@@ -344,7 +344,7 @@ static int read_from_tun(uint8_t * recv_buf,int tun_fd)
 	struct tun_pi *pi = (struct tun_pi *)recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(tun_fd, recv_buf, gcfg->recv_buf_size);
+	ret = read(tun_fd, recv_buf, RECV_BUF_SIZE);
 	//slog(LOG_DEBUG,"Processing %d bytes from tun %d\n",ret,tun_fd);
 	if (ret < 0) {
 		if (errno == EAGAIN)
@@ -358,7 +358,7 @@ static int read_from_tun(uint8_t * recv_buf,int tun_fd)
 				"(%d bytes)\n", ret);
 		return 0;
 	}
-	if ((uint32_t)ret == gcfg->recv_buf_size) {
+	if ((uint32_t)ret == RECV_BUF_SIZE) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return 0;
 	}
@@ -486,10 +486,10 @@ static int worker_bytes[MAX_THREADS] = {0};
 static void * worker(void * arg)
 {
 	int idx = (int)arg;
-	uint8_t * recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
+	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
 	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
-				"receive buffer\n", gcfg->recv_buf_size);
+				"receive buffer\n", RECV_BUF_SIZE);
 		exit(1);
 	}
 
@@ -819,10 +819,10 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	uint8_t * recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
+	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
 	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
-				"receive buffer\n", gcfg->recv_buf_size);
+				"receive buffer\n", RECV_BUF_SIZE);
 		exit(1);
 	}
 
