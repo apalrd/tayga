@@ -80,8 +80,8 @@ static void signal_setup(void)
 				strerror(errno));
 		exit(1);
 	}
-	set_nonblock(signalfds[0]);
-	set_nonblock(signalfds[1]);
+	if(set_nonblock(signalfds[0])) exit(-1);
+	if(set_nonblock(signalfds[1])) exit(-1);
 	memset(&act, 0, sizeof(act));
 	act.sa_handler = signal_handler;
 	sigaction(SIGINT, &act, NULL);
@@ -360,7 +360,7 @@ int main(int argc, char **argv)
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
-		tun_setup(do_mktun, do_rmtun);
+		if(tun_setup(do_mktun, do_rmtun)) exit(-1);
 		return 0;
 	}
 
@@ -489,7 +489,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Setup tun adapter */
-	tun_setup(0, 0);
+	if(tun_setup(0, 0)) exit(-1);
 
 	if (do_chroot) {
 		if (chroot(gcfg->data_dir) < 0) {

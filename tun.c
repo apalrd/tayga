@@ -19,24 +19,25 @@
 
 
 
-void set_nonblock(int fd)
+int set_nonblock(int fd)
 {
 	int flags;
 
 	flags = fcntl(fd, F_GETFL);
 	if (flags < 0) {
 		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 	flags |= O_NONBLOCK;
 	if (fcntl(fd, F_SETFL, flags) < 0) {
 		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
+    return 0;
 }
 
 #ifdef __linux__
-void tun_setup(int do_mktun, int do_rmtun)
+int tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
 	int fd;
@@ -45,7 +46,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if (gcfg->tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
@@ -57,7 +58,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
 				"%s\n", gcfg->tundev, strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	if (do_mktun) {
@@ -65,42 +66,42 @@ void tun_setup(int do_mktun, int do_rmtun)
 			slog(LOG_CRIT, "Unable to set persist flag on %s, "
 					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		if (ioctl(gcfg->tun_fd, TUNSETOWNER, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set owner on %s, "
 					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		if (ioctl(gcfg->tun_fd, TUNSETGROUP, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set group on %s, "
 					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return 0;
 	} else if (do_rmtun) {
 		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 0) < 0) {
 			slog(LOG_CRIT, "Unable to clear persist flag on %s, "
 					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return 0;
 	}
 
-	set_nonblock(gcfg->tun_fd);
+	if(set_nonblock(gcfg->tun_fd)) return ERROR_REJECT;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
 		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	/* Query MTU from tun adapter */
@@ -109,7 +110,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 	close(fd);
 
@@ -118,7 +119,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if(gcfg->mtu < MTU_MIN) {
 		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
 				gcfg->mtu, MTU_MIN);
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
@@ -136,13 +137,13 @@ void tun_setup(int do_mktun, int do_rmtun)
 		if (gcfg->tun_fd_addl[i] < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		//slog(LOG_DEBUG,"Addl tun fd %d is %d\n",i,gcfg->tun_fd_addl[i]);
 		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
 					"%s\n", gcfg->tundev, strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 		//slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
 	}
@@ -161,14 +162,15 @@ void tun_setup(int do_mktun, int do_rmtun)
 	/* Initialize uring */
     if(io_uring_queue_init(MAX_QUEUE_DEPTH, &gcfg->ring, 0)) {
         fprintf(stderr, "Unable to setup io_uring: %s\n", strerror(errno));
-        exit(1);
+        return ERROR_REJECT;
     }
 #endif
+    return 0;
 }
 #endif /* ifdef __linux__ */
 
 #ifdef __FreeBSD__
-void tun_setup(int do_mktun, int do_rmtun)
+int tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
 	int fd, do_rename = 0, multi_af;
@@ -182,7 +184,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 		slog(LOG_CRIT,
 			"tunnel interface name needs to match tun[0-9]+ pattern "
 				"for --mktun to work\n");
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg->tundev);
@@ -191,7 +193,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if (gcfg->tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
 				devname, strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	if (do_mktun) {
@@ -207,7 +209,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 		if (fd < 0) {
 			slog(LOG_CRIT, "Unable to create control socket, aborting: %s\n",
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 
 		memset(&ifr, 0, sizeof(ifr));
@@ -215,7 +217,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 		if (ioctl(fd, SIOCIFDESTROY, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to destroy interface %s, aborting: %s\n",
 					gcfg->tundev, strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 
 		close(fd);
@@ -231,18 +233,18 @@ void tun_setup(int do_mktun, int do_rmtun)
 			slog(LOG_CRIT, "Unable to set multi-AF on %s, "
 					"aborting: %s\n", gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 	}
 
 	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg->tundev);
 
-	set_nonblock(gcfg->tun_fd);
+	if(set_nonblock(gcfg->tun_fd)) return ERROR_REJECT;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
 		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 
 	if (do_rename) {
@@ -253,7 +255,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 			slog(LOG_CRIT, "Unable to rename interface %s to %s, aborting: %s\n",
 					fdevname(gcfg->tun_fd), gcfg->tundev,
 					strerror(errno));
-			exit(1);
+			return ERROR_REJECT;
 		}
 	}
 
@@ -262,7 +264,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
-		exit(1);
+		return ERROR_REJECT;
 	}
 	close(fd);
 
@@ -270,6 +272,7 @@ void tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
+    return 0;
 }
 #endif
 
