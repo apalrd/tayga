@@ -444,5 +444,9 @@ int journal_printv_with_location(
         int priority, const char *file, const char *line, const char *func,
         const char *format, va_list ap);
 
+/* tun.c */
+void tun_setup(int do_mktun, int do_rmtun);
+void set_nonblock(int fd);
+int tun_read(uint8_t * recv_buf,int tun_fd);
 
 #endif /* #ifndef __TAYGA_H__ */

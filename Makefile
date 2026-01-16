@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c tun.c
 LDLIBS := 
 
 #Default installation paths (may be overridden by environment variables)
@@ -99,7 +99,7 @@ ifeq ($(CC),gcc)
 TEST_CFLAGS += -coverage
 endif
 TEST_FILES := test/unit.c
-unit_conffile: $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
+unit_conffile: tayga $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 
 .PHONY: integration
