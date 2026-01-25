@@ -28,6 +28,7 @@ extern struct config *gcfg;
 time_t now;
 static const char *progname;
 static int signalfds[2];
+static long int worker_bytes[MAX_WORKERS] = {0};
 
 void usage(int code) {
 	fprintf(stderr,
@@ -115,6 +116,10 @@ static void read_from_signalfd(void)
 			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
+		/* Also print worker bytes for debugging */
+		for(int i = 0; i < gcfg->workers; i++) {
+			slog(LOG_DEBUG,"Worker %d has done %d bytes\n",i,worker_bytes[i]);
+		}
 		if (gcfg->log_out == LOG_TO_SYSLOG) {
 			closelog();
 		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
@@ -194,7 +199,7 @@ static void print_op_info(void)
 #if WITH_MULTIQUEUE
 static void * worker(void * arg)
 {
-	int idx = (int)arg;
+	int idx = (size_t)arg;
 	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
 	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
@@ -205,7 +210,7 @@ static void * worker(void * arg)
 	/* Enter worker loop */
 	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
+		worker_bytes[idx] += tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
 	}	
 }
 #endif
@@ -565,7 +570,7 @@ int main(int argc, char **argv)
 	
 #if WITH_MULTIQUEUE
 	/* Launch worker threads */
-	for(int i = 0; i < gcfg->workers; i++) {
+	for(size_t i = 0; i < gcfg->workers; i++) {
 		ret = pthread_create(&gcfg->threads[i], NULL, worker, (void *)(i));
 		if (ret != 0) {
 			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
@@ -602,6 +607,10 @@ int main(int argc, char **argv)
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
 			addrmap_maint();
+			/* Also print worker bytes for debugging */
+			for(int i = 0; i < gcfg->workers; i++) {
+				slog(LOG_DEBUG,"Worker %d has done %d bytes\n",i,worker_bytes[i]);
+			}
 			gcfg->last_cache_maint = now;
 		}
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +

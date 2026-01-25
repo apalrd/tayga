@@ -54,6 +54,9 @@ int tun_setup(int do_mktun, int do_rmtun)
 #if WITH_MULTIQUEUE
 	ifr.ifr_flags |= IFF_MULTI_QUEUE;
 #endif
+#if WITH_SEG_OFFLOAD
+	ifr.ifr_flags |= IFF_VNET_HDR;
+#endif
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
@@ -95,6 +98,23 @@ int tun_setup(int do_mktun, int do_rmtun)
 		return 0;
 	}
 
+#if WITH_SEG_OFFLOAD
+	/* Set vnet header size */
+	int hdr_sz = RECV_VIO_SIZE;
+	if(ioctl(gcfg->tun_fd, TUNSETVNETHDRSZ, &hdr_sz) < 0) {
+		slog(LOG_CRIT, "Unable to set VirtIO header size (main) to %d, aborting: "
+				"%s\n", hdr_sz, strerror(errno));
+		return ERROR_REJECT;
+	}
+	/* Set offload */
+	int offload = TUN_F_CSUM;// | TUN_F_TSO4 | TUN_F_TSO6 | TUN_F_UFO | TUN_F_USO4 | TUN_F_USO6;
+	if(ioctl(gcfg->tun_fd, TUNSETOFFLOAD, offload) < 0) {
+		slog(LOG_CRIT, "Unable to set offloads (addl) to 0x%x, aborting: "
+				"%s\n", offload, strerror(errno));
+		return ERROR_REJECT;
+	}		
+#endif
+
 	if(set_nonblock(gcfg->tun_fd)) return ERROR_REJECT;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
@@ -131,6 +151,9 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
+#if WITH_SEG_OFFLOAD
+	ifr.ifr_flags |= IFF_VNET_HDR;
+#endif
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	for(int i = 0; i < gcfg->workers; i++) {
 		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
@@ -145,6 +168,22 @@ int tun_setup(int do_mktun, int do_rmtun)
 					"%s\n", gcfg->tundev, strerror(errno));
 			return ERROR_REJECT;
 		}
+#if WITH_SEG_OFFLOAD
+		/* Set vnet header size */
+		if(ioctl(gcfg->tun_fd, TUNSETVNETHDRSZ, &hdr_sz) < 0) {
+			slog(LOG_CRIT, "Unable to set VirtIO header size (addl) to %d, aborting: "
+					"%s\n", hdr_sz, strerror(errno));
+			return ERROR_REJECT;
+		}
+
+		/* Set offload */
+		if(ioctl(gcfg->tun_fd, TUNSETOFFLOAD, offload) < 0) {
+			slog(LOG_CRIT, "Unable to set offloads (addl) to 0x%x, aborting: "
+					"%s\n", offload, strerror(errno));
+			return ERROR_REJECT;
+		}		
+#endif
+
 		//slog(LOG_DEBUG,"Opened tun adapter for worker %d\n",i);
 	}
 
@@ -281,6 +320,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 int tun_read(uint8_t * recv_buf,int tun_fd)
 {
 	int ret;
+	int min_size = sizeof(struct tun_pi) + RECV_VIO_SIZE;
 	struct tun_pi *pi = (struct tun_pi *)(recv_buf+RECV_HEADER_OFFSET);
 	struct pkt pbuf, *p = &pbuf;
 
@@ -293,26 +333,49 @@ int tun_read(uint8_t * recv_buf,int tun_fd)
 				"device: %s\n", strerror(errno));
 		return 0;
 	}
-	if ((size_t)ret < sizeof(struct tun_pi)) {
+	if ((size_t)ret < min_size) {
 		slog(LOG_WARNING, "short read from tun device "
 				"(%d bytes)\n", ret);
 		return 0;
 	}
-	if ((uint32_t)ret == RECV_BUF_SIZE) {
+	if ((uint32_t)ret == RECV_BUF_SIZE-RECV_HEADER_OFFSET) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return 0;
 	}
 	memset(p, 0, sizeof(struct pkt));
-	p->data = recv_buf + sizeof(struct tun_pi)+RECV_HEADER_OFFSET;
-	p->data_len = ret - sizeof(struct tun_pi);
+	p->data = recv_buf + min_size+RECV_HEADER_OFFSET;
+	p->data_len = ret - min_size;
+#if WITH_SEG_OFFLOAD
+	p->vnet = (struct virtio_net_hdr *)(recv_buf + RECV_HEADER_OFFSET + sizeof(struct tun_pi));
+	min_size += RECV_VIO_SIZE;
+#endif
+
+#if 0 && WITH_SEG_OFFLOAD
+	/* Debug - print virtio data */
+	slog(LOG_DEBUG,"Virto Net Hdr got flags 0x%02x type 0x%02x hdr_len %d gso_size %d\n",
+		p->vnet->flags,p->vnet->gso_type,p->vnet->hdr_len,p->vnet->gso_size);
+#endif
+#if 0
+	uint8_t * recv_bytes = recv_buf + RECV_HEADER_OFFSET;
+	slog(LOG_DEBUG,"First 24 bytes of the tun are:\n"
+		"%02x %02x %02x %02x %02x %02x %02x %02x "
+		"%02x %02x %02x %02x %02x %02x %02x %02x "
+		"%02x %02x %02x %02x %02x %02x %02x %02x\n",
+		recv_bytes[0],recv_bytes[1],recv_bytes[2],recv_bytes[3],
+		recv_bytes[4],recv_bytes[5],recv_bytes[6],recv_bytes[7],
+		recv_bytes[8],recv_bytes[9],recv_bytes[10],recv_bytes[11],
+		recv_bytes[12],recv_bytes[13],recv_bytes[14],recv_bytes[15],
+		recv_bytes[16],recv_bytes[17],recv_bytes[18],recv_bytes[19],
+		recv_bytes[20],recv_bytes[21],recv_bytes[22],recv_bytes[23]);
+#endif
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:
 		handle_ip4(p);
-		return ret - sizeof(struct tun_pi);
+		return ret - min_size;
 		break;
 	case ETH_P_IPV6:
 		handle_ip6(p);
-		return ret - sizeof(struct tun_pi);
+		return ret - min_size;
 		break;
 	default:
 		slog(LOG_WARNING, "Dropping unknown proto %04x from "

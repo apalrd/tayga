@@ -21,18 +21,27 @@
 /* Protocol headers */
 struct ip6_data {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip6 ip6;
     struct ip6_frag ip6_frag;
 };
 
 struct ip6_icmp {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip6 ip6;
     struct icmp icmp;
 };
 
 struct ip6_error {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip6 ip6;
     struct icmp icmp;
     struct ip6 ip6_em;
@@ -40,21 +49,47 @@ struct ip6_error {
 
 struct ip4_data {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip4 ip4;
 };
 
 struct ip4_icmp {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip4 ip4;
     struct icmp icmp;
 };
 
 struct ip4_error {
     struct tun_pi pi;
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr vnet;
+#endif
     struct ip4 ip4;
     struct icmp icmp;
     struct ip4 ip4_em;
 };
+
+/* Verify alignment at compile time for this architecture */
+#if WITH_SEG_OFFLOAD
+static_assert(offsetof(struct ip6_data,ip6) == 16,"Struct ip6_data is misaligned by 16");
+static_assert(offsetof(struct ip6_icmp,ip6) == 16,"Struct ip6_icmp is misaligned");
+static_assert(offsetof(struct ip6_error,ip6) == 16,"Struct ip6_error is misaligned");
+static_assert(offsetof(struct ip4_data,ip4) == 16,"Struct ip4_data is misaligned");
+static_assert(offsetof(struct ip4_icmp,ip4) == 16,"Struct ip4_icmp is misaligned");
+static_assert(offsetof(struct ip4_error,ip4) == 16,"Struct ip4_error is misaligned");
+#else
+static_assert(offsetof(struct ip6_data,ip6) == 4,"Struct ip6_data is misaligned");
+static_assert(offsetof(struct ip6_icmp,ip6) == 4,"Struct ip6_icmp is misaligned");
+static_assert(offsetof(struct ip6_error,ip6) == 4,"Struct ip6_error is misaligned");
+static_assert(offsetof(struct ip4_data,ip4) == 4,"Struct ip4_data is misaligned");
+static_assert(offsetof(struct ip4_icmp,ip4) == 4,"Struct ip4_icmp is misaligned");
+static_assert(offsetof(struct ip4_error,ip4) == 4,"Struct ip4_error is misaligned");
+#endif
 
 /**
  * @brief Print an IPv4 packet to the log
@@ -218,6 +253,9 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	header.icmp.cksum = 0;
 	header.icmp.cksum = ones_add(ip_checksum(data, data_len),
 			ip_checksum(&header.icmp, sizeof(header.icmp)));
+#if WITH_SEG_OFFLOAD
+	memset(&header.vnet,0,RECV_VIO_SIZE);
+#endif
 	iov[0].iov_base = &header;
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
@@ -412,10 +450,13 @@ static void xlate_4to6_data(struct pkt *p)
 
 	if (no_frag_hdr) {
 		iov[0].iov_base = &header;
-		iov[0].iov_len = sizeof(struct tun_pi) + sizeof(struct ip6);
+		iov[0].iov_len = sizeof(struct tun_pi) + sizeof(struct ip6) + RECV_VIO_SIZE;
 		iov[1].iov_base = p->data;
 		iov[1].iov_len = p->data_len;
-
+#if WITH_SEG_OFFLOAD
+		memcpy(&header.vnet,p->vnet,RECV_VIO_SIZE);
+#endif
+		if(header.vnet.flags) slog(LOG_DEBUG, "Writing packet to tun device with flags 4to6_data nofrag\n");
 		if (writev(gcfg->tun_fd, iov, 2) < 0)
 			slog(LOG_WARNING, "error writing packet to tun "
 					"device: %s\n", strerror(errno));
@@ -451,6 +492,10 @@ static void xlate_4to6_data(struct pkt *p)
 							htons(IP4_F_MF)))
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
 
+#if WITH_SEG_OFFLOAD
+			memcpy(&header.vnet,p->vnet,RECV_VIO_SIZE);
+#endif
+			if(header.vnet.flags) slog(LOG_DEBUG, "Writing packet to tun device with flags 4to6_data frag\n");
 			if (writev(gcfg->tun_fd, iov, 2) < 0) {
 				slog(LOG_WARNING, "error writing packet to "
 						"tun device: %s\n",
@@ -712,6 +757,9 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
+#if WITH_SEG_OFFLOAD
+	memset(&header.vnet,0,RECV_VIO_SIZE);
+#endif
 
 	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
@@ -781,6 +829,9 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
+#if WITH_SEG_OFFLOAD
+	memset(&header.vnet,0,RECV_VIO_SIZE);
+#endif
 	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
@@ -894,6 +945,11 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 			if(!em) log_pkt6(LOG_OPT_DROP,p,"Insufficient UDP Header Length");
 			return ERROR_DROP;
 		}
+#if WITH_SEG_OFFLOAD
+		/* Not doing checksum calc */
+		if(p->vnet && (p->vnet->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)) return ERROR_NONE;
+#endif
+		/* Get existing checksum for calc */
 		tck = (uint16_t *)(p->data + 6);
 		if (!*tck) {
 			/* UDP packet has no checksum, how do we deal? */
@@ -920,6 +976,10 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 			if(!em) log_pkt6(LOG_OPT_DROP,p,"Insufficient TCP Header Length");
 			return ERROR_DROP;
 		}
+#if WITH_SEG_OFFLOAD
+		/* Not doing checksum calc */
+		if(p->vnet && (p->vnet->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)) return ERROR_NONE;
+#endif
 		tck = (uint16_t *)(p->data + 16);
 		break;
 	/* Other */
@@ -981,7 +1041,10 @@ static void xlate_6to4_data(struct pkt *p)
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = p->data;
 	iov[1].iov_len = p->data_len;
-
+#if WITH_SEG_OFFLOAD
+	memcpy(&header.vnet,p->vnet,RECV_VIO_SIZE);
+#endif
+	if(header.vnet.flags) slog(LOG_DEBUG, "Writing packet to tun device with flags 6to4_data\n");
 	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
@@ -1253,7 +1316,9 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
-
+#if WITH_SEG_OFFLOAD
+	memset(&header.vnet,0,RECV_VIO_SIZE);
+#endif
 	if (writev(gcfg->tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));

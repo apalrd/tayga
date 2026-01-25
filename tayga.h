@@ -45,7 +45,10 @@
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
 #if WITH_URING
-#include "liburing.h"
+#include <liburing.h>
+#endif
+#if WITH_SEG_OFFLOAD
+#include <linux/virtio_net.h>
 #endif
 #elif defined(__FreeBSD__)
 #include <net/if.h>
@@ -125,14 +128,21 @@ struct tun_pi {
 #endif
 
 /* Do not allow uring or multiqueue if not Linux */
-#if !defined(__linux__) && (WITH_MULTIQUEUE || WITH_URING)
-#error "Cannot enable Multiqueue and Uring on non-Linux platforms"
+#if !defined(__linux__) && (WITH_MULTIQUEUE || WITH_URING || WITH_SEG_OFFLOAD )
+#error "Cannot enable Multiqueue, Uring, and Seg Offload on non-Linux platforms"
+#endif
+
+#if WITH_SEG_OFFLOAD
+/* Use 12 bytes so the structures are 16-byte aligned */
+#define RECV_VIO_SIZE 12
+#else
+#define RECV_VIO_SIZE 0
 #endif
 
 /* Size of receive buffer(s) */
 //'save' some bytes in the beginning of the buffer for headers later
 #define RECV_HEADER_OFFSET 128
-#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+RECV_HEADER_OFFSET)
+#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+RECV_HEADER_OFFSET+RECV_VIO_SIZE)
 /* Protocol structures */
 
 struct ip4 {
@@ -207,6 +217,9 @@ static_assert(sizeof(struct icmp) == 8,"Struct ICMP must be 8 bytes long");
 
 /// Packet structure
 struct pkt {
+#if WITH_SEG_OFFLOAD
+	struct virtio_net_hdr *vnet;
+#endif
 	struct ip4 *ip4;
 	struct ip6 *ip6;
 	struct ip6_frag *ip6_frag;

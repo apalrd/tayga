@@ -105,6 +105,7 @@ unit_conffile: tayga $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
 .PHONY: integration
 integration: tayga
 	-$(IP) netns add tayga-test
+	$(IP) netns exec tayga-test python3 test/segment.py
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py

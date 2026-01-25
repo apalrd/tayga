@@ -130,6 +130,7 @@ class confgen:
         self.map.append("172.16.0.2 2001:db8::2")
         self.log = "drop reject icmp self"
         self.offlink_mtu = 0
+        self.workers = -1
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -153,6 +154,8 @@ class confgen:
             if self.offlink_mtu > 0:
                 print("Setting offlink MTU to "+str(self.offlink_mtu))
                 conf_file.write("offlink-mtu "+str(self.offlink_mtu)+"\n")
+            if self.workers > 0:
+                conf_file.write("workers "+str(self.workers)+"\n")
 
 
 
@@ -275,7 +278,7 @@ class test_env:
 
         # Check if tayga started successfully
         if self.tayga_proc.poll() is not None:  # Check if the process has already terminated
-            print("tayga failed to start")
+            print("tayga failed to start: ", self.tayga_proc.poll())
             sys.exit(1)
 
     def setup_tun(self):
@@ -419,10 +422,10 @@ class test_env:
             print(f"Failed: {self.test_failed} (expected {expect_fail})")
         overall = 0
         if self.test_passed != expect_pass:
-            print(f"Expected {expect_pass} passes, only got {self.test_passed}")
+            print(f"Expected {expect_pass} passes, but got {self.test_passed}")
             overall = 1
         if self.test_failed != expect_fail:
-            print(f"Expected {expect_fail} failures, only got {self.test_failed}")
+            print(f"Expected {expect_fail} failures, but got {self.test_failed}")
             overall = 1
         exit(overall)
 
@@ -461,12 +464,12 @@ class test_env:
         self.response_func = response_func
         self.test_stat = test_result()
 
-        # Send the packet using the test.tun interface
-        if self.debug:
-            print(f"Sending packet for {test_name}:")
-            print(packet.show())
         # Send the packet
-        self.tun.send(packet)
+        if packet is not None: 
+            if self.debug:
+                print(f"Sending packet for {test_name}:")
+                print(packet.show())
+            self.tun.send(packet)
 
         # Use the sniff method to wait for a response
         self.tun.sniff(timeout=self.timeout,stop_filter=self._val_snd_check,store=False)
