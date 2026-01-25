@@ -29,6 +29,7 @@ time_t now;
 static const char *progname;
 static int signalfds[2];
 static long int worker_bytes[MAX_WORKERS] = {0};
+static long int tun_bytes = 0;
 
 void usage(int code) {
 	fprintf(stderr,
@@ -117,6 +118,7 @@ static void read_from_signalfd(void)
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		/* Also print worker bytes for debugging */
+		slog(LOG_DEBUG,"Worker -1 has done %d bytes\n",tun_bytes);
 		for(int i = 0; i < gcfg->workers; i++) {
 			slog(LOG_DEBUG,"Worker %d has done %d bytes\n",i,worker_bytes[i]);
 		}
@@ -492,7 +494,6 @@ int main(int argc, char **argv)
 		}
 		gcfg->workers = cpu_cores;
 	}
-
 	/* Setup tun adapter */
 	if(tun_setup(0, 0)) exit(-1);
 
@@ -602,12 +603,13 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			tun_read(recv_buf,gcfg->tun_fd);
+			tun_bytes += tun_read(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
 			addrmap_maint();
 			/* Also print worker bytes for debugging */
+			slog(LOG_DEBUG,"Worker -1 has done %d bytes\n",tun_bytes);
 			for(int i = 0; i < gcfg->workers; i++) {
 				slog(LOG_DEBUG,"Worker %d has done %d bytes\n",i,worker_bytes[i]);
 			}

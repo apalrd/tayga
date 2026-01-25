@@ -607,12 +607,13 @@ void test_config_read(void) {
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
-    testcase = "workers 6\nworkesr 4\n";
+    testcase = "workers 6\nworkers 4\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
+
 
     /* Test Case - workers  */
     printf("TEST CASE: workers too low\n");

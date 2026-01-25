@@ -101,6 +101,7 @@ def csum_offload():
     #Close sockets
     sock4.close()
     sock6.close()
+    test.section("Checksum Offload")
 
 #############################################
 # Multi-Queue Testing
@@ -131,8 +132,8 @@ def multiqueue():
             expect_sa = test.public_ipv4_xlate+i
             expect_data = randbytes(128)
             expect_len = 128
-            #send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4+i),proto=16) / Raw(expect_data)
-            #test.send_and_check(send_pkt,ip6_val, test_nm+" v4->v6")
+            send_pkt = IP(dst=str(test.public_ipv6_xlate),src=str(test.public_ipv4+i),proto=16) / Raw(expect_data)
+            test.send_and_check(send_pkt,ip6_val, test_nm+" v4->v6")
 
             #v6 to v4
             expect_da = test.public_ipv4
@@ -142,19 +143,19 @@ def multiqueue():
             send_pkt = IPv6(dst=str(test.public_ipv4_xlate),src=str(ipaddress.ip_address("2001:db8:2::")+i),nh=16,fl=i) / Raw(expect_data)
             test.send_and_check(send_pkt,ip_val, test_nm+" v6->v4")
 
-
-
+    #Close section
+    test.section("Multi-Queue")
 
 
 # Test was created at top of file
 # Setup, call tests, etc.
 
-test.debug = True
+#test.debug = True
 test.timeout = 0.1
 test.setup()
 
 # Call all tests
-csum_offload()
+#csum_offload()
 multiqueue()
 
 time.sleep(1)

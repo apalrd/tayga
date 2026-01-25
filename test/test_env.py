@@ -154,7 +154,7 @@ class confgen:
             if self.offlink_mtu > 0:
                 print("Setting offlink MTU to "+str(self.offlink_mtu))
                 conf_file.write("offlink-mtu "+str(self.offlink_mtu)+"\n")
-            if self.workers > 0:
+            if self.workers >= 0:
                 conf_file.write("workers "+str(self.workers)+"\n")
 
 
