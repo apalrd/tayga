@@ -153,6 +153,25 @@ static inline uint16_t ones_add(uint16_t a, uint16_t b)
 	return ~((sum & 0xffff) + (sum >> 16));
 }
 
+
+static uint16_t ip4_checksum(struct ip4 *ip4, uint32_t data_len, uint8_t proto)
+{
+	uint32_t sum = 0;
+	uint16_t *p;
+	int i;
+
+	for (i = 0, p = (uint16_t *)&ip4->src; i < 4; ++i)
+		sum += *p++;
+	sum += htonl(data_len) >> 16;
+	sum += htonl(data_len) & 0xffff;
+	sum += htons(proto);
+
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+
+	return ~sum;
+}
+
 static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
 {
 	uint32_t sum = 0;
@@ -916,7 +935,7 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 			case UDP_CKSUM_CALC:
 				/* Calculate a real UDP checksum, now */
 				*tck = ones_add(ip_checksum(p->data,p->data_len), /* Body */
-								ip_checksum(ip4,20));			  /* IP4 header */
+								ip4_checksum(ip4,p->data_len,p->data_proto));		/* IP4 psuedo-header */
 				return ERROR_NONE;
 			}
 		}
