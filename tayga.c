@@ -335,7 +335,7 @@ int main(int argc, char **argv)
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
-		tun_setup(do_mktun, do_rmtun);
+		if(tun_setup(do_mktun, do_rmtun)) exit(1);
 		return 0;
 	}
 
@@ -449,7 +449,7 @@ int main(int argc, char **argv)
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 
-	tun_setup(0, 0);
+	if(tun_setup(0, 0)) exit(1);
 
 	if (do_chroot) {
 		if (chroot(gcfg->data_dir) < 0) {
