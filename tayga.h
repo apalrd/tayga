@@ -38,12 +38,11 @@
 #include <errno.h>
 #include <time.h>
 #include <stdarg.h>
+#include <net/if.h>
 #if defined(__linux__)
-#include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
 #elif defined(__FreeBSD__)
-#include <net/if.h>
 #include <net/if_tun.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>

@@ -16,6 +16,250 @@
  *  GNU General Public License for more details.
  */
 #include "tayga.h"
+#if defined(__linux__)
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#endif
+
+int netlink_wait_for_ack(int fd)
+{
+    char buf[4096];
+    ssize_t len;
+    struct nlmsghdr *nh;
+	/* Receive ACK */
+    len = recv(fd, buf, sizeof(buf), 0);
+    if (len < 0) {
+		slog(LOG_CRIT,"NETLINK Receive Failed\n");
+        return ERROR_REJECT;
+    }
+
+    for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len)) {
+        if (nh->nlmsg_type == NLMSG_ERROR) {
+            struct nlmsgerr *err = (struct nlmsgerr *)NLMSG_DATA(nh);
+
+			//Found our ack
+            if (err->error == 0) {
+                close(fd);
+                return 0;
+            }
+            close(fd);
+			slog(LOG_CRIT,"NETLINK Returned Error %d\n",err->error);
+            return ERROR_REJECT;
+        }
+    }
+
+    close(fd);
+	slog(LOG_CRIT,"NETLINK Response Not Received\n");
+	return ERROR_REJECT;
+}
+
+
+/**
+ * @brief Set interface flags via Netlink
+ *
+ * This function connects to the Netlink socket and sends a request to set
+ * the specified flags on the given network interface.
+ *
+ * @param ifidx The index of the network interface (e.g., 0).
+ * @param flags The flags to set on the interface (e.g., IFF_UP).
+ * @param change The flags that are changing (e.g., IFF_UP).
+ * @return 0 on success, ERROR_REJECT on failure.
+ */
+int netlink_set_if_flags(int ifidx,
+                         unsigned int flags,
+                         unsigned int change)
+{
+    int fd;
+    struct {
+        struct nlmsghdr nh;
+        struct ifinfomsg ifi;
+    } req;
+
+    fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (fd < 0) {
+		slog(LOG_CRIT,"NETLINK Socket Failed\n");
+        return ERROR_REJECT;
+	}
+
+    memset(&req, 0, sizeof(req));
+
+    req.nh.nlmsg_len   = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nh.nlmsg_type  = RTM_NEWLINK;
+    req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+    req.nh.nlmsg_seq   = 1;
+    req.nh.nlmsg_pid   = getpid();
+
+    req.ifi.ifi_family = AF_UNSPEC;
+    req.ifi.ifi_index  = ifidx;
+    req.ifi.ifi_flags  = flags;
+    req.ifi.ifi_change = change;
+
+    if (send(fd, &req, req.nh.nlmsg_len, 0) < 0) {
+        close(fd);
+		slog(LOG_CRIT,"NETLINK Send Failed\n");
+        return ERROR_REJECT;
+    }
+
+    /* Receive ACK */
+    return netlink_wait_for_ack(fd);
+}
+
+/**
+ * @brief Modyfy interface address via Netlink
+ * 
+ * This function connects to the Netlink socket and sends a request to add or
+ * delete an IP address on the specified network interface.
+ * 
+ * @param ifidx The index of the network interface
+ * @param af_family The address family (e.g., AF_INET or AF_INET6
+ * @param addr The IP address in in_addr or in6_addr format
+ * @param prefixlen The prefix length of the IP address
+ * @param add 1 to add or 0 to delete the address
+ */
+int netlink_addr_modify(int ifidx,
+                        int af_family,
+						const void *addr,
+                        int prefixlen,
+                        int add)
+{
+    int fd;
+    char buf[256];
+    struct nlmsghdr *nh;
+    struct ifaddrmsg *ifa;
+    struct rtattr *rta;
+    size_t addrlen;
+
+
+    if (af_family == AF_INET) addrlen = sizeof(struct in_addr);
+    else addrlen = sizeof(struct in6_addr);
+
+	/* Open socket */
+    fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (fd < 0) {
+		slog(LOG_CRIT,"NETLINK Socket Failed\n");
+        return ERROR_REJECT;
+	}
+
+    memset(buf, 0, sizeof(buf));
+
+	nh = (struct nlmsghdr *)buf;
+    nh->nlmsg_len   = NLMSG_LENGTH(sizeof(*ifa));
+    nh->nlmsg_type  = add ? RTM_NEWADDR : RTM_DELADDR;
+    nh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK |
+                      (add ? NLM_F_CREATE | NLM_F_REPLACE : 0);
+    nh->nlmsg_seq   = 1;
+    nh->nlmsg_pid   = getpid();
+
+    ifa = NLMSG_DATA(nh);
+    ifa->ifa_family    = af_family;
+    ifa->ifa_prefixlen = prefixlen;
+    ifa->ifa_scope     = RT_SCOPE_UNIVERSE;
+    ifa->ifa_index     = ifidx;
+
+    /* IFA_ADDRESS */
+    rta = (struct rtattr *)((char *)nh + NLMSG_ALIGN(nh->nlmsg_len));
+    rta->rta_type = IFA_ADDRESS;
+    rta->rta_len  = RTA_LENGTH(addrlen);
+    memcpy(RTA_DATA(rta), addr, addrlen);
+    nh->nlmsg_len = NLMSG_ALIGN(nh->nlmsg_len) + rta->rta_len;
+
+    /* IFA_LOCAL only meaningful for IPv4 */
+    if (af_family == AF_INET) {
+        rta = (struct rtattr *)((char *)nh + NLMSG_ALIGN(nh->nlmsg_len));
+        rta->rta_type = IFA_LOCAL;
+        rta->rta_len  = RTA_LENGTH(addrlen);
+        memcpy(RTA_DATA(rta), addr, addrlen);
+        nh->nlmsg_len = NLMSG_ALIGN(nh->nlmsg_len) + rta->rta_len;
+    }
+
+    if (send(fd, nh, nh->nlmsg_len, 0) < 0) {
+        close(fd);
+		slog(LOG_CRIT,"NETLINK Send Failed\n");
+        return ERROR_REJECT;
+    }
+
+    /* Receive ACK */
+    return netlink_wait_for_ack(fd);
+}
+
+/**
+ * @brief Modyfy interface routes via Netlink
+ * 
+ * This function connects to the Netlink socket and sends a request to add or
+ * delete a route to the specified network interface.
+ * 
+ * @param ifidx The index of the network interface
+ * @param af_family The address family (e.g., AF_INET or AF_INET6
+ * @param dst The route destination in in_addr or in6_addr format
+ * @param prefixlen The prefix length of the route
+ * @param add 1 to add or 0 to delete the route
+ */
+int netlink_route_dev_modify(int ifidx,
+							 int af_family,
+                             const void *dst,
+                             int prefixlen,
+                             int add)
+{
+    int fd;
+	char buf[256];
+    struct nlmsghdr *nh;
+    struct rtmsg *rtm;
+    struct rtattr *rta;
+    size_t addrlen;
+
+    if (af_family == AF_INET) addrlen = sizeof(struct in_addr);
+    else addrlen = sizeof(struct in6_addr);
+
+    fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (fd < 0) {
+		slog(LOG_CRIT,"NETLINK Socket Failed\n");
+        return ERROR_REJECT;
+	}
+
+    memset(buf, 0, sizeof(buf));
+
+    /* Netlink header */
+    nh = (struct nlmsghdr *)buf;
+    nh->nlmsg_len   = NLMSG_LENGTH(sizeof(*rtm));
+    nh->nlmsg_type  = add ? RTM_NEWROUTE : RTM_DELROUTE;
+    nh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK |
+                      (add ? NLM_F_CREATE | NLM_F_REPLACE : 0);
+    nh->nlmsg_seq   = 1;
+    nh->nlmsg_pid   = getpid();
+
+    /* Route message */
+    rtm = NLMSG_DATA(nh);
+    rtm->rtm_family   = af_family;
+    rtm->rtm_table    = RT_TABLE_MAIN;
+    rtm->rtm_protocol = RTPROT_BOOT;
+    rtm->rtm_scope    = RT_SCOPE_LINK;
+    rtm->rtm_type     = RTN_UNICAST;
+    rtm->rtm_dst_len  = prefixlen;
+
+	/* Destination */
+	rta = (struct rtattr *)((char *)nh + NLMSG_ALIGN(nh->nlmsg_len));
+	rta->rta_type = RTA_DST;
+	rta->rta_len  = RTA_LENGTH(addrlen);
+	memcpy(RTA_DATA(rta), dst, addrlen);
+	nh->nlmsg_len = NLMSG_ALIGN(nh->nlmsg_len) + rta->rta_len;
+
+    /* Output interface */
+    rta = (struct rtattr *)((char *)nh + NLMSG_ALIGN(nh->nlmsg_len));
+    rta->rta_type = RTA_OIF;
+    rta->rta_len  = RTA_LENGTH(sizeof(ifidx));
+    memcpy(RTA_DATA(rta), &ifidx, sizeof(ifidx));
+    nh->nlmsg_len = NLMSG_ALIGN(nh->nlmsg_len) + rta->rta_len;
+
+    /* Send */
+    if (send(fd, nh, nh->nlmsg_len, 0) < 0) {
+        close(fd);
+		slog(LOG_CRIT,"NETLINK Send Failed\n");
+        return ERROR_REJECT;
+    }
+
+    /* Receive ACK */
+	return netlink_wait_for_ack(fd);
+}
 
 
 
@@ -121,6 +365,61 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
+
+	/* Get our own device ID for the tun setup operations */
+	int ifidx = if_nametoindex(gcfg->tundev);
+
+    if (ifidx == 0) {
+		slog(LOG_INFO, "Failed to get if idx from tun device %s\n",gcfg->tundev);
+		return ERROR_REJECT;
+    }
+	/* Bring tun device up */
+	if(gcfg->tun_up) {
+		if(netlink_set_if_flags(ifidx,IFF_UP,IFF_UP)) return ERROR_REJECT;
+		slog(LOG_INFO, "Tun device %s is UP\n",gcfg->tundev);
+	}
+
+	/* Add IPs to the tun dev */
+	char addrbuf[64];
+	struct list_head *entry;
+	list_for_each(entry, &gcfg->tun_ip4_list) {
+		struct tun_ip4 *ip4;
+		ip4 = list_entry(entry, struct tun_ip4, list);
+		if(netlink_addr_modify(ifidx,AF_INET,&ip4->addr,
+				ip4->prefix_len,1)) return ERROR_REJECT;
+		slog(LOG_INFO, "Added IPv4 address %s/%d to tun device %s\n",
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			ip4->prefix_len,gcfg->tundev);
+	}
+	list_for_each(entry, &gcfg->tun_ip6_list) {
+		struct tun_ip6 *ip6;
+		ip6 = list_entry(entry, struct tun_ip6, list);
+		if(netlink_addr_modify(ifidx,AF_INET6,&ip6->addr,
+				ip6->prefix_len,1)) return ERROR_REJECT;
+		slog(LOG_INFO, "Added IPv6 address %s/%d to tun device %s\n",
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			ip6->prefix_len,gcfg->tundev);
+	}
+
+	/* Add routes to the tun dev */
+	list_for_each(entry, &gcfg->tun_rt4_list) {
+		struct tun_ip4 *ip4;
+		ip4 = list_entry(entry, struct tun_ip4, list);
+		if(netlink_route_dev_modify(ifidx,AF_INET,&ip4->addr,
+				ip4->prefix_len,1)) return ERROR_REJECT;
+		slog(LOG_INFO, "Added IPv4 route %s/%d to tun device %s\n",
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			ip4->prefix_len,gcfg->tundev);
+	}
+	list_for_each(entry, &gcfg->tun_rt6_list) {
+		struct tun_ip6 *ip6;
+		ip6 = list_entry(entry, struct tun_ip6, list);
+		if(netlink_route_dev_modify(ifidx,AF_INET6,&ip6->addr,
+				ip6->prefix_len,1)) return ERROR_REJECT;
+		slog(LOG_INFO, "Added IPv6 route %s/%d to tun device %s\n",
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			ip6->prefix_len,gcfg->tundev);
+	}
 
     return 0;
 }

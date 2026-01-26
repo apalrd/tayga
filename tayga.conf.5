@@ -244,6 +244,15 @@ IPv6 guarantees delivery of packets which are 1280 bytes or less. This behavior 
 Increasing this limit will allow Tayga to translate packets which are larger than 1280 bytes, which may increase performance if you can guarantee that your network can transport packets up to this MTU end to end.
 .IP
 .B Incorrectly setting this parameter may cause IPv4-translated packets to be dropped by IPv6 routers, in violation of expected IPv4 behavior. 
+.TP
+.BI "tun-up " yes|no
+Configure whether Tayga should bring up the TUN interface itself upon startup. If set to "no", the administrator is responsible for bringing up the interface and configuring its parameters (addresses, routes, etc) manually. Only supported on Linux.
+.TP
+.BI "tun-ip " ip_address/prefix
+Configure an IP address and prefix for the TUN interface. May be specified multiple times. Only supported on Linux.
+.TP
+.BI "tun-route " destination/prefix
+Configure a route for the TUN interface. May be specified multiple times. Only supported on Linux.
 .IP
 
 .SH "SEE ALSO"
