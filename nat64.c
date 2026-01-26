@@ -138,7 +138,7 @@ static uint16_t ip_checksum(void *d, uint32_t c)
 	}
 
 	if (c)
-		sum += htons(*((uint8_t *)p) << 8);
+		sum += *((uint8_t *)p) << BIG_LITTLE(8,0);
 
 	while (sum > 0xffff)
 		sum = (sum & 0xffff) + (sum >> 16);
@@ -313,10 +313,10 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6, int em)
 		cksum = ones_add(p->icmp->cksum, cksum);
 		if (p->icmp->type == 8) {
 			p->icmp->type = 128;
-			p->icmp->cksum = ones_add(cksum, ~(128 - 8));
+			p->icmp->cksum = ones_add(cksum, ~((128 - 8)<<BIG_LITTLE(8,0)));
 		} else {
 			p->icmp->type = 129;
-			p->icmp->cksum = ones_add(cksum, ~(129 - 0));
+			p->icmp->cksum = ones_add(cksum, ~((129 - 0)<<BIG_LITTLE(8,0)));
 		}
 		return ERROR_NONE;
 	/* UDP */
@@ -908,10 +908,10 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 		cksum = ones_add(p->icmp->cksum, cksum);
 		if (p->icmp->type == 128) {
 			p->icmp->type = 8;
-			p->icmp->cksum = ones_add(cksum, 128 - 8);
+			p->icmp->cksum = ones_add(cksum, (128 - 8)<<BIG_LITTLE(8,0));
 		} else {
 			p->icmp->type = 0;
-			p->icmp->cksum = ones_add(cksum, 129 - 0);
+			p->icmp->cksum = ones_add(cksum, (129 - 0)<<BIG_LITTLE(8,0));
 		}
 		return ERROR_NONE;
 	/* UDP */
