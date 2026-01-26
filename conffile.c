@@ -308,7 +308,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 	//Check if we have a slash, and get prefix length
 	char *slash;
 	slash = strchr(args[0], '/');
-	unsigned int prefix = -1;
+	int prefix = -1;
 	if (slash) {
 		prefix = atoi(slash+1);
 		//Additional check on zero answer
@@ -372,7 +372,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 	//Check if we have a slash, and get prefix length
 	char *slash;
 	slash = strchr(args[0], '/');
-	unsigned int prefix = -1;
+	int prefix = -1;
 	if (slash) {
 		prefix = atoi(slash+1);
 		//Additional check on zero answer
