@@ -312,7 +312,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 	if (slash) {
 		prefix = atoi(slash+1);
 		//Additional check on zero answer
-		if(!prefix && slash[1] != '0') {
+		if(slash[1] > '9' || slash[1] < '0' || (!prefix && slash[1] != '0')) {
 			slog(LOG_CRIT, "Invalid prefix length in %s for "
 			     "address on line %d\n", args[0], ln);
 			return ERROR_REJECT;
@@ -376,7 +376,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 	if (slash) {
 		prefix = atoi(slash+1);
 		//Additional check on zero answer
-		if(!prefix && slash[1] != '0') {
+		if(slash[1] > '9' || slash[1] < '0' || (!prefix && slash[1] != '0')) {
 			slog(LOG_CRIT, "Invalid prefix length in %s for "
 			     "route on line %d\n", args[0], ln);
 			return ERROR_REJECT;

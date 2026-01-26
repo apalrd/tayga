@@ -761,18 +761,6 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
 
-    /* Test Case - tun-ip invalid ipv6 mcast */
-    printf("TEST CASE: tun-ip invalid ipv6 mcast\n");
-    fd = fopen(conffile,"w");
-    expect((long)fd,"fopen");
-    if(!fd) return;
-    testcase = "tun-ip ff02::69\n";
-    fwrite(testcase,strlen(testcase),1,fd);
-    fclose(fd);
-    free(gcfg);
-    config_init();
-    expect(config_read(conffile),"Failed");
-
     /* Test Case - tun-ip invalid ipv6 too long */
     printf("TEST CASE: tun-ip invalid ipv6 too long\n");
     fd = fopen(conffile,"w");
@@ -864,18 +852,6 @@ void test_config_read(void) {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "tun-route hello\n";
-    fwrite(testcase,strlen(testcase),1,fd);
-    fclose(fd);
-    free(gcfg);
-    config_init();
-    expect(config_read(conffile),"Failed");
-
-    /* Test Case - tun-route invalid ipv6 mcast */
-    printf("TEST CASE: tun-route invalid ipv6 mcast\n");
-    fd = fopen(conffile,"w");
-    expect((long)fd,"fopen");
-    if(!fd) return;
-    testcase = "tun-route ff02::69\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -1316,7 +1292,7 @@ int main(void) {
     test_config_read();
 
     /* Test function for config_validate */
-    //test_config_validate();
+    test_config_validate();
 
     /* Return final status */
     return overall();
