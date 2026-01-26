@@ -369,6 +369,14 @@ enum {
 
 /* Macros and static functions */
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+#  define BIG_LITTLE(x, y) (x)
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#  define BIG_LITTLE(x, y) (y)
+#else
+# error Unsupported byte order
+#endif
+
 /* Get a pointer to the object containing x, which is of type "type" and
  * embeds x as a field called "field" */
 #define container_of(x, type, field) ({ \

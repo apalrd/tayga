@@ -68,6 +68,12 @@ tayga: $(SOURCES)
 static: LDFLAGS += -static
 static: tayga
 
+# Compile Tayga with big-endian s390x for big-endian checksum test cases
+# S390x was chosen as it is officially supported by Debian and is Big-Endian
+taygabe: $(SOURCES)
+	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
+	s390x-linux-gnu-gcc $(CFLAGS) -o taygabe $(SOURCES) $(LDFLAGS) $(LDLIBS)
+
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test
 test: unit_conffile
@@ -88,11 +94,15 @@ integration: tayga
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py
+# Do not run big-endian tests by default
+ifdef WITH_BIG_ENDIAN
+	$(IP) netns exec tayga-test python3 test/bigendian.py
+endif
 	$(IP) netns del tayga-test
 
 .PHONY: clean
 clean:
-	$(RM) tayga version.h tayga-nat64.tar tayga-clat.tar tayga.tar
+	$(RM) tayga taygabe version.h tayga-nat64.tar tayga-clat.tar tayga.tar
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
