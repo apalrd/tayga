@@ -68,216 +68,6 @@ void die(const char *format, ...) {
 	exit(1);
 }
 
-static void set_nonblock(int fd)
-{
-	int flags;
-
-	flags = fcntl(fd, F_GETFL);
-	if (flags < 0) {
-		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
-		exit(1);
-	}
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL, flags) < 0) {
-		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		exit(1);
-	}
-}
-
-#ifdef __linux__
-static void tun_setup(int do_mktun, int do_rmtun)
-{
-	struct ifreq ifr;
-	int fd;
-
-	gcfg->tun_fd = open("/dev/net/tun", O_RDWR);
-	if (gcfg->tun_fd < 0) {
-		slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-
-	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_flags = IFF_TUN;
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
-		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
-				"%s\n", gcfg->tundev, strerror(errno));
-		exit(1);
-	}
-
-	if (do_mktun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 1) < 0) {
-			slog(LOG_CRIT, "Unable to set persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
-		if (ioctl(gcfg->tun_fd, TUNSETOWNER, 0) < 0) {
-			slog(LOG_CRIT, "Unable to set owner on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
-		if (ioctl(gcfg->tun_fd, TUNSETGROUP, 0) < 0) {
-			slog(LOG_CRIT, "Unable to set group on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
-		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
-		return;
-	} else if (do_rmtun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 0) < 0) {
-			slog(LOG_CRIT, "Unable to clear persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
-		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
-		return;
-	}
-
-	set_nonblock(gcfg->tun_fd);
-
-	fd = socket(PF_INET, SOCK_DGRAM, 0);
-	if (fd < 0) {
-		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-
-	/* Query MTU from tun adapter */
-	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
-		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	close(fd);
-
-	/* MTU is less than 1280, not allowed */
-	gcfg->mtu = ifr.ifr_mtu;
-	if(gcfg->mtu < MTU_MIN) {
-		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
-				gcfg->mtu, MTU_MIN);
-		exit(1);
-	}
-
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
-}
-#endif
-
-#ifdef __FreeBSD__
-static void tun_setup(int do_mktun, int do_rmtun)
-{
-	struct ifreq ifr;
-	int fd, do_rename = 0, multi_af;
-	char devname[64];
-
-	if (strncmp(gcfg->tundev, "tun", 3))
-		do_rename = 1;
-
-	if ((do_mktun || do_rmtun) && do_rename)
-	{
-		slog(LOG_CRIT,
-			"tunnel interface name needs to match tun[0-9]+ pattern "
-				"for --mktun to work\n");
-		exit(1);
-	}
-
-	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg->tundev);
-
-	gcfg->tun_fd = open(devname, O_RDWR);
-	if (gcfg->tun_fd < 0) {
-		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
-				devname, strerror(errno));
-		exit(1);
-	}
-
-	if (do_mktun) {
-		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
-		return;
-	} else if (do_rmtun) {
-
-		/* Close socket before removal */
-		close(gcfg->tun_fd);
-
-		fd = socket(PF_INET, SOCK_DGRAM, 0);
-		if (fd < 0) {
-			slog(LOG_CRIT, "Unable to create control socket, aborting: %s\n",
-					strerror(errno));
-			exit(1);
-		}
-
-		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, gcfg->tundev);
-		if (ioctl(fd, SIOCIFDESTROY, &ifr) < 0) {
-			slog(LOG_CRIT, "Unable to destroy interface %s, aborting: %s\n",
-					gcfg->tundev, strerror(errno));
-			exit(1);
-		}
-
-		close(fd);
-
-		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
-		return;
-	}
-
-	/* Set multi-AF mode */
-	multi_af = 1;
-	if (ioctl(gcfg->tun_fd, TUNSIFHEAD, &multi_af) < 0) {
-			slog(LOG_CRIT, "Unable to set multi-AF on %s, "
-					"aborting: %s\n", gcfg->tundev,
-					strerror(errno));
-			exit(1);
-	}
-
-	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg->tundev);
-
-	set_nonblock(gcfg->tun_fd);
-
-	fd = socket(PF_INET, SOCK_DGRAM, 0);
-	if (fd < 0) {
-		slog(LOG_CRIT, "Unable to create socket, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-
-	if (do_rename) {
-		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, fdevname(gcfg->tun_fd));
-		ifr.ifr_data = gcfg->tundev;
-		if (ioctl(fd, SIOCSIFNAME, &ifr) < 0) {
-			slog(LOG_CRIT, "Unable to rename interface %s to %s, aborting: %s\n",
-					fdevname(gcfg->tun_fd), gcfg->tundev,
-					strerror(errno));
-			exit(1);
-		}
-	}
-
-	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
-		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	close(fd);
-
-	gcfg->mtu = ifr.ifr_mtu;
-
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
-}
-#endif
-
 static void signal_handler(int signal)
 {
 	(void)!write(signalfds[1], &signal, sizeof(signal));
@@ -292,8 +82,8 @@ static void signal_setup(void)
 				strerror(errno));
 		exit(1);
 	}
-	set_nonblock(signalfds[0]);
-	set_nonblock(signalfds[1]);
+	if(set_nonblock(signalfds[0])) exit(1);
+	if(set_nonblock(signalfds[1])) exit(1);
 	memset(&act, 0, sizeof(act));
 	act.sa_handler = signal_handler;
 	sigaction(SIGINT, &act, NULL);
@@ -304,45 +94,6 @@ static void signal_setup(void)
 	sigaction(SIGTERM, &act, NULL);
 }
 
-static void read_from_tun(void)
-{
-	int ret;
-	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
-	struct pkt pbuf, *p = &pbuf;
-
-	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
-	if (ret < 0) {
-		if (errno == EAGAIN)
-			return;
-		slog(LOG_ERR, "received error when reading from tun "
-				"device: %s\n", strerror(errno));
-		return;
-	}
-	if ((size_t)ret < sizeof(struct tun_pi)) {
-		slog(LOG_WARNING, "short read from tun device "
-				"(%d bytes)\n", ret);
-		return;
-	}
-	if ((uint32_t)ret == gcfg->recv_buf_size) {
-		slog(LOG_WARNING, "dropping oversized packet\n");
-		return;
-	}
-	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
-	p->data_len = ret - sizeof(struct tun_pi);
-	switch (TUN_GET_PROTO(pi)) {
-	case ETH_P_IP:
-		handle_ip4(p);
-		break;
-	case ETH_P_IPV6:
-		handle_ip6(p);
-		break;
-	default:
-		slog(LOG_WARNING, "Dropping unknown proto %04x from "
-				"tun device\n", ntohs(pi->proto));
-		break;
-	}
-}
 
 static void read_from_signalfd(void)
 {
@@ -776,7 +527,7 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			read_from_tun();
+			tun_read();
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {

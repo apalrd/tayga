@@ -2,7 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c tun.c
 
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
