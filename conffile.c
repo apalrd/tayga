@@ -249,6 +249,29 @@ static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_tun_up(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	if (!strcasecmp(args[0], "true") ||
+	    !strcasecmp(args[0], "on") ||
+	    !strcasecmp(args[0], "yes") ||
+		!strcasecmp(args[0], "1")) {
+		gcfg->tun_up = 1;
+	} else if (!strcasecmp(args[0], "false") ||
+			   !strcasecmp(args[0], "off") ||
+			   !strcasecmp(args[0], "no") ||
+			   !strcasecmp(args[0], "0")) {
+		gcfg->tun_up = 0;
+	} else {
+		slog(LOG_CRIT, "Error: invalid value for tun-up on line %d\n",ln);
+		return ERROR_REJECT;
+	}
+	return ERROR_NONE;
+}
+
+
 static int config_tun_device(int ln, int arg_count, char **args)
 {
 	//arg_count unused
@@ -267,6 +290,136 @@ static int config_tun_device(int ln, int arg_count, char **args)
 	strcpy(gcfg->tundev, args[0]);
 	return ERROR_NONE;
 }
+
+
+static int config_tun_ip(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	struct tun_ip6 *ip6 = malloc(sizeof(struct tun_ip6));
+	if(!ip6) {
+		slog(LOG_CRIT,"Failed to allocate ip memory\n");
+		return ERROR_REJECT;
+	}
+	//We will only use one of these two pointers
+	struct tun_ip4 *ip4 = (struct tun_ip4 *)ip6;
+
+	//Check if we have a slash, and get prefix length
+	char *slash;
+	slash = strchr(args[0], '/');
+	int prefix = -1;
+	if (slash) {
+		prefix = atoi(slash+1);
+		//Additional check on zero answer
+		if(slash[1] > '9' || slash[1] < '0' || (!prefix && slash[1] != '0')) {
+			slog(LOG_CRIT, "Invalid prefix length in %s for "
+			     "address on line %d\n", args[0], ln);
+			return ERROR_REJECT;
+		}
+		slash[0] = '\0';
+	}
+
+	//Try to decode as IPv6
+	if (inet_pton(AF_INET6, args[0], &ip6->addr)) {
+		//IP6 was valid, set prefix and insert into array
+		if(prefix < 0) prefix = 128;
+		if(prefix > 128) {
+			slog(LOG_CRIT, "Invalid prefix length %d for IPv6 "
+			     "address on line %d\n", prefix, ln);
+			free(ip6);
+			return ERROR_REJECT;
+		}
+		ip6->prefix_len = prefix;
+		INIT_LIST_HEAD(&ip6->list);
+		list_add(&ip6->list,&gcfg->tun_ip6_list);
+		return ERROR_NONE;
+	}
+	//Then try as IPv4
+	if(inet_pton(AF_INET, args[0], &ip4->addr)) {
+		//IP4 was valid, set prefix and insert into array
+		if(prefix < 0) prefix = 32;
+		if(prefix > 32) {
+			slog(LOG_CRIT, "Invalid prefix length %d for IPv4 "
+			     "address on line %d\n", prefix, ln);
+			free(ip4);
+			return ERROR_REJECT;
+		}
+		ip4->prefix_len = prefix;
+		INIT_LIST_HEAD(&ip4->list);
+		list_add(&ip4->list,&gcfg->tun_ip4_list);
+		return ERROR_NONE;
+	}
+	//Error handling
+	slog(LOG_CRIT, "Expected an IPv4 or IPv6 address but found \"%s\" on "
+		     "line %d\n", args[0], ln);
+	return ERROR_REJECT;
+}
+
+static int config_tun_route(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	struct tun_ip6 *ip6 = malloc(sizeof(struct tun_ip6));
+	if(!ip6) {
+		slog(LOG_CRIT,"Failed to allocate route memory\n");
+		return ERROR_REJECT;
+	}
+	//We will only use one of these two pointers
+	struct tun_ip4 *ip4 = (struct tun_ip4 *)ip6;
+
+	//Check if we have a slash, and get prefix length
+	char *slash;
+	slash = strchr(args[0], '/');
+	int prefix = -1;
+	if (slash) {
+		prefix = atoi(slash+1);
+		//Additional check on zero answer
+		if(slash[1] > '9' || slash[1] < '0' || (!prefix && slash[1] != '0')) {
+			slog(LOG_CRIT, "Invalid prefix length in %s for "
+			     "route on line %d\n", args[0], ln);
+			return ERROR_REJECT;
+		}
+		slash[0] = '\0';
+	}
+
+	//Try to decode as IPv6
+	if (inet_pton(AF_INET6, args[0], &ip6->addr)) {
+		//IP6 was valid, set prefix and insert into array
+		if(prefix < 0) prefix = 128;
+		if(prefix > 128) {
+			slog(LOG_CRIT, "Invalid prefix length %d for IPv6 "
+			     "route on line %d\n", prefix, ln);
+			free(ip6);
+			return ERROR_REJECT;
+		}
+		ip6->prefix_len = prefix;
+		INIT_LIST_HEAD(&ip6->list);
+		list_add(&ip6->list,&gcfg->tun_rt6_list);
+		return ERROR_NONE;
+	}
+	//Then try as IPv4
+	if(inet_pton(AF_INET, args[0], &ip4->addr)) {
+		//IP4 was valid, set prefix and insert into array
+		if(prefix < 0) prefix = 32;
+		if(prefix > 32) {
+			slog(LOG_CRIT, "Invalid prefix length %d for IPv4 "
+			     "route on line %d\n", prefix, ln);
+			free(ip4);
+			return ERROR_REJECT;
+		}
+		ip4->prefix_len = prefix;
+		INIT_LIST_HEAD(&ip4->list);
+		list_add(&ip4->list,&gcfg->tun_rt4_list);
+		return ERROR_NONE;
+	}
+	//Error handling
+	slog(LOG_CRIT, "Expected an IPv4 or IPv6 route but found \"%s\" on "
+		     "line %d\n", args[0], ln);
+	return ERROR_REJECT;
+}
+
 
 static int config_map(int ln, int arg_count, char **args)
 {
@@ -506,6 +659,9 @@ struct {
 	{ "prefix", 		config_prefix, 			1 },
 	{ "wkpf-strict", 	config_wkpf_strict, 	1 },
 	{ "udp-cksum-mode", config_udp_cksum_mode, 	1 },
+	{ "tun-up", 		config_tun_up, 			1 },
+	{ "tun-ip", 		config_tun_ip, 			1 },
+	{ "tun-route", 		config_tun_route, 		1 },
 	{ "tun-device", 	config_tun_device, 		1 },
 	{ "map", 			config_map, 			2 },
 	{ "dynamic-pool", 	config_dynamic_pool,	1 },
@@ -537,6 +693,11 @@ int config_init(void)
 	INIT_LIST_HEAD(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+	INIT_LIST_HEAD(&gcfg->tun_ip4_list);
+	INIT_LIST_HEAD(&gcfg->tun_ip6_list);
+	INIT_LIST_HEAD(&gcfg->tun_rt4_list);
+	INIT_LIST_HEAD(&gcfg->tun_rt6_list);
+	gcfg->tun_up = 0;
 	return ERROR_NONE;
 }
 

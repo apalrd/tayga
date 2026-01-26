@@ -25,6 +25,10 @@ static struct config tcfg;
 static char *tmap4[100] = {0};
 static char *tmap6[100] = {0};
 
+/* IP / Route lists as strings (IPv4 first) */
+static char *tun_ip[100] = {0};
+static char *tun_route[100] = {0};
+
 /* assign_dynamic
  * required for addrmap.c to link
  * we need addrmap.c for this test
@@ -93,6 +97,7 @@ void test_config_compare(void) {
     expectl(gcfg->wkpf_strict, tcfg.wkpf_strict, "wkpf_strict");
     expectl(gcfg->log_opts, tcfg.log_opts, "log_opts");
     expectl(gcfg->udp_cksum_mode, tcfg.udp_cksum_mode, "udp_cksum_mode");
+    expectl(gcfg->tun_up, tcfg.tun_up, "tun_up");
 
     /* Pointers in gcfg which are not touched by conffile.c */
     expectl(gcfg->tun_fd, 0, "tun_fd");
@@ -151,6 +156,86 @@ void test_config_compare(void) {
         }
 	}
 
+
+    /* Iterate over ip4 + ip6 list and compare length */
+    count = 0;
+	list_for_each(entry, &gcfg->tun_ip4_list) {
+        count++;
+    }
+	list_for_each(entry, &gcfg->tun_ip6_list) {
+        count++;
+    }
+    for(expect_count = 0; tun_ip[expect_count];expect_count++) ;
+    expectl(count,expect_count,"tun_ip length");
+
+
+    /* If the lengths are equal, compare contents */
+    if(count == expect_count) {
+        count = 0;
+        /* Compare contents of ip4 list as strings */
+        list_for_each(entry, &gcfg->tun_ip4_list) {
+            struct tun_ip4 *ip4;
+            sprintf(namebuf,"tun_ip[%d]",count);
+            ip4 = list_entry(entry, struct tun_ip4, list);
+            sprintf(linebuf,"%s/%d",
+                inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+                ip4->prefix_len);
+            expects(linebuf,tun_ip[count],512,namebuf);
+            count++;
+        }
+
+        /* Compare contents of ip6 list as strings */
+        list_for_each(entry, &gcfg->tun_ip6_list) {
+            struct tun_ip6 *ip6;
+            sprintf(namebuf,"tun_ip[%d]",count);
+            ip6 = list_entry(entry, struct tun_ip6, list);
+            sprintf(linebuf,"%s/%d",
+                inet_ntop(AF_INET6,&ip6->addr,addrbuf,64),
+                ip6->prefix_len);
+            expects(linebuf,tun_ip[count],512,namebuf);
+            count++;
+        }
+    }
+
+    /* Iterate over rt4 and rt6 lists and compare length */
+    count = 0;
+	list_for_each(entry, &gcfg->tun_rt4_list) {
+        count++;
+    }
+	list_for_each(entry, &gcfg->tun_rt6_list) {
+        count++;
+    }
+    for(expect_count = 0; tun_route[expect_count];expect_count++) ;
+    expectl(count,expect_count,"tun_route length");
+
+    /* If the lengths are equal, compare contents */
+    if(count == expect_count) {
+        count = 0;
+        /* Compare contents of ip4 list as strings */
+        list_for_each(entry, &gcfg->tun_rt4_list) {
+            struct tun_ip4 *ip4;
+            sprintf(namebuf,"tun_route[%d]",count);
+            ip4 = list_entry(entry, struct tun_ip4, list);
+            sprintf(linebuf,"%s/%d",
+                inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+                ip4->prefix_len);
+            expects(linebuf,tun_route[count],512,namebuf);
+            count++;
+        }
+
+        /* Compare contents of ip6 list as strings */
+        list_for_each(entry, &gcfg->tun_rt6_list) {
+            struct tun_ip6 *ip6;
+            sprintf(namebuf,"tun_route[%d]",count);
+            ip6 = list_entry(entry, struct tun_ip6, list);
+            sprintf(linebuf,"%s/%d",
+                inet_ntop(AF_INET6,&ip6->addr,addrbuf,64),
+                ip6->prefix_len);
+            expects(linebuf,tun_route[count],512,namebuf);
+            count++;
+        }
+    }
+
     /* Structs */
     //expect(gcfg->map6_list == tcfg.map6_list, "map6_list");
     //expect(gcfg->map4_list == tcfg.map4_list, "map4_list");
@@ -178,12 +263,13 @@ void test_config_init(void) {
     tcfg.hash_bits = 7;
     tcfg.cache_size = 1<<13;
     tcfg.wkpf_strict = 1;
+    tcfg.tun_up = 0;
 
     /* Make sure config is the size we expect
      * This ensures the test has been updated for new variables
      */
     printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),768,"sizeof");
+    expectl(sizeof(struct config),832,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");
@@ -626,6 +712,237 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
 
+
+    /* Test Case - tun-up invalid  */
+    printf("TEST CASE: tun-up invalid\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-up hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-up blank  */
+    printf("TEST CASE: tun-up blank\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-up\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip blank */
+    printf("TEST CASE: tun-ip blank\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip garbage */
+    printf("TEST CASE: tun-ip garbage\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv6 too long */
+    printf("TEST CASE: tun-ip invalid ipv6 too long\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 2001:db8::1/129\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv6 too short */
+    printf("TEST CASE: tun-ip invalid ipv6 too short\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 2001:db8::1/-1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv6 not a number */
+    printf("TEST CASE: tun-ip invalid ipv6 not a number\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 2001:db8::1/hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+
+    /* Test Case - tun-ip invalid ipv4 hex*/
+    printf("TEST CASE: tun-ip invalid ipv4 hex\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 192.168.0.b\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv4 not enough digits*/
+    printf("TEST CASE: tun-ip invalid ipv4 not enough digits\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 192.168.0\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv4 prefix low*/
+    printf("TEST CASE: tun-ip invalid ipv4 prefix low\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 192.168.0.0/-1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-ip invalid ipv4 prefix high*/
+    printf("TEST CASE: tun-ip invalid ipv4 prefix high\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-ip 192.168.0.0/33\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route garbage */
+    printf("TEST CASE: tun-route garbage\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv6 too long */
+    printf("TEST CASE: tun-route invalid ipv6 too long\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 2001:db8::1/129\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv6 too short */
+    printf("TEST CASE: tun-route invalid ipv6 too short\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 2001:db8::1/-1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv6 not a number */
+    printf("TEST CASE: tun-route invalid ipv6 not a number\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 2001:db8::1/hello\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+
+    /* Test Case - tun-route invalid ipv4 hex*/
+    printf("TEST CASE: tun-route invalid ipv4 hex\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 192.168.0.b\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv4 not enough digits*/
+    printf("TEST CASE: tun-route invalid ipv4 not enough digits\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 192.168.0\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv4 prefix low*/
+    printf("TEST CASE: tun-route invalid ipv4 prefix low\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 192.168.0.0/-1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - tun-route invalid ipv4 prefix high*/
+    printf("TEST CASE: tun-route invalid ipv4 prefix high\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "tun-route 192.168.0.0/33\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
     /* Test Case - unknown option  */
     printf("TEST CASE: unknown option\n");
     fd = fopen(conffile,"w");
@@ -662,6 +979,8 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
 
+    
+
     /* Parse all config options */
     testcase = "#config for tayga\n"
         "tun-device nat64\n"
@@ -675,7 +994,12 @@ void test_config_read(void) {
         "map 192.168.6.0/24 2001:db8:1:4445::/120\n"
         "udp-cksum-mode drop\n"
         "log drop reject icmp self dyn \n"
-        "offlink-mtu 1492\n";
+        "offlink-mtu 1492\n"
+        "tun-up yes\n"
+        "tun-ip 192.168.0.0/24\n"
+        "tun-ip 2001:db8:6969::/64\n"
+        "tun-route 192.168.255.0/24\n"
+        "tun-route 64:ff9b::/96\n";
     printf("TEST CASE: all config options\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
@@ -693,6 +1017,7 @@ void test_config_read(void) {
     tcfg.local_addr6.s6_addr32[3] = htonl(0x00000002);
     tcfg.ipv6_offlink_mtu = 1492;
     tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
+    tcfg.tun_up = 1;
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
     tmap4[2] = "192.168.6.0/24 type 0 mask 255.255.255.0";
@@ -702,6 +1027,12 @@ void test_config_read(void) {
     tmap6[1] = "2001:db8:1:4445::/120 type 0 mask ffff:ffff:ffff:ffff:ffff:ffff:ffff:ff00";
     tmap6[2] = "64:ff9b::/96 type 1 mask ffff:ffff:ffff:ffff:ffff:ffff::";
     tmap6[3] = 0;
+    tun_ip[0] = "192.168.0.0/24";
+    tun_ip[1] = "2001:db8:6969::/64";
+    tun_ip[2] = 0;
+    tun_route[0] = "192.168.255.0/24";
+    tun_route[1] = "64:ff9b::/96";
+    tun_route[2] = 0;
     test_config_compare();
 }
 
