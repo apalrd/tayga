@@ -130,6 +130,7 @@ class confgen:
         self.map.append("172.16.0.2 2001:db8::2")
         self.log = "drop reject icmp self"
         self.offlink_mtu = 0
+        self.udp_cksum_mode = None
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -153,6 +154,8 @@ class confgen:
             if self.offlink_mtu > 0:
                 print("Setting offlink MTU to "+str(self.offlink_mtu))
                 conf_file.write("offlink-mtu "+str(self.offlink_mtu)+"\n")
+            if self.udp_cksum_mode is not None:
+                conf_file.write("udp-cksum-mode "+self.udp_cksum_mode+"\n")
 
 
 
