@@ -71,6 +71,8 @@ def icmp4_val(pkt):
         res.compare("MTU",pkt[ICMP].nexthopmtu,expect_mtu)
     if expect_ptr >= 0:
         res.compare("PTR",pkt[ICMP].ptr,expect_ptr)
+    if expect_csum >= 0:
+        res.compare("Checksum",pkt[ICMP].chksum,expect_csum)
     return res
 
 ####
@@ -123,15 +125,17 @@ def ip6_val(pkt):
             res.compare("Payload",pkt[Raw].load,expect_data[0:expect_len],print=False)
         else:
             res.compare("Payload",pkt[Raw].load,expect_data,print=False)
-    if expect_csum >= 0 and pkt.haslayer(TCP):
+    if expect_csum < 0:
+        pass
+    elif pkt.haslayer(TCP):
         res.compare("Checksum TCP",pkt[TCP].chksum,expect_csum)
-    elif expect_csum >= 0 and pkt.haslayer(UDP):
+    elif pkt.haslayer(UDP):
         res.compare("Checksum UDP",pkt[UDP].chksum,expect_csum)
-    elif expect_csum >= 0 and pkt.haslayer(ICMPv6EchoRequest):
+    elif pkt.haslayer(ICMPv6EchoRequest):
         res.compare("Checksum ICMPv6",pkt[ICMPv6EchoRequest].cksum,expect_csum)
-    elif expect_csum >= 0 and pkt.haslayer(ICMPv6EchoReply):
+    elif pkt.haslayer(ICMPv6EchoReply):
         res.compare("Checksum ICMPv6",pkt[ICMPv6EchoReply].cksum,expect_csum)
-    elif expect_csum >= 0:
+    else:
         res.expect("Checksum Non-TCP/UDP/ICMPv6",False,"Cannot check checksum on non-TCP/UDP/ICMPv6 packet")
 
     if expect_ref is not None:
@@ -270,6 +274,15 @@ def ip_val(pkt):
     res.compare("Src",pkt[IP].src,str(expect_sa))
     res.compare("Dest",pkt[IP].dst,str(expect_da))
     res.compare("Payload",pkt[Raw].load,expect_ref[Raw].load)
+    # If checksum expected, check it
+    if expect_csum < 0:
+        pass
+    elif pkt.haslayer(TCP):
+        res.compare("Checksum TCP",pkt[TCP].chksum,expect_csum)
+    elif pkt.haslayer(UDP):
+        res.compare("Checksum UDP",pkt[UDP].chksum,expect_csum)
+    else:
+        res.expect("Checksum Non-TCP/UDP/ICMP",False,"Cannot check checksum on non-TCP/UDP/ICMP packet")
     return res
 
 
@@ -1790,25 +1803,87 @@ def sec_5_4():
 #############################################
 def sec_5_5():
     global test
+    global expect_sa
+    global expect_da
+    global expect_data
+    global expect_ref
+    global expect_len
+    global expect_frag
+    global expect_id
+    global expect_csum
+    global expect_type
+    global expect_code
+
     # Setup config for this section
     test.tayga_conf.default()
+    test.tayga_conf.udp_cksum_mode = "drop"
     test.reload()
 
     # TCP Header
-    test.tfail("TCP Header","Not Implemented")
+    # Using well-known TCP packet payloads and manually calculated checksums
+    expect_data = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    expect_sa = test.public_ipv6_xlate
+    expect_da = test.public_ipv4
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=20+16) \
+        / TCP(sport=666,dport=667,flags="S",seq=420) \
+        / Raw(expect_data)
+    expect_csum = 58108 #manually calculated
+    test.send_and_check(expect_ref,ip_val, "TCP Header")
 
     # UDP Header w/ checksum
-    test.tfail("UDP Header w/ checksum","Not Implemented")
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=8+16) \
+        / UDP(sport=666,dport=667) \
+        / Raw(expect_data)
+    expect_csum = 21644 #manually calculated
+    test.send_and_check(expect_ref,ip_val, "UDP Header w/ checksum")
 
     # UDP Header w/o checksum w/ drop behavior
-    test.tfail("UDP Header w/o checksum, drop","Not Implemented")
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=8+16) \
+        / UDP(sport=666,dport=667,chksum=0) \
+        / Raw(expect_data)
+    expect_csum = 21644 #manually calculated
+    test.send_and_none(expect_ref, "UDP Header w/o checksum, drop")
+    
     # UDP Header w/o checksum w/ forward behavior
-    test.tfail("UDP Header w/o checksum, forward","Not Implemented")
+    test.tayga_conf.default()
+    test.tayga_conf.udp_cksum_mode = "fwd"
+    test.reload()
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=8+16) \
+        / UDP(sport=666,dport=667,chksum=0) \
+        / Raw(expect_data)
+    expect_csum = 0 #manually calculated
+    test.send_and_check(expect_ref,ip_val, "UDP Header w/o checksum, forward")
+    
     # UDP Header w/o checksum w/ calculate behavior
-    test.tfail("UDP Header w/o checksum, calculate","Not Implemented")
+    test.tayga_conf.default()
+    test.tayga_conf.udp_cksum_mode = "calc"
+    test.reload()
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6),plen=8+16) \
+        / UDP(sport=666,dport=667,chksum=0) \
+        / Raw(expect_data)
+    expect_csum = 21644 #manually calculated
+    test.send_and_check(expect_ref,ip_val, "UDP Header w/o checksum, calculate")
 
     # ICMP Header
-    test.tfail("ICMP Header","Not Implemented")
+    expect_type = 8
+    expect_code = 0
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6EchoRequest(id=15,seq=21)
+    expect_csum = 63451 #manually calculated
+    test.send_and_check(expect_ref,icmp4_val, "ICMP Header Echo Request")
+
+    expect_ref = IPv6(dst=str(test.public_ipv4_xlate),src=str(test.public_ipv6)) / ICMPv6EchoReply(id=16,seq=22)
+    expect_csum = 65497 #manually calculated
+    expect_type = 0
+    test.send_and_check(expect_ref,icmp4_val, "ICMP Header Echo Reply")
+
+    #equiv packet used to generate checksums
+    #expect_equiv = IP(dst=expect_da,src=expect_sa) / ICMP(type=0,id=16,seq=22)
+    #expect_equiv.show2()
+
+    #reset expecteds
+    expect_type = -1
+    expect_code = -1
+    expect_csum = -1
 
     # No other protocols are required, but we may want to test them   
     test.section("Transport-Layer Header (RFC 7915 5.5)")
@@ -1871,5 +1946,5 @@ time.sleep(1)
 
 test.cleanup()
 #Print test report (expected pass/fail count)
-test.report(239,7)
+test.report(246,1)
 
