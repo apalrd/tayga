@@ -164,3 +164,35 @@ dynamic-pool 192.168.255.0/24
 #
 # Default value: 1280
 #offlink-mtu 1492
+
+
+#
+# If Tayga should bring up the tun device (Linux only)
+#
+# Default no, valid values are 'yes' or 'up'
+#
+#tun-up yes
+
+
+#
+# IP Address to add to the tun device (Linux only)
+#
+# Must be specified as a single address or CIDR notation
+# May be specified multiple times
+#
+# Equivalent to running `ip addr add <ip> dev <tun-device>`
+#
+#tun-ip 192.0.0.1/29
+#tun-ip 2001:db8::1/128
+
+
+#
+# IP Route to add to the tun device (Linux only)
+#
+# Must be specified as a single address or CIDR notation
+# May be specified multiple times
+#
+# Equivalent to running `ip route add <route> dev <tun-device>`
+#
+#tun-route 192.168.255.0/24
+#tun-route 64:ff9b::/96

@@ -266,6 +266,20 @@ struct cache_entry {
 	struct list_head hash6; /* gcfg->hash_table6 */
 };
 
+/// IP Address or Route Entry (IPv4)
+struct tun_ip4 {
+	struct in_addr addr;
+	int prefix_len;
+	struct list_head list; /* gcfg->tun_ip4_list and gcfg->tun_rt4_list */
+};
+
+/// IP Address or Route Entry (IPv6)
+struct tun_ip6 {
+	struct in6_addr addr;
+	int prefix_len;
+	struct list_head list; /* gcfg->tun_ip6_list and gcfg->tun_rt6_list */
+};
+
 /// Cache flag bits
 enum {
 	CACHE_F_SEEN_4TO6	= (1<<0),
@@ -283,37 +297,48 @@ enum udp_cksum_mode {
 
 /// Configuration structure
 struct config {
+	// Tunnel parameters
 	char tundev[IFNAMSIZ];
-	char data_dir[512];
+	int tun_fd;
+	uint16_t mtu;
+	int tun_up;
+	struct list_head tun_ip4_list;
+	struct list_head tun_ip6_list;
+	struct list_head tun_rt4_list;
+	struct list_head tun_rt6_list;
+
+	//Receive buffer parameters
+	uint8_t *recv_buf;
 	uint32_t recv_buf_size;
+
+	//Map paramters
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
 	struct list_head map4_list;
 	struct list_head map6_list;
+
+	//Dynamic map parameters
+	char data_dir[512];
 	int dyn_min_lease;
 	int dyn_max_lease;
 	int max_commit_delay;
 	struct dynamic_pool *dynamic_pool;
+
+	//Cache
 	int hash_bits;
 	int cache_size;
-	uint32_t ipv6_offlink_mtu;
-
-	int tun_fd;
-
-	uint16_t mtu;
-	uint8_t *recv_buf;
-
 	uint32_t rand[8];
 	struct list_head cache_pool;
 	struct list_head cache_active;
 	time_t last_cache_maint;
 	struct list_head *hash_table4;
 	struct list_head *hash_table6;
-
 	time_t last_dynamic_maint;
 	time_t last_map_write;
 	int map_write_pending;
 
+	//Other config parameters
+	uint32_t ipv6_offlink_mtu;
 	int wkpf_strict;
 	int log_opts;
 	enum udp_cksum_mode udp_cksum_mode;	
