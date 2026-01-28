@@ -72,15 +72,15 @@ static void log_pkt4(int err, struct pkt *p, const char *msg)
 	else if(gcfg->log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
 	else return;
 
-	/* Convert the src / dest IPv6 to strings */
-	char saddr[32],daddr[32]; //requires 15 bytes
+	/* Convert the src / dest IPv4 to strings */
+	char saddr[INET_ADDRSTRLEN],daddr[INET_ADDRSTRLEN];
 	const char * ret;
-	ret = inet_ntop(AF_INET,&p->ip4->src,saddr,64);
+	ret = inet_ntop(AF_INET,&p->ip4->src,saddr,sizeof(saddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(saddr,"ERROR:%d",errno);
 	}
-	ret = inet_ntop(AF_INET,&p->ip4->dest,daddr,64);
+	ret = inet_ntop(AF_INET,&p->ip4->dest,daddr,sizeof(daddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(daddr,"ERROR:%d",errno);
@@ -109,13 +109,13 @@ static void log_pkt6(int err, struct pkt *p, const char *msg)
 	else return;
 
 	/* Convert the src / dest IPv6 to strings */
-	char saddr[64],daddr[64]; //requires 39 bytes
-	const char * ret = inet_ntop(AF_INET6,&p->ip6->src,saddr,64);
+	char saddr[INET6_ADDRSTRLEN],daddr[INET6_ADDRSTRLEN];
+	const char * ret = inet_ntop(AF_INET6,&p->ip6->src,saddr,sizeof(saddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(saddr,"ERROR:%d",errno);
 	}
-	ret = inet_ntop(AF_INET6,&p->ip6->dest,daddr,64);
+	ret = inet_ntop(AF_INET6,&p->ip6->dest,daddr,sizeof(daddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(daddr,"ERROR:%d",errno);
