@@ -577,6 +577,20 @@ static int config_data_dir(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_map_file(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	if (gcfg->map_file[0]) {
+		slog(LOG_CRIT, "Error: duplicate map-file directive on line "
+				"%d\n", ln);
+		return ERROR_REJECT;
+	}
+	strcpy(gcfg->map_file, args[0]);
+	return ERROR_NONE;
+}
+
 static int config_strict_fh(int ln, int arg_count, char **args)
 {
 	//unused
@@ -666,6 +680,7 @@ struct {
 	{ "map", 			config_map, 			2 },
 	{ "dynamic-pool", 	config_dynamic_pool,	1 },
 	{ "data-dir", 		config_data_dir, 		1 },
+	{ "map-file", 		config_map_file, 		1 },
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },

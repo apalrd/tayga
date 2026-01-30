@@ -81,6 +81,7 @@ void test_config_compare(void) {
     /* Compare every field in the struct */
     expects(gcfg->tundev, tcfg.tundev, IFNAMSIZ, "tundev");
     expects(gcfg->data_dir, tcfg.data_dir, 512, "data_dir");
+    expects(gcfg->map_file, tcfg.map_file, 512, "map_file");
     expectl(gcfg->recv_buf_size, tcfg.recv_buf_size, "recv_buf_size");
     expectl(gcfg->local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
     expectl(gcfg->local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
@@ -269,7 +270,7 @@ void test_config_init(void) {
      * This ensures the test has been updated for new variables
      */
     printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),832,"sizeof");
+    expectl(sizeof(struct config),1344,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");
@@ -634,6 +635,18 @@ void test_config_read(void) {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "data-dir var/spool/tayga\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - map file duplicate */
+    printf("TEST CASE: map file duplicate\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "map-file /var/lib/tayga/static.map\nmap-file static.map\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);

@@ -323,6 +323,9 @@ struct config {
 	int max_commit_delay;
 	struct dynamic_pool *dynamic_pool;
 
+	//Reloadable map file parameters
+	char map_file[512];
+
 	//Cache
 	int hash_bits;
 	int cache_size;
