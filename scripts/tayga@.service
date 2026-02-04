@@ -15,7 +15,7 @@ ExecStart=tayga --config /etc/tayga/%i.conf --journal --nodetach
 
 # Hardening options
 PrivateTmp=true
-StateDirectory=tayga
+StateDirectory=tayga-%i
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
