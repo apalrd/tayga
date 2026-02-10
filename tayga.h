@@ -58,6 +58,7 @@ inline static void dummy()
 {
 	static volatile int temp;
 	temp++;
+	(void)temp;
 }
 #else
 #define dummy()

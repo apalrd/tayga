@@ -20,7 +20,7 @@
 
 struct config *gcfg;
 
-static int parse_prefix(int af, const char *src, void *prefix, int *prefix_len)
+static int parse_prefix(int af, char *src, void *prefix, int *prefix_len)
 {
 	char *p, *end;
 	long int a;
