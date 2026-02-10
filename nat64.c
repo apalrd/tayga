@@ -72,15 +72,15 @@ static void log_pkt4(int err, struct pkt *p, const char *msg)
 	else if(gcfg->log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
 	else return;
 
-	/* Convert the src / dest IPv6 to strings */
-	char saddr[32],daddr[32]; //requires 15 bytes
+	/* Convert the src / dest IPv4 to strings */
+	char saddr[INET_ADDRSTRLEN],daddr[INET_ADDRSTRLEN];
 	const char * ret;
-	ret = inet_ntop(AF_INET,&p->ip4->src,saddr,64);
+	ret = inet_ntop(AF_INET,&p->ip4->src,saddr,sizeof(saddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(saddr,"ERROR:%d",errno);
 	}
-	ret = inet_ntop(AF_INET,&p->ip4->dest,daddr,64);
+	ret = inet_ntop(AF_INET,&p->ip4->dest,daddr,sizeof(daddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(daddr,"ERROR:%d",errno);
@@ -109,13 +109,13 @@ static void log_pkt6(int err, struct pkt *p, const char *msg)
 	else return;
 
 	/* Convert the src / dest IPv6 to strings */
-	char saddr[64],daddr[64]; //requires 39 bytes
-	const char * ret = inet_ntop(AF_INET6,&p->ip6->src,saddr,64);
+	char saddr[INET6_ADDRSTRLEN],daddr[INET6_ADDRSTRLEN];
+	const char * ret = inet_ntop(AF_INET6,&p->ip6->src,saddr,sizeof(saddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(saddr,"ERROR:%d",errno);
 	}
-	ret = inet_ntop(AF_INET6,&p->ip6->dest,daddr,64);
+	ret = inet_ntop(AF_INET6,&p->ip6->dest,daddr,sizeof(daddr));
 	if(!ret) {
 		/* ntop got an error */
 		sprintf(daddr,"ERROR:%d",errno);
@@ -138,7 +138,7 @@ static uint16_t ip_checksum(void *d, uint32_t c)
 	}
 
 	if (c)
-		sum += htons(*((uint8_t *)p) << 8);
+		sum += *((uint8_t *)p) << BIG_LITTLE(8,0);
 
 	while (sum > 0xffff)
 		sum = (sum & 0xffff) + (sum >> 16);
@@ -151,6 +151,25 @@ static inline uint16_t ones_add(uint16_t a, uint16_t b)
 	uint32_t sum = (uint16_t)~a + (uint16_t)~b;
 
 	return ~((sum & 0xffff) + (sum >> 16));
+}
+
+
+static uint16_t ip4_checksum(struct ip4 *ip4, uint32_t data_len, uint8_t proto)
+{
+	uint32_t sum = 0;
+	uint16_t *p;
+	int i;
+
+	for (i = 0, p = (uint16_t *)&ip4->src; i < 4; ++i)
+		sum += *p++;
+	sum += htonl(data_len) >> 16;
+	sum += htonl(data_len) & 0xffff;
+	sum += htons(proto);
+
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+
+	return ~sum;
 }
 
 static uint16_t ip6_checksum(struct ip6 *ip6, uint32_t data_len, uint8_t proto)
@@ -294,10 +313,10 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6, int em)
 		cksum = ones_add(p->icmp->cksum, cksum);
 		if (p->icmp->type == 8) {
 			p->icmp->type = 128;
-			p->icmp->cksum = ones_add(cksum, ~(128 - 8));
+			p->icmp->cksum = ones_add(cksum, ~((128 - 8)<<BIG_LITTLE(8,0)));
 		} else {
 			p->icmp->type = 129;
-			p->icmp->cksum = ones_add(cksum, ~(129 - 0));
+			p->icmp->cksum = ones_add(cksum, ~((129 - 0)<<BIG_LITTLE(8,0)));
 		}
 		return ERROR_NONE;
 	/* UDP */
@@ -882,10 +901,10 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 		cksum = ones_add(p->icmp->cksum, cksum);
 		if (p->icmp->type == 128) {
 			p->icmp->type = 8;
-			p->icmp->cksum = ones_add(cksum, 128 - 8);
+			p->icmp->cksum = ones_add(cksum, (128 - 8)<<BIG_LITTLE(8,0));
 		} else {
 			p->icmp->type = 0;
-			p->icmp->cksum = ones_add(cksum, 129 - 0);
+			p->icmp->cksum = ones_add(cksum, (129 - 0)<<BIG_LITTLE(8,0));
 		}
 		return ERROR_NONE;
 	/* UDP */
@@ -909,7 +928,7 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 			case UDP_CKSUM_CALC:
 				/* Calculate a real UDP checksum, now */
 				*tck = ones_add(ip_checksum(p->data,p->data_len), /* Body */
-								ip_checksum(ip4,20));			  /* IP4 header */
+								ip4_checksum(ip4,p->data_len,p->data_proto));		/* IP4 psuedo-header */
 				return ERROR_NONE;
 			}
 		}

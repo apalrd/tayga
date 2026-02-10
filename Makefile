@@ -2,8 +2,8 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
-SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c
-LDLIBS := 
+LDLIBS := -lpthread
+SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c tun.c
 
 #Default installation paths (may be overridden by environment variables)
 prefix ?= /usr/local
@@ -55,13 +55,6 @@ help:
 	@echo 'WITH_SYSTEMD    - Install systemd scripts'
 	@echo 'WITH_OPENRC     - Install OpenRC scripts and example config'
 
-# Library options based on with flags
-ifdef WITH_MULTIQUEUE
-LDLIBS += -lpthread
-endif
-ifdef WITH_URING
-LDLIBS += -luring
-endif
 # Synthesize the version.h header from Git
 define VERSION_HEADER
 #ifndef __TAYGA_VERSION_H__
@@ -70,10 +63,6 @@ define VERSION_HEADER
 #define TAYGA_VERSION "$(TAYGA_VERSION)"
 #define TAYGA_BRANCH  "$(TAYGA_BRANCH)"
 #define TAYGA_COMMIT  "$(TAYGA_COMMIT)"
-#define WITH_EBPF	$(if $(WITH_EBPF),1,0)
-#define WITH_MULTIQUEUE	$(if $(WITH_MULTIQUEUE),1,0)
-#define WITH_SEG_OFFLOAD $(if $(WITH_SEG_OFFLOAD),1,0)
-#define WITH_URING	$(if $(WITH_URING),1,0)
 
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
@@ -87,6 +76,12 @@ tayga: $(SOURCES)
 .PHONY: static
 static: LDFLAGS += -static
 static: tayga
+
+# Compile Tayga with big-endian s390x for big-endian checksum test cases
+# S390x was chosen as it is officially supported by Debian and is Big-Endian
+taygabe: $(SOURCES)
+	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
+	s390x-linux-gnu-gcc $(CFLAGS) -o taygabe $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Test suite compiles with -Werror to detect compiler warnings
 .PHONY: test
@@ -108,11 +103,15 @@ integration: tayga
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py
+# Do not run big-endian tests by default
+ifdef WITH_BIG_ENDIAN
+	$(IP) netns exec tayga-test python3 test/bigendian.py
+endif
 	$(IP) netns del tayga-test
 
 .PHONY: clean
 clean:
-	$(RM) tayga version.h tayga-nat64.tar tayga-clat.tar tayga.tar
+	$(RM) tayga taygabe version.h tayga-nat64.tar tayga-clat.tar tayga.tar
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages

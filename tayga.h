@@ -40,15 +40,11 @@
 #include <stdarg.h>
 #include <pthread.h>
 #include "version.h"
+#include <net/if.h>
 #if defined(__linux__)
-#include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
-#if WITH_URING
-#include "liburing.h"
-#endif
 #elif defined(__FreeBSD__)
-#include <net/if.h>
 #include <net/if_tun.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
@@ -64,6 +60,7 @@ inline static void dummy()
 {
 	static volatile int temp;
 	temp++;
+	(void)temp;
 }
 #else
 #define dummy()
@@ -294,6 +291,20 @@ struct cache_entry {
 	struct list_head hash6; /* gcfg->hash_table6 */
 };
 
+/// IP Address or Route Entry (IPv4)
+struct tun_ip4 {
+	struct in_addr addr;
+	int prefix_len;
+	struct list_head list; /* gcfg->tun_ip4_list and gcfg->tun_rt4_list */
+};
+
+/// IP Address or Route Entry (IPv6)
+struct tun_ip6 {
+	struct in6_addr addr;
+	int prefix_len;
+	struct list_head list; /* gcfg->tun_ip6_list and gcfg->tun_rt6_list */
+};
+
 /// Cache flag bits
 enum {
 	CACHE_F_SEEN_4TO6	= (1<<0),
@@ -311,35 +322,49 @@ enum udp_cksum_mode {
 
 /// Configuration structure
 struct config {
+	// Tunnel parameters
 	char tundev[IFNAMSIZ];
 	char data_dir[512];
+	int tun_fd;
+	uint16_t mtu;
+	int tun_up;
+	struct list_head tun_ip4_list;
+	struct list_head tun_ip6_list;
+	struct list_head tun_rt4_list;
+	struct list_head tun_rt6_list;
+
+	//Receive buffer parameters
+	uint8_t *recv_buf;
+	uint32_t recv_buf_size;
+
+	//Map paramters
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
 	struct list_head map4_list;
 	struct list_head map6_list;
+
+	//Dynamic map parameters
+	char data_dir[512];
 	int dyn_min_lease;
 	int dyn_max_lease;
 	int max_commit_delay;
 	struct dynamic_pool *dynamic_pool;
+
+	//Cache
 	int hash_bits;
 	int cache_size;
-	uint32_t ipv6_offlink_mtu;
-
-	int tun_fd;
-
-	uint16_t mtu;
-
 	uint32_t rand[8];
 	struct list_head cache_pool;
 	struct list_head cache_active;
 	time_t last_cache_maint;
 	struct list_head *hash_table4;
 	struct list_head *hash_table6;
-
 	time_t last_dynamic_maint;
 	time_t last_map_write;
 	int map_write_pending;
 
+	//Other config parameters
+	uint32_t ipv6_offlink_mtu;
 	int wkpf_strict;
 	int log_opts;
 	enum udp_cksum_mode udp_cksum_mode;	
@@ -354,9 +379,6 @@ struct config {
 	pthread_mutex_t map_mutex;
 	pthread_t threads[MAX_WORKERS];
 	int tun_fd_addl[MAX_WORKERS];
-#if WITH_URING
-	struct io_uring ring;
-#endif
 };
 
 /// Logging flags
@@ -379,6 +401,14 @@ enum {
 
 
 /* Macros and static functions */
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+#  define BIG_LITTLE(x, y) (x)
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#  define BIG_LITTLE(x, y) (y)
+#else
+# error Unsupported byte order
+#endif
 
 /* Get a pointer to the object containing x, which is of type "type" and
  * embeds x as a field called "field" */
@@ -443,6 +473,11 @@ void journal_cleanup(void);
 int journal_printv_with_location(
         int priority, const char *file, const char *line, const char *func,
         const char *format, va_list ap);
+
+/* tun.c */
+int tun_setup(int do_mktun, int do_rmtun);
+int set_nonblock(int fd);
+void tun_read();
 
 
 #endif /* #ifndef __TAYGA_H__ */

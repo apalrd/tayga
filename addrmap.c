@@ -18,14 +18,6 @@
 
 #include "tayga.h"
 
-#if __BYTE_ORDER == __BIG_ENDIAN
-#  define BIG_LITTLE(x, y) (x)
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
-#  define BIG_LITTLE(x, y) (y)
-#else
-# error Unsupported byte order
-#endif
-
 /**
  * @brief Check if an IPv4 address is valid
  *
