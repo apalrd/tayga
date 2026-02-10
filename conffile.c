@@ -60,7 +60,8 @@ static struct map_static *alloc_map_static(int ln)
 	m->map6.prefix_len = 128;
 	calc_ip6_mask(&m->map6.mask, NULL, 128);
 	INIT_LIST_HEAD(&m->map6.list);
-	m->conffile_lineno = ln;
+	m->line_no = ln;
+	m->origin = MAP_ORIGIN_CONFFILE;
 	return m;
 }
 
@@ -72,8 +73,8 @@ static void abort_on_conflict4(char *msg, int ln, struct map4 *old)
 
 	if (old->type == MAP_TYPE_STATIC || old->type == MAP_TYPE_RFC6052) {
 		s = container_of(old, struct map_static, map4);
-		if (s->conffile_lineno)
-			sprintf(oldline, " from line %d", s->conffile_lineno);
+		if (s->line_no)
+			sprintf(oldline, " from line %d", s->line_no);
 	}
 
 	inet_ntop(AF_INET, &old->addr, oldaddr, sizeof(oldaddr));
@@ -95,8 +96,8 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 
 	if (old->type == MAP_TYPE_STATIC || old->type == MAP_TYPE_RFC6052) {
 		s = container_of(old, struct map_static, map6);
-		if (s->conffile_lineno)
-			sprintf(oldline, " from line %d", s->conffile_lineno);
+		if (s->line_no)
+			sprintf(oldline, " from line %d", s->line_no);
 	}
 
 	inet_ntop(AF_INET6, &old->addr, oldaddr, sizeof(oldaddr));
@@ -722,7 +723,6 @@ int config_read(char *conffile)
 	int ln = 0;
 	char line[512];
 	char *c, *tokptr;
-#define MAX_ARGS 10
 	char *args[MAX_ARGS];
 	int arg_count;
 	int i;

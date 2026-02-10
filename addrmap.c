@@ -334,9 +334,9 @@ struct map6 *find_map6(const struct in6_addr *addr6)
 	return NULL;
 }
 /**
- * @brief Insert an IPv4 entry into the cache
+ * @brief Insert an IPv4 entry into the map
  *
- * @param map4 Cache entry to add
+ * @param map4 Entry to add
  * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
  */
@@ -350,21 +350,19 @@ int insert_map4(struct map4 *m, struct map4 **conflict)
 		if (s->prefix_len < m->prefix_len)
 			break;
 		if (s->prefix_len == m->prefix_len &&
-				s->addr.s_addr == m->addr.s_addr)
-			goto conflict;
+				s->addr.s_addr == m->addr.s_addr) {
+			if (conflict)
+				*conflict = s;
+			return -1;
+		}
 	}
 	list_add_tail(&m->list, entry);
 	return 0;
-
-conflict:
-	if (conflict)
-		*conflict = s;
-	return -1;
 }
 /**
- * @brief Insert an IPv6 entry into the cache
+ * @brief Insert an IPv6 entry into the map
  *
- * @param map6 Cache entry to add
+ * @param map6 Entry to add
  * @param[out] conflict Pointer to return conflicting object
  * @returns -1 on conflict
  */
@@ -729,6 +727,165 @@ void addrmap_maint(void)
 			list_add(&c->list, &gcfg->cache_pool);
 			list_del(&c->hash4);
 			list_del(&c->hash6);
+		}
+	}
+}
+
+
+
+
+static int addrmap_entry(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	struct map_static *m;
+	struct map4 *m4;
+	struct map6 *m6;
+
+	m = alloc_map_static(ln);
+	if(!m) return ERROR_REJECT;
+
+	char *slash;
+	slash = strchr(args[0], '/');
+	unsigned int prefix4 = 32;
+	if (slash) {
+		prefix4 = atoi(slash+1);
+		slash[0] = '\0';
+	}
+
+	if (!inet_pton(AF_INET, args[0], &m->map4.addr)) {
+		slog(LOG_CRIT, "Expected an IPv4 subnet but found \"%s\" on "
+		     "line %d\n", args[0], ln);
+		return ERROR_REJECT;
+	}
+	m->map4.prefix_len = prefix4;
+	calc_ip4_mask(&m->map4.mask, NULL, prefix4);
+
+	unsigned int prefix6 = 128;
+	slash = strchr(args[1], '/');
+	if (slash) {
+		prefix6 = atoi(slash+1);
+		slash[0] = '\0';
+	}
+
+	if ((32 - prefix4) != (128 - prefix6)) {
+		slog(LOG_CRIT, "IPv4 and IPv6 subnet must be of the same size, but found"
+				" %s and %s on line %d\n", args[0], args[1], ln);
+		return ERROR_REJECT;
+	}
+
+	if (!inet_pton(AF_INET6, args[1], &m->map6.addr)) {
+		slog(LOG_CRIT, "Expected an IPv6 subnet but found \"%s\" on "
+				"line %d\n", args[1], ln);
+		return ERROR_REJECT;
+	}
+	m->map6.prefix_len = prefix6;
+	calc_ip6_mask(&m->map6.mask, NULL, prefix6);
+    int ret = validate_ip4_addr(&m->map4.addr);
+	if (ret == ERROR_LOCAL) {
+		slog(LOG_WARNING, "Using link-local address %s in map "
+			"directive, use with caution\n", args[0]);
+	} else if (ret < 0) {
+		slog(LOG_CRIT, "Cannot use reserved address %s in map "
+				"directive, aborting...\n", args[0]);
+		return ERROR_REJECT;
+	}
+	if (validate_ip6_addr(&m->map6.addr) < 0) {
+		slog(LOG_CRIT, "Cannot use reserved address %s in map "
+				"directive, aborting...\n", args[1]);
+		return ERROR_REJECT;
+	}
+	if (insert_map4(&m->map4, &m4) < 0) {
+		abort_on_conflict4("Error: IPv4 address in map directive",
+				ln, m4);
+		return ERROR_REJECT;
+	}
+	if (insert_map6(&m->map6, &m6) < 0) {
+		abort_on_conflict6("Error: IPv6 address in map directive",
+				ln, m6);
+		return ERROR_REJECT;
+	}
+	return ERROR_NONE;
+}
+
+
+
+/**
+ * @brief (re)load the static map file
+ * 
+ */
+void addrmap_reload(void)
+{
+	struct list_head *entry;
+	struct map4 *m4;
+	struct map6 *m6;
+	struct map_static *s;
+	FILE *in;
+	char *args[MAX_ARGS];
+	char line[512];
+	int ln = 0;
+	int arg_count;
+	char *c, *tokptr;
+
+	/* Open map file, and do not modify mappings on error */
+	in = fopen(gcfg->map_file, "r");
+	if (!in) {
+		slog(LOG_ERR, "MAP-FILE: Unable to open %s, aborting: %s\n", gcfg->map_file,
+				strerror(errno));
+		return;
+	}
+
+	/* Go through the old map list and clear line number, to detect changes */
+	list_for_each(entry, &gcfg->map4_list) {
+		m4 = list_entry(entry, struct map4, list);
+		if(m4->type == MAP_TYPE_STATIC) {
+			s = container_of(m4, struct map_static, map4);
+			if(s->origin == MAP_ORIGIN_MAPFILE) s->line_no = -1;
+		}
+	}
+
+	/* Read in the file, and update line number if found again */
+	while (fgets(line, sizeof(line), in)) {
+		++ln;
+		if (strlen(line) + 1 == sizeof(line)) {
+			slog(LOG_ERR, "MAP-FILE: Line %d of %s is too long\n", ln, gcfg->map_file);
+			continue;
+		}
+		arg_count = 0;
+		for (;;) {
+			c = strtok_r(arg_count ? NULL : line, DELIM, &tokptr);
+			if (!c || *c == '#')
+				break;
+			if (arg_count == MAX_ARGS) {
+				slog(LOG_ERR, "MAP-FILE: Line %d of %s has too many tokens\n", ln, gcfg->map_file);
+				break;
+			}
+			args[arg_count++] = c;
+		}
+		if (arg_count == 0)
+			continue;
+		/* The only valid token here is `map`, currently */
+		if (strcasecmp(args[0], "map")) {
+			slog(LOG_ERR, "MAP-FILE: Unknown directive \"%s\" on line %d of "
+					"%s\n", args[0],
+					ln, gcfg->map_file);
+			continue;
+		}
+		--arg_count;
+		/* Write parsing code here */
+	}
+	fclose(in);
+
+	/* Go through the map list again and find cleared line numbers, to delete entries */
+	list_for_each(entry, &gcfg->map4_list) {
+		m4 = list_entry(entry, struct map4, list);
+		if(m4->type == MAP_TYPE_STATIC) {
+			s = container_of(m4, struct map_static, map4);
+			if(s->origin == MAP_ORIGIN_MAPFILE && s->line_no < 0) {
+				/* Delete this entry and purge it from cache */
+				slog(LOG_DEBUG,"MAP-FILE: Deleting entry which was removed TBD\n");
+			}
 		}
 	}
 }

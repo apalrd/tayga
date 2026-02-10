@@ -173,6 +173,9 @@ static_assert(sizeof(struct icmp) == 8,"Struct ICMP must be 8 bytes long");
 /* Minimum MTU allowed by IPv6 */
 #define MTU_MIN 1280
 
+/* Maximum config arguments in parser */
+#define MAX_ARGS 10
+
 
 /* TAYGA data definitions */
 
@@ -194,10 +197,10 @@ static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0,"Pac
 
 /// Type of mapping in mapping list
 enum {
-	MAP_TYPE_STATIC,
-	MAP_TYPE_RFC6052,
-	MAP_TYPE_DYNAMIC_POOL,
-	MAP_TYPE_DYNAMIC_HOST,
+	MAP_TYPE_STATIC,			//Static map
+	MAP_TYPE_RFC6052,			//Map generated from RFC6052 prefix
+	MAP_TYPE_DYNAMIC_POOL,		//Dynamic map pool without specific host mapping
+	MAP_TYPE_DYNAMIC_HOST,		//Dynamic map host
 };
 
 /// Mapping entry (IPv4)
@@ -218,11 +221,18 @@ struct map6 {
 	struct list_head list; /* gcfg->map6_list */
 };
 
+/// Origin of static mapping entry
+enum {
+	MAP_ORIGIN_CONFFILE,		//Map originated from tayga.conf
+	MAP_ORIGIN_MAPFILE,			//Map originated from map-file
+};
+
 /// Mapping entry (Static Maps)
 struct map_static {
 	struct map4 map4;
 	struct map6 map6;
-	int conffile_lineno;
+	int line_no;
+	int origin;
 };
 
 /// Free addresses
