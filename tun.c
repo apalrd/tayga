@@ -107,7 +107,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		return ERROR_REJECT;
 	}
 	/* Set offload */
-	int offload = TUN_F_CSUM;// | TUN_F_TSO4 | TUN_F_TSO6 | TUN_F_UFO | TUN_F_USO4 | TUN_F_USO6;
+	int offload = 0;//TUN_F_CSUM;// | TUN_F_TSO4 | TUN_F_TSO6 | TUN_F_UFO | TUN_F_USO4 | TUN_F_USO6;
 	if(ioctl(gcfg->tun_fd, TUNSETOFFLOAD, offload) < 0) {
 		slog(LOG_CRIT, "Unable to set offloads (addl) to 0x%x, aborting: "
 				"%s\n", offload, strerror(errno));
