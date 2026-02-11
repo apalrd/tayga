@@ -266,9 +266,13 @@ void test_config_init(void) {
 
     /* Make sure config is the size we expect
      * This ensures the test has been updated for new variables
+     * Only run this test case on amd64, since struct packing is not
+     * the same on all platforms
      */
+#ifdef __amd64__
     printf("TEST CASE: config struct size\n");
     expectl(sizeof(struct config),1680,"sizeof");
+#endif
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");
