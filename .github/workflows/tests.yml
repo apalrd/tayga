@@ -40,8 +40,16 @@ jobs:
         run: make
       - name: install deps
         run: sudo apt-get install -y python3-pyroute2 python3-scapy
-      - name: run test
+      - name: install s390x emulation
+        if: matrix.arch == 'amd64'
+        run: sudo dpkg --add-architecture s390x && sudo apt-get update && \
+          sudo apt-get install gcc-s390x-linux-gnu qemu-user-static libc6:s390x
+      - name: run test w/o s390x
+        if: matrix.arch != 'amd64'
         run: sudo make integration
+      - name: run test w/ s390x
+        if: matrix.arch == 'amd64'
+        run: sudo make integration WITH_BIG_ENDIAN=1
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.arch }}

@@ -97,6 +97,10 @@ TEST_FILES := test/unit.c
 unit_conffile: $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 
+ifdef WITH_BIG_ENDIAN
+integration: taygabe
+endif
+
 .PHONY: integration
 integration: tayga
 	-$(IP) netns add tayga-test
