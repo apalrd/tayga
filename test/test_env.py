@@ -467,9 +467,11 @@ class test_env:
         # Send the packet using the test.tun interface
         if self.debug:
             print(f"Sending packet for {test_name}:")
-            print(packet.show())
+            if packet is not None:
+                print(packet.show())
         # Send the packet
-        self.tun.send(packet)
+        if packet is not None:
+            self.tun.send(packet)
 
         # Use the sniff method to wait for a response
         self.tun.sniff(timeout=self.timeout,stop_filter=self._val_snd_check,store=False)

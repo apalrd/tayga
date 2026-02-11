@@ -421,8 +421,6 @@ int tun_setup(int do_mktun, int do_rmtun)
 			ip6->prefix_len,gcfg->tundev);
 	}
 
-
-
 	/* Setup multiqueue additional queues */
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
@@ -567,7 +565,7 @@ void tun_read(uint8_t * recv_buf,int tun_fd)
 	struct tun_pi *pi = (struct tun_pi *)recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(gcfg->tun_fd, recv_buf, RECV_BUF_SIZE);
+	ret = read(tun_fd, recv_buf, RECV_BUF_SIZE);
 	if (ret < 0) {
 		if (errno == EAGAIN)
 			return;

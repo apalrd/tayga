@@ -103,6 +103,7 @@ integration: tayga
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py
+	$(IP) netns exec tayga-test python3 test/segment.py
 # Do not run big-endian tests by default
 ifdef WITH_BIG_ENDIAN
 	$(IP) netns exec tayga-test python3 test/bigendian.py
