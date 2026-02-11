@@ -22,6 +22,7 @@ GIT ?= git
 INSTALL ?= install
 IP ?= ip
 SYSTEMCTL ?= /bin/systemctl
+PANDOC ?= pandoc
 
 INSTALL_DATA ?= $(INSTALL) -m 644
 INSTALL_PROGRAM ?= $(INSTALL)
@@ -40,6 +41,7 @@ help:
 	@echo 'static          - Compile tayga with static linkage (produces ./tayga)'
 	@echo 'test            - Run the test suite'
 	@echo 'integration     - Run integration tests. Requires root permissions'
+	@echo 'man             - Generate man pages from markdown (requires pandoc)'
 	@echo 'install         - Installs tayga and manpages'
 	@echo 'clean           - Remove compiled files'
 	@echo
@@ -109,6 +111,16 @@ ifdef WITH_BIG_ENDIAN
 	$(IP) netns exec tayga-test python3 test/bigendian.py
 endif
 	$(IP) netns del tayga-test
+
+# Generate man pages from markdown sources (requires pandoc)
+.PHONY: man
+man: tayga.8 tayga.conf.5
+
+tayga.8: docs/man/tayga.8.md
+	$(PANDOC) -s -t man $< -o $@
+
+tayga.conf.5: docs/man/tayga.conf.5.md
+	$(PANDOC) -s -t man $< -o $@
 
 .PHONY: clean
 clean:
