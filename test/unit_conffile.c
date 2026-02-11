@@ -268,7 +268,7 @@ void test_config_init(void) {
      * This ensures the test has been updated for new variables
      */
     printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),1608,"sizeof");
+    expectl(sizeof(struct config),1680,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");
@@ -1043,7 +1043,7 @@ void test_config_read(void) {
         "udp-cksum-mode drop\n"
         "log drop reject icmp self dyn \n"
         "offlink-mtu 1492\n"
-        "workers 7\n";
+        "workers 7\n"
         "tun-up yes\n"
         "tun-ip 192.168.0.0/24\n"
         "tun-ip 2001:db8:6969::/64\n"
