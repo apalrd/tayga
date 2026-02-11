@@ -107,29 +107,16 @@ struct tun_pi {
 #endif
 
 /* Maximum number of threads (sizes thread pool array) */
+#ifdef __linux__
 #define MAX_WORKERS 64
-
-/* Queue Depth for uring */
-#if WITH_URING
-#define MAX_QUEUE_DEPTH 64
-#else
-#define MAX_QUEUE_DEPTH 0
 #endif
-
-/* Do not alow uring and multiqueue at the same time */
-#if WITH_MULTIQUEUE && WITH_URING
-#error "Cannot enable Multiqueue and Uring together"
-#endif
-
-/* Do not allow uring or multiqueue if not Linux */
-#if !defined(__linux__) && (WITH_MULTIQUEUE || WITH_URING)
-#error "Cannot enable Multiqueue and Uring on non-Linux platforms"
+#ifdef __FreeBSD__
+#define MAX_WORKERS 0
 #endif
 
 /* Size of receive buffer(s) */
 //'save' some bytes in the beginning of the buffer for headers later
-#define RECV_HEADER_OFFSET 128
-#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi)+RECV_HEADER_OFFSET)
+#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi))
 /* Protocol structures */
 
 struct ip4 {
@@ -324,7 +311,6 @@ enum udp_cksum_mode {
 struct config {
 	// Tunnel parameters
 	char tundev[IFNAMSIZ];
-	char data_dir[512];
 	int tun_fd;
 	uint16_t mtu;
 	int tun_up;
@@ -332,10 +318,6 @@ struct config {
 	struct list_head tun_ip6_list;
 	struct list_head tun_rt4_list;
 	struct list_head tun_rt6_list;
-
-	//Receive buffer parameters
-	uint8_t *recv_buf;
-	uint32_t recv_buf_size;
 
 	//Map paramters
 	struct in_addr local_addr4;
@@ -374,6 +356,7 @@ struct config {
 		LOG_TO_JOURNAL = 2,
 	} log_out;
 
+	//Multiqueue related
 	int workers;
 	pthread_mutex_t cache_mutex;
 	pthread_mutex_t map_mutex;
@@ -477,7 +460,7 @@ int journal_printv_with_location(
 /* tun.c */
 int tun_setup(int do_mktun, int do_rmtun);
 int set_nonblock(int fd);
-void tun_read();
+void tun_read(uint8_t * recv_buf,int tun_fd);
 
 
 #endif /* #ifndef __TAYGA_H__ */

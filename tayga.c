@@ -192,10 +192,9 @@ static void print_op_info(void)
 }
 
 /* Worker thread for multiqueue tun interface */
-#if WITH_MULTIQUEUE
 static void * worker(void * arg)
 {
-	int idx = (int)arg;
+	int idx = *(int *)arg;
 	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
 	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
@@ -206,10 +205,9 @@ static void * worker(void * arg)
 	/* Enter worker loop */
 	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		read_from_tun(recv_buf,gcfg->tun_fd_addl[idx]);
+		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
 	}	
 }
-#endif
 
 int main(int argc, char **argv)
 {
@@ -562,23 +560,17 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
-	
-#if WITH_MULTIQUEUE
+
+#ifdef __linux__
 	/* Launch worker threads */
+	static int thread_ids[MAX_WORKERS];
 	for(int i = 0; i < gcfg->workers; i++) {
-		ret = pthread_create(&gcfg->threads[i], NULL, worker, (void *)(i));
+		thread_ids[i] = i;
+		ret = pthread_create(&gcfg->threads[i], NULL, worker, &thread_ids[i]);
 		if (ret != 0) {
 			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
 				i, strerror(ret));
-			/* Clean up already created threads? */
-			//atomic_store(&pool->shutdown, 1);
-			//for (int j = 0; j < i; j++) {
-			//	pthread_join(pool->threads[j], NULL);
-			//}
-			//free(pool->threads);
-			//pool->threads = NULL;
-			//return -1;
-			//TBD
+			exit(1);
 		}
 	}
 #endif
@@ -597,7 +589,7 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			tun_read();
+			tun_read(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
