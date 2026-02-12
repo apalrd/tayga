@@ -365,7 +365,6 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6, int em)
 static void xlate_4to6_data(struct pkt *p)
 {
 	struct ip6_data header;
-	struct cache_entry *src = NULL, *dest = NULL;
 	struct iovec iov[2];
 	int no_frag_hdr = 0;
 	uint16_t off = ntohs(p->ip4->flags_offset);
@@ -377,7 +376,7 @@ static void xlate_4to6_data(struct pkt *p)
 		frag_size = gcfg->mtu;
 	frag_size -= sizeof(struct ip6);
 
-	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, &dest);
+	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest);
 	if (ret == ERROR_REJECT) {
 		log_pkt4(LOG_OPT_REJECT,p,"Unable to map destination address");
 		host_send_icmp4_error(3, 1, 0, p);
@@ -389,7 +388,7 @@ static void xlate_4to6_data(struct pkt *p)
 		return;
 	}
 
-	ret = map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, &src);
+	ret = map_ip4_to_ip6(&header.ip6.src, &p->ip4->src);
 	if (ret == ERROR_REJECT) {
 		log_pkt4(LOG_OPT_REJECT,p,"Unable to map source address");
 		host_send_icmp4_error(3, 10, 0, p);
@@ -427,11 +426,6 @@ static void xlate_4to6_data(struct pkt *p)
 
 	if (xlate_payload_4to6(p, &header.ip6,0) < 0)
 		return;
-
-	if (src)
-		src->flags |= CACHE_F_SEEN_4TO6;
-	if (dest)
-		dest->flags |= CACHE_F_SEEN_4TO6;
 
 	TUN_SET_PROTO(&header.pi,  ETH_P_IPV6);
 
@@ -571,7 +565,6 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	struct pkt p_em;
 	uint32_t mtu;
 	uint16_t em_len;
-	struct cache_entry *orig_dest = NULL;
 	char temp[64];
 
 	memset(&p_em, 0, sizeof(p_em));
@@ -603,9 +596,9 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		p_em.data_len = MTU_MIN - sizeof(struct ip6) * 2 -
 						sizeof(struct icmp);
 
-	if (map_ip4_to_ip6(&header.ip6_em.src, &p_em.ip4->src, NULL) ||
+	if (map_ip4_to_ip6(&header.ip6_em.src, &p_em.ip4->src) ||
 			map_ip4_to_ip6(&header.ip6_em.dest,
-					&p_em.ip4->dest, &orig_dest)) {
+					&p_em.ip4->dest)) {
 		log_pkt4(LOG_OPT_DROP,p,"ICMP Failed to map em src or em dest");
 		return;
 	}
@@ -709,13 +702,13 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 		return;
 	}
 
-	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src, NULL)) {
+	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src)) {
 		log_pkt4(LOG_OPT_DROP,p,"Need to rely on fake source");
 		//Fake source IP is our own IP
 		header.ip6.src = gcfg->local_addr6;
 	}
 
-	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest, NULL)) {
+	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest)) {
 		log_pkt4(LOG_OPT_DROP,p,"Unable to map destination address");
 		return;
 	}
@@ -960,11 +953,10 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 static void xlate_6to4_data(struct pkt *p)
 {
 	struct ip4_data header;
-	struct cache_entry *src = NULL, *dest = NULL;
 	int ret;
 	struct iovec iov[2];
 
-	ret = map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, &dest, 0);
+	ret = map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, 0);
 	if (ret == ERROR_REJECT) {
 		log_pkt6(LOG_OPT_REJECT,p,"Failed to map dest addr");
 		host_send_icmp6_error(1, 0, 0, p);
@@ -976,7 +968,7 @@ static void xlate_6to4_data(struct pkt *p)
 		return;
 	}
 
-	ret = map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, &src, 1);
+	ret = map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, 1);
 	if (ret == ERROR_REJECT) {
 		log_pkt6(LOG_OPT_REJECT,p,"Failed to map src addr");
 		host_send_icmp6_error(1, 5, 0, p);
@@ -999,11 +991,6 @@ static void xlate_6to4_data(struct pkt *p)
 
 	if (xlate_payload_6to4(p, &header.ip4,0) < 0)
 		return;
-
-	if (src)
-		src->flags |= CACHE_F_SEEN_6TO4;
-	if (dest)
-		dest->flags |= CACHE_F_SEEN_6TO4;
 
 	TUN_SET_PROTO(&header.pi, ETH_P_IP);
 
@@ -1237,9 +1224,9 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 		return;
 	}
 
-	if (map_ip6_to_ip4(&header.ip4_em.src, &p_em.ip6->src, NULL, 0) ||
+	if (map_ip6_to_ip4(&header.ip4_em.src, &p_em.ip6->src, 0) ||
 			map_ip6_to_ip4(&header.ip4_em.dest,
-						&p_em.ip6->dest, NULL, 0)) {
+						&p_em.ip6->dest, 0)) {
 		log_pkt6(LOG_OPT_DROP,p,"Failed to map em src or dest");
 		return;
 	}
@@ -1256,13 +1243,13 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 
 	//As this is an ICMP error packet, we will not further
 	//send errors, so treat return of REJECT = DROP
-	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, NULL, 0)) {
+	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, 0)) {
 		log_pkt6(LOG_OPT_ICMP,p,"Need to rely on fake source");
 		//fake source IP is our own IP
 		header.ip4.src = gcfg->local_addr4;
 	}
 
-	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, NULL, 0)) {
+	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, 0)) {
 		log_pkt6(LOG_OPT_DROP,p,"Failed to map dest");
 		return;
 	}

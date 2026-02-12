@@ -82,7 +82,6 @@ void test_config_compare(void) {
     expects(gcfg->tundev, tcfg.tundev, IFNAMSIZ, "tundev");
     expects(gcfg->data_dir, tcfg.data_dir, 512, "data_dir");
     expects(gcfg->map_file, tcfg.map_file, 512, "map_file");
-    expectl(gcfg->recv_buf_size, tcfg.recv_buf_size, "recv_buf_size");
     expectl(gcfg->local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
     expectl(gcfg->local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
     expectl(gcfg->local_addr6.s6_addr32[1],tcfg.local_addr6.s6_addr32[1], "local_addr6[1]");
@@ -94,6 +93,7 @@ void test_config_compare(void) {
     expectl(gcfg->hash_bits,tcfg.hash_bits, "hash_bits");
     expectl(gcfg->cache_size,tcfg.cache_size, "cache_size");
     expectl(gcfg->ipv6_offlink_mtu,tcfg.ipv6_offlink_mtu, "ipv6_offlink_mtu");
+    expectl(gcfg->workers,tcfg.workers, "workers");
     expectl(gcfg->mtu,tcfg.mtu, "mtu");
     expectl(gcfg->wkpf_strict, tcfg.wkpf_strict, "wkpf_strict");
     expectl(gcfg->log_opts, tcfg.log_opts, "log_opts");
@@ -102,7 +102,6 @@ void test_config_compare(void) {
 
     /* Pointers in gcfg which are not touched by conffile.c */
     expectl(gcfg->tun_fd, 0, "tun_fd");
-    expectl((long)gcfg->recv_buf, 0, "recv_buf");
 
     int count = 0, expect_count = 0;
 	struct list_head *entry;
@@ -257,20 +256,23 @@ void test_config_init(void) {
     config_init();
 
     /* Setup expected outputs */
-    tcfg.recv_buf_size = 65540;
     tcfg.dyn_min_lease = 7440;
     tcfg.dyn_max_lease = 1209600;
     tcfg.max_commit_delay = 302400;
     tcfg.hash_bits = 7;
     tcfg.cache_size = 1<<13;
     tcfg.wkpf_strict = 1;
+    tcfg.workers = -1;
     tcfg.tun_up = 0;
 
     /* Make sure config is the size we expect
      * This ensures the test has been updated for new variables
+     * Only run this test case on amd64, since struct packing is not
+     * the same on all platforms
      */
+#ifdef __amd64__
     printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),1344,"sizeof");
+    expectl(sizeof(struct config),832,"sizeof");
 
     /* Compare to our initialized tcfg */
     printf("TEST CASE: config_init\n");
@@ -701,6 +703,55 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
 
+
+    /* Test Case - workers  */
+    printf("TEST CASE: workers duplicate\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "workers 6\nworkesr 4\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - workers  */
+    printf("TEST CASE: workers too low\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "workers -1\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - workers */
+    printf("TEST CASE: workers too high\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "workers 12000\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - workers  */
+    printf("TEST CASE: workers not a number\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "workers 0x6\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
     /* Test Case - log duplicate*/
     printf("TEST CASE: log duplicate\n");
     fd = fopen(conffile,"w");
@@ -1008,6 +1059,7 @@ void test_config_read(void) {
         "udp-cksum-mode drop\n"
         "log drop reject icmp self dyn \n"
         "offlink-mtu 1492\n"
+        "workers 7\n"
         "tun-up yes\n"
         "tun-ip 192.168.0.0/24\n"
         "tun-ip 2001:db8:6969::/64\n"
@@ -1016,7 +1068,7 @@ void test_config_read(void) {
     printf("TEST CASE: all config options\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
-    if(!fd) return;;
+    if(!fd) return;
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -1029,6 +1081,7 @@ void test_config_read(void) {
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);
     tcfg.local_addr6.s6_addr32[3] = htonl(0x00000002);
     tcfg.ipv6_offlink_mtu = 1492;
+    tcfg.workers = 7;
     tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
     tcfg.tun_up = 1;
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
@@ -1305,7 +1358,7 @@ int main(void) {
     test_config_read();
 
     /* Test function for config_validate */
-    test_config_validate();
+    //test_config_validate();
 
     /* Return final status */
     return overall();

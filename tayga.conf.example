@@ -166,6 +166,17 @@ dynamic-pool 192.168.255.0/24
 #offlink-mtu 1492
 
 #
+# Workers
+#
+# (Linux only) Tayga will spawn this many worker threads to process packets. 
+#
+# May be set to 0 to disable multiqueue behavior
+#
+# Default value: number of CPU cores, max 64
+# If multiqueue support is not compiled in, this has no effect
+#workers 4
+
+#
 # Map File
 #
 # tayga will read this file to find additional `map` directives. 

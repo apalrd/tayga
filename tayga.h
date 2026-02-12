@@ -38,6 +38,8 @@
 #include <errno.h>
 #include <time.h>
 #include <stdarg.h>
+#include <pthread.h>
+#include "version.h"
 #include <net/if.h>
 #if defined(__linux__)
 #include <linux/if_tun.h>
@@ -58,6 +60,7 @@ inline static void dummy()
 {
 	static volatile int temp;
 	temp++;
+	(void)temp;
 }
 #else
 #define dummy()
@@ -103,7 +106,17 @@ struct tun_pi {
 #define TAYGA_CONF_PATH "/etc/tayga.conf"
 #endif
 
+/* Maximum number of threads (sizes thread pool array) */
+#ifdef __linux__
+#define MAX_WORKERS 64
+#endif
+#ifdef __FreeBSD__
+#define MAX_WORKERS 0
+#endif
 
+/* Size of receive buffer(s) */
+//'save' some bytes in the beginning of the buffer for headers later
+#define RECV_BUF_SIZE (65536+sizeof(struct tun_pi))
 /* Protocol structures */
 
 struct ip4 {
@@ -316,10 +329,6 @@ struct config {
 	struct list_head tun_rt4_list;
 	struct list_head tun_rt6_list;
 
-	//Receive buffer parameters
-	uint8_t *recv_buf;
-	uint32_t recv_buf_size;
-
 	//Map paramters
 	struct in_addr local_addr4;
 	struct in6_addr local_addr6;
@@ -359,6 +368,13 @@ struct config {
 		LOG_TO_STDOUT = 1,
 		LOG_TO_JOURNAL = 2,
 	} log_out;
+
+	//Multiqueue related
+	int workers;
+	pthread_mutex_t cache_mutex;
+	pthread_mutex_t map_mutex;
+	pthread_t threads[MAX_WORKERS];
+	int tun_fd_addl[MAX_WORKERS];
 };
 
 /// Logging flags
@@ -424,10 +440,8 @@ struct map4 *find_map4(const struct in_addr *addr4);
 struct map6 *find_map6(const struct in6_addr *addr6);
 int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 		const struct in6_addr *prefix, int prefix_len);
-int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
-		struct cache_entry **c_ptr);
-int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
-		struct cache_entry **c_ptr, int dyn_alloc);
+int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4);
+int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6, int dyn_alloc);
 void addrmap_maint(void);
 int addrmap_reload(void);
 
@@ -460,7 +474,7 @@ int journal_printv_with_location(
 /* tun.c */
 int tun_setup(int do_mktun, int do_rmtun);
 int set_nonblock(int fd);
-void tun_read();
+void tun_read(uint8_t * recv_buf,int tun_fd);
 
 
 #endif /* #ifndef __TAYGA_H__ */

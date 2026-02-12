@@ -294,7 +294,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_flags = IFF_TUN;
+	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
 	strcpy(ifr.ifr_name, gcfg->tundev);
 	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
@@ -421,6 +421,32 @@ int tun_setup(int do_mktun, int do_rmtun)
 			ip6->prefix_len,gcfg->tundev);
 	}
 
+	/* Setup multiqueue additional queues */
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
+	strcpy(ifr.ifr_name, gcfg->tundev);
+	for(int i = 0; i < gcfg->workers; i++) {
+		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
+		if (gcfg->tun_fd_addl[i] < 0) {
+			slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
+					strerror(errno));
+			exit(1);
+		}
+		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
+			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
+					"%s\n", gcfg->tundev, strerror(errno));
+			exit(1);
+		}
+	}
+
+	/* Disable queue of main tun if we have >0 workers */
+	if(gcfg->workers > 0) {
+		memset(&ifr, 0, sizeof(ifr));
+		ifr.ifr_flags = IFF_DETACH_QUEUE;
+		if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
+	}
+
+	//No error on setup
     return 0;
 }
 #endif /* ifdef __linux__ */
@@ -533,13 +559,13 @@ int tun_setup(int do_mktun, int do_rmtun)
 #endif
 
 
-void tun_read(void)
+void tun_read(uint8_t * recv_buf,int tun_fd)
 {
 	int ret;
-	struct tun_pi *pi = (struct tun_pi *)gcfg->recv_buf;
+	struct tun_pi *pi = (struct tun_pi *)recv_buf;
 	struct pkt pbuf, *p = &pbuf;
 
-	ret = read(gcfg->tun_fd, gcfg->recv_buf, gcfg->recv_buf_size);
+	ret = read(tun_fd, recv_buf, RECV_BUF_SIZE);
 	if (ret < 0) {
 		if (errno == EAGAIN)
 			return;
@@ -552,12 +578,12 @@ void tun_read(void)
 				"(%d bytes)\n", ret);
 		return;
 	}
-	if ((uint32_t)ret == gcfg->recv_buf_size) {
+	if ((uint32_t)ret == RECV_BUF_SIZE) {
 		slog(LOG_WARNING, "dropping oversized packet\n");
 		return;
 	}
 	memset(p, 0, sizeof(struct pkt));
-	p->data = gcfg->recv_buf + sizeof(struct tun_pi);
+	p->data = recv_buf + sizeof(struct tun_pi);
 	p->data_len = ret - sizeof(struct tun_pi);
 	switch (TUN_GET_PROTO(pi)) {
 	case ETH_P_IP:

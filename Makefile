@@ -2,6 +2,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -O2
 LDFLAGS ?= -flto=auto
+LDLIBS := -lpthread
 SOURCES := nat64.c addrmap.c dynamic.c tayga.c conffile.c log.c tun.c
 
 #Default installation paths (may be overridden by environment variables)
@@ -40,6 +41,14 @@ help:
 	@echo 'test            - Run the test suite'
 	@echo 'integration     - Run integration tests. Requires root permissions'
 	@echo 'install         - Installs tayga and manpages'
+	@echo 'clean           - Remove compiled files'
+	@echo
+	@echo 'Compilation Variables:'
+	@echo 'WITH_EBPF	    - Compile with eBPF support (Linux only)'
+	@echo 'WITH_MULTIQUEUE  - Compile with multi-queue support (Linux only)'
+	@echo 'WITH_SEG_OFFLOAD - Compile with segmentation offload support (Linux only)'
+	@echo 'WITH_URING       - Compile with io_uring support (Linux only)'
+#TBD which optimizations we will support on BSD
 	@echo
 	@echo 'Installation Variables:'
 	@echo 'LIVE            - Install on a live system (daemon-reload)'
@@ -94,6 +103,7 @@ integration: tayga
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py
+	$(IP) netns exec tayga-test python3 test/segment.py
 # Do not run big-endian tests by default
 ifdef WITH_BIG_ENDIAN
 	$(IP) netns exec tayga-test python3 test/bigendian.py

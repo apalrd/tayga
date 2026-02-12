@@ -17,7 +17,6 @@
  */
 
 #include "tayga.h"
-#include "version.h"
 
 #include <stdarg.h>
 #include <signal.h>
@@ -27,7 +26,6 @@
 
 extern struct config *gcfg;
 time_t now;
-static const char *progname;
 static const char *progname;
 static int signalfds[2];
 
@@ -112,9 +110,17 @@ static void read_from_signalfd(void)
 			slog(LOG_CRIT, "signal fd was closed\n");
 			exit(1);
 		}
-		if (gcfg->dynamic_pool)
+		if (gcfg->dynamic_pool) {
+			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 1);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
+		if (gcfg->log_out == LOG_TO_SYSLOG) {
+			closelog();
+		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+			journal_cleanup();
+		}
 		exit(0);
 	}
 }
@@ -183,6 +189,24 @@ static void print_op_info(void)
 			inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
 			s6->prefix_len,s6->type);
 	}
+}
+
+/* Worker thread for multiqueue tun interface */
+static void * worker(void * arg)
+{
+	int idx = *(int *)arg;
+	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
+	if (!recv_buf) {
+		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
+				"receive buffer\n", RECV_BUF_SIZE);
+		exit(1);
+	}
+
+	/* Enter worker loop */
+	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
+	for (;;) {
+		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
+	}	
 }
 
 int main(int argc, char **argv)
@@ -454,6 +478,20 @@ int main(int argc, char **argv)
 
 		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
+	
+	/* If workers is -1 (default), set to cpu cores */
+	if(gcfg->workers < 0) {
+		int cpu_cores = sysconf(_SC_NPROCESSORS_ONLN);
+		if(cpu_cores > MAX_WORKERS) cpu_cores = MAX_WORKERS;
+		if(cpu_cores < 0) {
+			slog(LOG_WARNING,"Unable to detect CPU cores, defaulting to 4\n");
+			cpu_cores = 4;
+		}
+		else {
+			slog(LOG_DEBUG,"Using %d workers based on CPU core count\n",cpu_cores);
+		}
+		gcfg->workers = cpu_cores;
+	}
 
 	if(tun_setup(0, 0)) exit(1);
 
@@ -497,10 +535,20 @@ int main(int argc, char **argv)
 	if (gcfg->cache_size)
 		create_cache();
 
-	gcfg->recv_buf = (uint8_t *)malloc(gcfg->recv_buf_size);
-	if (!gcfg->recv_buf) {
+	/* Initialize mutexes */
+	if (pthread_mutex_init(&gcfg->cache_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize cache mutex\n");
+		exit(1);
+	}
+	if (pthread_mutex_init(&gcfg->map_mutex, NULL) != 0) {
+		slog(LOG_CRIT, "Failed to initialize map mutex\n");
+		exit(1);
+	}
+
+	uint8_t * recv_buf = (uint8_t *)malloc(RECV_BUF_SIZE);
+	if (!recv_buf) {
 		slog(LOG_CRIT, "Error: unable to allocate %d bytes for "
-				"receive buffer\n", gcfg->recv_buf_size);
+				"receive buffer\n", RECV_BUF_SIZE);
 		exit(1);
 	}
 
@@ -519,6 +567,20 @@ int main(int argc, char **argv)
 		}
 	}
 
+#ifdef __linux__
+	/* Launch worker threads */
+	static int thread_ids[MAX_WORKERS];
+	for(int i = 0; i < gcfg->workers; i++) {
+		thread_ids[i] = i;
+		ret = pthread_create(&gcfg->threads[i], NULL, worker, &thread_ids[i]);
+		if (ret != 0) {
+			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
+				i, strerror(ret));
+			exit(1);
+		}
+	}
+#endif
+
 	/* Main loop */
 	for (;;) {
 		ret = poll(pollfds, 2, POOL_CHECK_INTERVAL * 1000);
@@ -533,7 +595,7 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			read_from_signalfd();
 		if (pollfds[1].revents)
-			tun_read();
+			tun_read(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
 					gcfg->last_cache_maint > now)) {
@@ -543,15 +605,11 @@ int main(int argc, char **argv)
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
 					gcfg->last_dynamic_maint > now)) {
+			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
+			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
-	}
-
-	if (gcfg->log_out == LOG_TO_SYSLOG) {
-		closelog();
-	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-		journal_cleanup();
 	}
 	return 0;
 }
