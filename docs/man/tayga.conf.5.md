@@ -1,8 +1,6 @@
 ---
 title: TAYGA.CONF
 section: 5
-footer: TAYGA 0.9.6
-date: Jun 2025
 ---
 
 # NAME

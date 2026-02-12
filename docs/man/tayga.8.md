@@ -1,8 +1,6 @@
 ---
 title: TAYGA
 section: 8
-footer: TAYGA 0.9.4
-date: Jun 2025
 ---
 
 # NAME
