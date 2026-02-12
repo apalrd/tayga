@@ -319,6 +319,12 @@ int main(int argc, char **argv)
 	/* Validate config */
 	if(config_validate() < 0) return 1;
 
+	/* If we have a map-file specified, load it now */
+	if(gcfg->map_file[0] && addrmap_reload()) {
+		slog(LOG_CRIT,"Unable to load map file\n");
+		return 1;
+	}
+
 	/* Check if we are doing tunnel operations only
 	 * Must be done after config reading so we know tun name
 	 */

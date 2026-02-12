@@ -429,6 +429,7 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 		struct cache_entry **c_ptr, int dyn_alloc);
 void addrmap_maint(void);
+int addrmap_reload(void);
 
 /* conffile.c */
 int config_init(void);

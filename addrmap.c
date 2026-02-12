@@ -731,17 +731,50 @@ void addrmap_maint(void)
 	}
 }
 
+/**
+ * @brief Delete the parent map entry of this map4
+ * 
+ * This assumes that the parent is a static map
+ *
+ */
+static void addrmap_delete4(struct map4 *m4) {
+	if(m4->type == MAP_TYPE_STATIC) {
+		struct map_static *m = container_of(m4, struct map_static, map4);
+		/* Delete from map4 and map6 lists */
+		list_del(m->map4.list);
+		list_del(m->map6.list);
+		/* Free static map */
+		free(m);
+	}
+}
+
+/**
+ * @brief Delete the parent map entry of this map6
+ * 
+ * This assumes that the parent is a static map
+ *
+ */
+static void addrmap_delete6(struct map6 *m6) {
+	if(m6->type == MAP_TYPE_STATIC) {
+		struct map_static *m = container_of(m6, struct map_static, map6);
+		/* Delete from map4 and map6 lists */
+		list_del(&m->map4.list);
+		list_del(&m->map6.list);
+		/* Free static map */
+		free(m);
+	}
+}
 
 
-
-static int addrmap_entry(int ln, int arg_count, char **args)
+/**
+ * @brief Parse a single entry in a map file
+ *
+ */
+static int addrmap_entry(int ln, char **args)
 {
-	//arg_count unused
-	(void)arg_count;
-
-	struct map_static *m;
-	struct map4 *m4;
-	struct map6 *m6;
+	struct map_static *m, *n1, *n2;
+	struct map4 *m4 = NULL;
+	struct map6 *m6 = NULL;
 
 	m = alloc_map_static(ln);
 	if(!m) return ERROR_REJECT;
@@ -755,7 +788,7 @@ static int addrmap_entry(int ln, int arg_count, char **args)
 	}
 
 	if (!inet_pton(AF_INET, args[0], &m->map4.addr)) {
-		slog(LOG_CRIT, "Expected an IPv4 subnet but found \"%s\" on "
+		slog(LOG_ERR, "MAP-FILE: Expected an IPv4 subnet but found \"%s\" on "
 		     "line %d\n", args[0], ln);
 		return ERROR_REJECT;
 	}
@@ -770,13 +803,13 @@ static int addrmap_entry(int ln, int arg_count, char **args)
 	}
 
 	if ((32 - prefix4) != (128 - prefix6)) {
-		slog(LOG_CRIT, "IPv4 and IPv6 subnet must be of the same size, but found"
+		slog(LOG_ERR, "MAP-FILE: IPv4 and IPv6 subnet must be of the same size, but found"
 				" %s and %s on line %d\n", args[0], args[1], ln);
 		return ERROR_REJECT;
 	}
 
 	if (!inet_pton(AF_INET6, args[1], &m->map6.addr)) {
-		slog(LOG_CRIT, "Expected an IPv6 subnet but found \"%s\" on "
+		slog(LOG_ERR, "MAP-FILE: Expected an IPv6 subnet but found \"%s\" on "
 				"line %d\n", args[1], ln);
 		return ERROR_REJECT;
 	}
@@ -784,28 +817,78 @@ static int addrmap_entry(int ln, int arg_count, char **args)
 	calc_ip6_mask(&m->map6.mask, NULL, prefix6);
     int ret = validate_ip4_addr(&m->map4.addr);
 	if (ret == ERROR_LOCAL) {
-		slog(LOG_WARNING, "Using link-local address %s in map "
+		slog(LOG_WARNING, "MAP-FILE: Using link-local address %s in map "
 			"directive, use with caution\n", args[0]);
 	} else if (ret < 0) {
-		slog(LOG_CRIT, "Cannot use reserved address %s in map "
+		slog(LOG_ERR, "MAP-FILE: Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[0]);
 		return ERROR_REJECT;
 	}
 	if (validate_ip6_addr(&m->map6.addr) < 0) {
-		slog(LOG_CRIT, "Cannot use reserved address %s in map "
+		slog(LOG_ERR, "MAP-FILE: Cannot use reserved address %s in map "
 				"directive, aborting...\n", args[1]);
 		return ERROR_REJECT;
 	}
-	if (insert_map4(&m->map4, &m4) < 0) {
-		abort_on_conflict4("Error: IPv4 address in map directive",
-				ln, m4);
-		return ERROR_REJECT;
+	//take mutex map
+
+	//Try to insert and see if there are conflicts to resolve
+	insert_map4(&m->map4, &m4);
+	insert_map6(&m->map6, &m6);
+	//At this point mX is not NULL if the exact entry previously existed, but not necessarily together
+	//Map is new = both m4 and m6 are NULL
+	//Map is unmodified = both m4 and m6 are not NULL and point to same container which is type static
+	//M4 is NULL and M6 is NOT and M6 pointer is type static (v4 mapping changed) 
+	//M6 is NULL and M4 is NOT and M4 pointer is type static (v6 mapping changed)
+	//M4 is null and m6 is not and m6 pointer is dynamic host (added static map from )
+	//M4 and M6 are not NULL but do not point to same container (multiple maps have changed)
+	if(m4 && m6) {
+		//Both existed before, but were they both static maps?
+		if(m4->type != MAP_TYPE_STATIC || m6->type != MAP_TYPE_STATIC) {
+			//Bail out, we can't handle this case
+			slog(LOG_ERR, "MAP-FILE: Existing incompatible map entry found for mapping on line %d\n",ln);
+			free(m);
+		} else {
+			//Both were static maps, but were they the same map?
+			n1 = container_of(m4, struct map_static, map4);
+			n2 = container_of(m6, struct map_static, map6);
+			if(n1!= n2) {
+				//They are different mapping entries, delete both and re-add this one
+				slog(LOG_DEBUG, "MAP-FILE: Existing multiple map changes found for mapping on line %d\n",ln);
+				addrmap_delete4(m4);
+				addrmap_delete6(m6);
+				insert_map4(&m->map4, &m4);
+				insert_map6(&m->map6, &m6);
+			} else {
+				//Otherwise, m and n are identical, so this mapping is already-existing
+				//Just update line number
+				m->line_no = ln;
+				m->origin = MAP_ORIGIN_MAPFILE;
+				//and free the newly-allocated map
+				free(m);
+			}
+		}
+	} else if (m4) {
+		//m4 exists and m6 does not
+		if(m4->type != MAP_TYPE_STATIC) {
+			slog(LOG_ERR, "MAP-FILE: Map entry v4 conflicts with non-static map on line %d (other map is %d)\n",ln,m4->type);
+			//TBD cleanup this entry that was half added
+		} else {
+			//Delete the existing m4 map and finish inserting this one
+			addrmap_delete4(m4);
+			insert_map4(&m->map4, &m4);
+		}
+	} else if (m6) {
+		//m6 exists and m4 does not
+		if(m6->type != MAP_TYPE_STATIC) {
+			slog(LOG_ERR, "MAP-FILE: Map entry v6 conflicts with non-static map on line %d (other map is %d)\n",ln,m6->type);
+			//TBD cleanup this entry that was half added
+		} else {
+			//Delete the existing m6 map and finish inserting this one
+			addrmap_delete6(m6);
+			insert_map6(&m->map6, &m6);
+		}
 	}
-	if (insert_map6(&m->map6, &m6) < 0) {
-		abort_on_conflict6("Error: IPv6 address in map directive",
-				ln, m6);
-		return ERROR_REJECT;
-	}
+	//give mutex map
 	return ERROR_NONE;
 }
 
@@ -815,11 +898,10 @@ static int addrmap_entry(int ln, int arg_count, char **args)
  * @brief (re)load the static map file
  * 
  */
-void addrmap_reload(void)
+int addrmap_reload(void)
 {
-	struct list_head *entry;
+	struct list_head *entry, *next;
 	struct map4 *m4;
-	struct map6 *m6;
 	struct map_static *s;
 	FILE *in;
 	char *args[MAX_ARGS];
@@ -827,13 +909,14 @@ void addrmap_reload(void)
 	int ln = 0;
 	int arg_count;
 	char *c, *tokptr;
+	int res = 0;
 
 	/* Open map file, and do not modify mappings on error */
 	in = fopen(gcfg->map_file, "r");
 	if (!in) {
 		slog(LOG_ERR, "MAP-FILE: Unable to open %s, aborting: %s\n", gcfg->map_file,
 				strerror(errno));
-		return;
+		return ERROR_REJECT;
 	}
 
 	/* Go through the old map list and clear line number, to detect changes */
@@ -850,6 +933,7 @@ void addrmap_reload(void)
 		++ln;
 		if (strlen(line) + 1 == sizeof(line)) {
 			slog(LOG_ERR, "MAP-FILE: Line %d of %s is too long\n", ln, gcfg->map_file);
+			res = ERROR_REJECT;
 			continue;
 		}
 		arg_count = 0;
@@ -859,6 +943,7 @@ void addrmap_reload(void)
 				break;
 			if (arg_count == MAX_ARGS) {
 				slog(LOG_ERR, "MAP-FILE: Line %d of %s has too many tokens\n", ln, gcfg->map_file);
+				res = ERROR_REJECT;
 				break;
 			}
 			args[arg_count++] = c;
@@ -870,22 +955,31 @@ void addrmap_reload(void)
 			slog(LOG_ERR, "MAP-FILE: Unknown directive \"%s\" on line %d of "
 					"%s\n", args[0],
 					ln, gcfg->map_file);
+			res = ERROR_REJECT;
 			continue;
 		}
 		--arg_count;
-		/* Write parsing code here */
+		/* Parse arguments */
+		addrmap_entry(ln,args);
 	}
 	fclose(in);
 
 	/* Go through the map list again and find cleared line numbers, to delete entries */
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each_safe(entry, next, &gcfg->map4_list) {
 		m4 = list_entry(entry, struct map4, list);
 		if(m4->type == MAP_TYPE_STATIC) {
 			s = container_of(m4, struct map_static, map4);
 			if(s->origin == MAP_ORIGIN_MAPFILE && s->line_no < 0) {
-				/* Delete this entry and purge it from cache */
+				/* Delete this entry */
+				list_del(&s->map4.list);
+				list_del(&s->map6.list);
+				free(s);
 				slog(LOG_DEBUG,"MAP-FILE: Deleting entry which was removed TBD\n");
+
+				/* Note that we do not purge cache, the entry will have to age out */
 			}
 		}
 	}
+
+	return res;
 }

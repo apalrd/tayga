@@ -48,7 +48,7 @@ static struct map_static *alloc_map_static(int ln)
 
 	m = (struct map_static *)malloc(sizeof(struct map_static));
 	if (!m) {
-		slog(LOG_CRIT, "Unable to allocate config memory\n");
+		slog(LOG_CRIT, "Unable to allocate config static map memory\n");
 		return NULL;
 	}
 	memset(m, 0, sizeof(struct map_static));
