@@ -57,3 +57,35 @@ jobs:
         run: make clean && make CC=gcc CFLAGS="-Werror -Wextra -O2"
       - name: run build clang w/ wextra
         run: make clean && make CC=clang CFLAGS="-Werror -Wextra -O2"
+
+  test-freebsd:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ver || github.ref }}
+      - name: test on FreeBSD 15
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.0"
+          usesh: true
+          prepare: |
+            pkg install -y gmake llvm
+          run: |
+            gmake clean && gmake CC=gcc CFLAGS="-Werror -Wall -O2"
+            gmake test CC=gcc
+            gmake clean && gmake CC=clang CFLAGS="-Werror -Wall -O2"
+            gmake test CC=clang
+            gmake clean && gmake CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+            gmake test CC=gcc LDFLAGS=""
+            gmake clean && gmake CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
+            gmake test CC=clang LDFLAGS=""
+            gmake clean && gmake CC=gcc CFLAGS="-Werror -Wextra -O2"
+            gmake clean && gmake CC=clang CFLAGS="-Werror -Wextra -O2"
