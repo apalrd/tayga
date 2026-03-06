@@ -1,3 +1,5 @@
+TOPDIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+
 # Default compiler flags
 CC ?= gcc
 CFLAGS ?= -Wall -O2
@@ -26,10 +28,6 @@ PANDOC ?= pandoc
 
 INSTALL_DATA ?= $(INSTALL) -m 644
 INSTALL_PROGRAM ?= $(INSTALL)
-
-TAYGA_VERSION = $(shell $(GIT) describe --tags --dirty)
-TAYGA_BRANCH = $(shell $(GIT) describe --all --dirty)
-TAYGA_COMMIT = $(shell $(GIT) rev-parse HEAD)
 
 .PHONY: all
 all: tayga
@@ -62,16 +60,24 @@ define VERSION_HEADER
 #ifndef __TAYGA_VERSION_H__
 #define __TAYGA_VERSION_H__
 
-#define TAYGA_VERSION "$(TAYGA_VERSION)"
-#define TAYGA_BRANCH  "$(TAYGA_BRANCH)"
-#define TAYGA_COMMIT  "$(TAYGA_COMMIT)"
+#define TAYGA_VERSION "$(shell $(GIT) describe --tags --dirty)"
+#define TAYGA_BRANCH  "$(shell $(GIT) describe --all --dirty)"
+#define TAYGA_COMMIT  "$(shell $(GIT) rev-parse HEAD)"
 
 #endif /* #ifndef __TAYGA_VERSION_H__ */
 endef
 
+# Regenerate version.h if detected to be in the tayga git repo
+define make-version-header
+  ifeq ($$(TOPDIR),$$(shell $$(GIT) rev-parse --show-toplevel 2>/dev/null))
+    $$(file > version.h,$$(VERSION_HEADER))
+  endif
+  $$(if $$(wildcard version.h),,$$(error missing version.h))
+endef
+
 # Compile Tayga
 tayga: $(SOURCES)
-	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
+	$(eval $(make-version-header))
 	$(CC) $(CFLAGS) -o tayga $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Compile Tayga (statically link)
@@ -82,7 +88,7 @@ static: tayga
 # Compile Tayga with big-endian s390x for big-endian checksum test cases
 # S390x was chosen as it is officially supported by Debian and is Big-Endian
 taygabe: $(SOURCES)
-	$(if test $(GIT) && git rev-parse,$(file > version.h,$(VERSION_HEADER)))
+	$(eval $(make-version-header))
 	s390x-linux-gnu-gcc $(CFLAGS) -o taygabe $(SOURCES) $(LDFLAGS) $(LDLIBS)
 
 # Test suite compiles with -Werror to detect compiler warnings
