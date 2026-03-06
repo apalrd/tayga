@@ -380,7 +380,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	/* Add IPs to the tun dev */
-	char addrbuf[64];
+	char addrbuf[INET6_ADDRSTRLEN];
 	struct list_head *entry;
 	list_for_each(entry, &gcfg->tun_ip4_list) {
 		struct tun_ip4 *ip4;
@@ -388,7 +388,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_addr_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 address %s/%d to tun device %s\n",
-			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip4->prefix_len,gcfg->tundev);
 	}
 	list_for_each(entry, &gcfg->tun_ip6_list) {
@@ -397,7 +397,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_addr_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 address %s/%d to tun device %s\n",
-			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip6->prefix_len,gcfg->tundev);
 	}
 
@@ -408,7 +408,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_route_dev_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 route %s/%d to tun device %s\n",
-			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip4->prefix_len,gcfg->tundev);
 	}
 	list_for_each(entry, &gcfg->tun_rt6_list) {
@@ -417,7 +417,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_route_dev_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 route %s/%d to tun device %s\n",
-			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip6->prefix_len,gcfg->tundev);
 	}
 
