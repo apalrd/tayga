@@ -130,7 +130,7 @@ man:
 
 .PHONY: clean
 clean:
-	$(RM) tayga taygabe version.h tayga-nat64.tar tayga-clat.tar tayga.tar
+	$(RM) tayga taygabe tayga-nat64.tar tayga-clat.tar tayga.tar
 	$(RM) unit_conffile *.gcda *.gcno
 
 # Install tayga and man pages
