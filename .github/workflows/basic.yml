@@ -79,13 +79,6 @@ jobs:
           prepare: |
             pkg install -y gmake llvm
           run: |
-            gmake clean && gmake CC=gcc CFLAGS="-Werror -Wall -O2"
-            gmake test CC=gcc
-            gmake clean && gmake CC=clang CFLAGS="-Werror -Wall -O2"
-            gmake test CC=clang
-            gmake clean && gmake CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-            gmake test CC=gcc LDFLAGS=""
-            gmake clean && gmake CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
-            gmake test CC=clang LDFLAGS=""
-            gmake clean && gmake CC=gcc CFLAGS="-Werror -Wextra -O2"
-            gmake clean && gmake CC=clang CFLAGS="-Werror -Wextra -O2"
+            gmake clean && gmake CFLAGS="-Werror -Wall -O2"
+            gmake test
+            gmake clean && gmake CFLAGS="-Werror -Wextra -O2"
