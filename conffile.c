@@ -734,12 +734,11 @@ struct {
 int config_init(void)
 {
 	/* Initialize configuration structure to defaults */
-	gcfg = (struct config *)malloc(sizeof(struct config));
+	gcfg = (struct config *) calloc(1, sizeof(struct config));
 	if (!gcfg) {
 		slog(LOG_CRIT, "Unable to allocate config memory\n");
 		return ERROR_REJECT;
 	}
-	memset(gcfg, 0, sizeof(struct config));
 	INIT_LIST_HEAD(&gcfg->map4_list);
 	INIT_LIST_HEAD(&gcfg->map6_list);
 	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
