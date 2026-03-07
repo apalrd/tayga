@@ -20,59 +20,12 @@
 
 #include <stdarg.h>
 #include <signal.h>
-#include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
 
 extern struct config *gcfg;
 time_t now;
-static const char *progname;
 static int signalfds[2];
-
-void usage(int code) {
-	int pad = strlen(progname);
-	fprintf(stderr,
-			"TAYGA version %s\n"
-			"Usage:\n"
-			"%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
-			"%*c [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
-			"%*c [--syslog|--stdout|--journal]\n"
-			"%s --mktun [-c|--config CONFIGFILE]\n"
-			"%s --rmtun [-c|--config CONFIGFILE]\n"
-			"%*c [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
-			"--config FILE      : Read configuration options from FILE\n"
-			"--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
-			"--nodetach         : Do not fork the process\n"
-			"--syslog           : Log messages to syslog (default)\n"
-			"--stdout           : Log messages to stdout\n"
-			"--journal          : Log messages to the systemd journal\n"
-			"--user USERID      : Set uid to USERID after initialization\n"
-			"--group GROUPID    : Set gid to GROUPID after initialization\n"
-			"--chroot           : chroot() to data-dir (specified in config file)\n"
-			"--pidfile FILE     : Write process ID of daemon to FILE\n"
-			"--mktun            : Create the persistent TUN interface\n"
-			"--rmtun            : Remove the persistent TUN interface\n"
-			"--help, -h         : Show this help message\n",
-		TAYGA_VERSION,
-		progname,
-		pad, ' ',
-		pad, ' ',
-		progname,
-		progname,
-		pad, ' '
-	);
-	exit(code);
-}
-
-/* Used during argument parsing, before logging is setup */
-void die(const char *format, ...) {
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(stderr, format, ap);
-	va_end(ap);
-	putc('\n', stderr);
-	exit(1);
-}
 
 static void signal_handler(int signal)
 {
@@ -259,103 +212,23 @@ static void * worker(void * arg)
 int main(int argc, char **argv)
 {
 	int ret;
-	int pidfd;
+	int pidfd = -1;
 	struct pollfd pollfds[2];
 	char addrbuf[INET6_ADDRSTRLEN];
-
-	char *conffile = TAYGA_CONF_PATH;
-	char *user = NULL;
-	char *group = NULL;
-	char *pidfile = NULL;
-	int do_chroot = 0;
-	int detach = 1;
-	int do_mktun = 0;
-	int do_rmtun = 0;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
-	progname = argv[0];
 
 	/* Init config structure */
 	if(config_init() < 0) return 1;
 
-	static struct option longopts[] = {
-		{ "mktun", no_argument, NULL, 1 },
-		{ "rmtun", no_argument, NULL, 2 },
-		{ "syslog", no_argument, NULL, 3 },
-		{ "stdout", no_argument, NULL, 4 },
-		{ "journal", no_argument, NULL, 5 },
-		{ "help", no_argument, NULL, 'h' },
-		{ "config", required_argument, NULL, 'c' },
-		{ "nodetach", no_argument, NULL, 'n' },
-		{ "user", required_argument, NULL, 'u' },
-		{ "group", required_argument, NULL, 'g' },
-		{ "chroot", no_argument, NULL, 'r' },
-		{ "pidfile", required_argument, NULL, 'p' },
-		{ "debug", no_argument, NULL, 'd' },
-		{ NULL, 0, NULL, 0 }
-	};
-
-	/* Arg parsing loop */
-	for (int c; c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, NULL), c != -1;) {
-		switch (c) {
-		case 1: /* --mktun */
-			do_mktun = 1;
-			break;
-		case 2: /* --rmtun */
-			do_rmtun = 1;
-			break;
-		case 3: /* --syslog */
-			gcfg->log_out = LOG_TO_SYSLOG;
-			break;
-		case 4: /* --stdout */
-			gcfg->log_out = LOG_TO_STDOUT;
-			break;
-		case 5: /* --journal */
-			gcfg->log_out = LOG_TO_JOURNAL;
-			break;
-		case 'c':
-			conffile = optarg;
-			break;
-		case 'd':
-			gcfg->log_out = LOG_TO_STDOUT;
-			detach = 0;
-			break;
-		case 'n':
-			detach = 0;
-			break;
-		case 'u':
-			user = optarg;
-			break;
-		case 'g':
-			group = optarg;
-			break;
-		case 'r':
-			do_chroot = 1;
-			break;
-		case 'p':
-			pidfile = optarg;
-			break;
-		case 'h':
-			usage(0);
-			break;
-		default:
-			die("Try `%s --help' for more information", progname);
-		}
-	}
-
-	if (do_mktun && do_rmtun) {
-		die("Error: both --mktun and --rmtun specified");
-	}
+	/* Parse command line arguments */
+	cmdline_parse(argc, argv);
 
 	/* Setup logging
-	 * But not if we are only doing mktun / rmtun
 	 * This must be done before config parsing, since those rely
 	 * on logging based on log_out
 	 */
-	if(do_mktun || do_rmtun) {
-		//Force stdout for these options
-		gcfg->log_out = LOG_TO_STDOUT;
-	} else if (gcfg->log_out == LOG_TO_SYSLOG) {
+	if (gcfg->log_out == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
 	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
 		int r = journal_init("tayga");
@@ -366,7 +239,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Parse config file options */
-	if(config_read(conffile) < 0) return 1;
+	if(config_read(arg_conffile) < 0) return 1;
 
 	/* Validate config (and load map file) */
 	if(config_validate() < 0) return 1;
@@ -374,47 +247,35 @@ int main(int argc, char **argv)
 	/* Check if we are doing tunnel operations only
 	 * Must be done after config reading so we know tun name
 	 */
-	if (do_mktun || do_rmtun) {
-		if (user) {
-			die("Error: cannot specify -u or --user "
-					"with mktun/rmtun operation");
-		}
-		if (group) {
-			die("Error: cannot specify -g or --group "
-					"with mktun/rmtun operation");
-		}
-		if (do_chroot) {
-			die("Error: cannot specify -r or --chroot "
-					"with mktun/rmtun operation");
-		}
-		if(tun_setup(do_mktun, do_rmtun)) return 1;
+	if (arg_do_mktun || arg_do_rmtun) {
+		if(tun_setup(arg_do_mktun, arg_do_rmtun)) return 1;
 		return 0;
 	}
 
 	/* Change user */
-	if (user) {
-		pw = getpwnam(user);
+	if (arg_user) {
+		pw = getpwnam(arg_user);
 		if (!pw) {
-			slog(LOG_CRIT, "Error: user %s does not exist\n", user);
+			slog(LOG_CRIT, "Error: user %s does not exist\n", arg_user);
 			return 1;
 		}
 	}
 
 	/* Change group */
-	if (group) {
-		gr = getgrnam(group);
+	if (arg_group) {
+		gr = getgrnam(arg_group);
 		if (!gr) {
 			slog(LOG_CRIT, "Error: group %s does not exist\n",
-					group);
+					arg_group);
 			return 1;
 		}
 	}
 
 	/* Chroot */
 	if (!gcfg->data_dir[0]) {
-		if (do_chroot) {
+		if (arg_do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
-					"is specified in %s\n", conffile);
+					"is specified in %s\n", arg_conffile);
 			return 1;
 		}
 		if (chdir("/")) {
@@ -423,7 +284,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	} else if (chdir(gcfg->data_dir) < 0) {
-		if (user || errno != ENOENT) {
+		if (arg_user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
 					"aborting: %s\n", gcfg->data_dir,
 					strerror(errno));
@@ -443,7 +304,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (do_chroot && (!pw || pw->pw_uid == 0)) {
+	if (arg_do_chroot && (!pw || pw->pw_uid == 0)) {
 		slog(LOG_CRIT, "Error: chroot is ineffective without also "
 				"specifying the -u option to switch to an "
 				"unprivileged user\n");
@@ -457,23 +318,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (pidfile) {
-		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (arg_pidfile) {
+		pidfd = open(arg_pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (pidfd < 0) {
 			slog(LOG_CRIT, "Error, unable to open %s for "
-					"writing: %s\n", pidfile,
+					"writing: %s\n", arg_pidfile,
 					strerror(errno));
 			exit(1);
 		}
 	}
 
-	if (detach && daemon(1, 0) < 0) {
+	if (arg_detach && daemon(1, 0) < 0) {
 		slog(LOG_CRIT, "Error, unable to fork and detach: %s\n",
 				strerror(errno));
 		exit(1);
 	}
 
-	if (pidfile) {
+	if (pidfd >= 0) {
 		snprintf(addrbuf, sizeof(addrbuf), "%ld\n", (long)getpid());
 		if (write(pidfd, addrbuf, strlen(addrbuf)) != (ssize_t)strlen(addrbuf)) {
 			slog(LOG_CRIT, "Error, unable to write PID file.\n");
@@ -524,7 +385,7 @@ int main(int argc, char **argv)
 
 	if(tun_setup(0, 0)) exit(1);
 
-	if (do_chroot) {
+	if (arg_do_chroot) {
 		if (chroot(gcfg->data_dir) < 0) {
 			slog(LOG_CRIT, "Unable to chroot to %s: %s\n",
 					gcfg->data_dir, strerror(errno));

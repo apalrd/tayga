@@ -52,7 +52,9 @@
 #else
 #error "Could not find headers for platform"
 #endif
+
 #include "list.h"
+#include "cmdline.h"
 
 #ifdef COVERAGE_TESTING
 //for coverage testing
