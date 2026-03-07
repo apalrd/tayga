@@ -16,6 +16,7 @@
  *  GNU General Public License for more details.
  */
 
+#define SYSLOG_NAMES
 
 #include "tayga.h"
 
@@ -234,6 +235,18 @@ static int journal_printv_with_location(
     return -errno;
 }
 
+/* Get a syslog priority's name */
+static const char *get_priority_name(int priority) {
+    priority = LOG_PRI(priority);
+
+    CODE *code = prioritynames;
+    while (code->c_name && code->c_val != priority)
+        code++;
+    const char *name = code->c_name;
+
+    return name ? name : "???";
+}
+
 /* Log the message to the configured logger */
 void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
 {
@@ -246,6 +259,7 @@ void slog_impl(int priority, const char *file, const char *line, const char *fun
 	switch (gcfg.log_out) {
         default:
 		case LOG_TO_STDOUT:
+            printf("[%s] ", get_priority_name(priority));
 			vprintf(format, ap);
 			break;
 		case LOG_TO_SYSLOG:
