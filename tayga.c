@@ -400,11 +400,11 @@ int main(int argc, char **argv)
 		}
 		if (group) {
 			die("Error: cannot specify -g or --group "
-					"with mktun/rmtun operation\n");
+					"with mktun/rmtun operation");
 		}
 		if (do_chroot) {
 			die("Error: cannot specify -r or --chroot "
-					"with mktun/rmtun operation\n");
+					"with mktun/rmtun operation");
 		}
 		if(tun_setup(do_mktun, do_rmtun)) return 1;
 		return 0;
