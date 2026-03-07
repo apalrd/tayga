@@ -396,6 +396,15 @@ enum {
 	LOG_OPT_ICMP   = (1<<2),	//Packet kicked back an ICMP for any reason
 	LOG_OPT_SELF   = (1<<3),	//Packet was destined to ourselves
 	LOG_OPT_DYN    = (1<<4),	//Events involving dynamic pool
+
+	LOG_OPT_ALL    = (			//Log everything
+		LOG_OPT_REJECT
+		| LOG_OPT_DROP
+		| LOG_OPT_ICMP
+		| LOG_OPT_SELF
+		| LOG_OPT_DYN
+	),
+
 	LOG_OPT_CONFIG = (1<<15),	//Log has been configured (used in conf file validation)
 };
 

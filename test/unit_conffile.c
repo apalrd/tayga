@@ -1038,7 +1038,7 @@ void test_config_read(void) {
 #else
     tcfg.workers = -1;
 #endif
-    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
+    tcfg.log_opts = (LOG_OPT_ALL | LOG_OPT_CONFIG);
     tcfg.tun_up = 1;
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
