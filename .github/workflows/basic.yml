@@ -18,7 +18,7 @@ permissions: { }
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  test:
+  test-linux:
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
@@ -40,19 +40,19 @@ jobs:
       - name: run build gcc
         run: make clean && make CC=gcc CFLAGS="-Werror -Wall -O2"
       - name: run test gcc
-        run: make test CC=gcc
+        run: make test CC=gcc FAIL_ONLY=1
       - name: run build clang
         run: make clean && make CC=clang CFLAGS="-Werror -Wall -O2"
       - name: run test clang
-        run: make test CC=clang
+        run: make test CC=clang FAIL_ONLY=1
       - name: run build gcc w/o LTO
         run: make clean && make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
       - name: run test gcc w/o LTO
-        run: make test CC=gcc LDFLAGS=""
+        run: make test CC=gcc LDFLAGS="" FAIL_ONLY=1
       - name: run build clang w/o LTO
         run: make clean && make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
       - name: run test clang w/o LTO
-        run: make test CC=clang LDFLAGS=""
+        run: make test CC=clang LDFLAGS="" FAIL_ONLY=1
       - name: run build gcc w/ Wextra
         run: make clean && make CC=gcc CFLAGS="-Werror -Wextra -O2"
       - name: run build clang w/ wextra
@@ -73,9 +73,10 @@ jobs:
           ref: ${{ inputs.ver || github.ref }}
       - name: test on FreeBSD 15
         uses: vmactions/freebsd-vm@v1
+        id: freebsd-test
         with:
           release: "15.0"
-          usesh: true
+          usesh: false
           prepare: |
             pkg install -y gmake llvm
           run: |

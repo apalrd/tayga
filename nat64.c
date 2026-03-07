@@ -313,10 +313,10 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6, int em)
 		cksum = ones_add(p->icmp->cksum, cksum);
 		if (p->icmp->type == 8) {
 			p->icmp->type = 128;
-			p->icmp->cksum = ones_add(cksum, ~((128 - 8)<<BIG_LITTLE(8,0)));
+			p->icmp->cksum = ones_add(cksum, (uint16_t)~((128 - 8)<<BIG_LITTLE(8,0)));
 		} else {
 			p->icmp->type = 129;
-			p->icmp->cksum = ones_add(cksum, ~((129 - 0)<<BIG_LITTLE(8,0)));
+			p->icmp->cksum = ones_add(cksum, (uint16_t)~((129 - 0)<<BIG_LITTLE(8,0)));
 		}
 		return ERROR_NONE;
 	/* UDP */

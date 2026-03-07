@@ -481,7 +481,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	if (do_mktun) {
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	} else if (do_rmtun) {
 
 		/* Close socket before removal */
@@ -506,7 +506,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	}
 
 	/* Set multi-AF mode */
@@ -554,7 +554,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
-    return 0;
+    return ERROR_NONE;
 }
 #endif
 
