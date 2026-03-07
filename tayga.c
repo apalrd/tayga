@@ -86,11 +86,7 @@ static void signal_read(void)
 			dynamic_maint(gcfg.dynamic_pool, 1);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
-		if (gcfg.log_out == LOG_TO_SYSLOG) {
-			closelog();
-		} else if (gcfg.log_out == LOG_TO_JOURNAL) {
-			journal_cleanup();
-		}
+		log_cleanup();
 		exit(0);
 	}
 }
@@ -223,18 +219,11 @@ int main(int argc, char **argv)
 	/* Parse command line arguments */
 	cmdline_parse(argc, argv);
 
-	/* Setup logging
-	 * This must be done before config parsing, since those rely
-	 * on logging based on log_out
-	 */
-	if (gcfg.log_out == LOG_TO_SYSLOG) {
-		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (gcfg.log_out == LOG_TO_JOURNAL) {
-		int r = journal_init("tayga");
-		if (r < 0) {
-			fprintf(stderr,"Error: Unable to initialize journal: %s\n", strerror(-r));
-			return 1;
-		}
+	/* Init logging infrastructure */
+	ret = log_init();
+	if (ret < 0) {
+		fprintf(stderr, "Error: Unable to initialize log: %s\n", strerror(-ret));
+		return 1;
 	}
 
 	/* Parse config file options */
@@ -451,13 +440,11 @@ int main(int argc, char **argv)
 	pollfds[1].fd = gcfg.tun_fd;
 	pollfds[1].events = POLLIN;
 
-	/* Tell systemd logger we are ready */
-	if(gcfg.log_out == LOG_TO_JOURNAL) {
-		int r = notify("READY=1");
-		if (r < 0) {
-			slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
-			exit(1);
-		}
+	/* Tell the logger we are ready */
+	ret = log_notify_ready();
+	if (ret < 0) {
+		slog(LOG_CRIT, "Failed to notify readiness: %s\n", strerror(-ret));
+		exit(1);
 	}
 
 #ifdef __linux__

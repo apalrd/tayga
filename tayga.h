@@ -55,6 +55,7 @@
 
 #include "list.h"
 #include "cmdline.h"
+#include "log.h"
 
 #ifdef COVERAGE_TESTING
 //for coverage testing
@@ -469,18 +470,6 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown);
 /* nat64.c */
 void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
-
-/* log.c */
-#define STRINGIFY_IMPL(x) #x
-#define STRINGIFY(x) STRINGIFY_IMPL(x)
-#define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
-void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
-int notify(const char *msg);
-int journal_init(const char *progname);
-void journal_cleanup(void);
-int journal_printv_with_location(
-        int priority, const char *file, const char *line, const char *func,
-        const char *format, va_list ap);
 
 /* tun.c */
 int tun_setup(int do_mktun, int do_rmtun);

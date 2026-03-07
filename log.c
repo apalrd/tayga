@@ -22,7 +22,6 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -34,31 +33,6 @@
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
-
-
-/* Log the message to the configured logger */
-void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
-{
-	va_list ap;
-	(void)file;
-	(void)line;
-	(void)func;
-
-	va_start(ap, format);
-	switch (gcfg.log_out) {
-        default:
-		case LOG_TO_STDOUT:
-			vprintf(format, ap);
-			break;
-		case LOG_TO_SYSLOG:
-			vsyslog(priority, format, ap);
-			break;
-		case LOG_TO_JOURNAL:
-			journal_printv_with_location(priority, file, line, func, format, ap);
-			break;
-	}
-	va_end(ap);
-}
 
 
 union sockaddr_union {
@@ -148,7 +122,7 @@ static int journal_fd = -1;
 static const char *syslog_identifier = NULL;
 
 /* Open the systemd journal. Not threadsafe. */
-int journal_init(const char *ident) {
+static int journal_init(const char *ident) {
     if (journal_fd >= 0)
         return 0;
 
@@ -170,7 +144,7 @@ int journal_init(const char *ident) {
 }
 
 /* Close the systemd journal. Not threadsafe. */
-void journal_cleanup(void) {
+static void journal_cleanup(void) {
     close(journal_fd);
     journal_fd = -1;
 }
@@ -184,7 +158,7 @@ void journal_cleanup(void) {
  *   format =~ ^[^\n]+\n?$
  *   vsnprintf(NULL, 0, format, ap) < MESSAGE_SIZE
  */
-int journal_printv_with_location(
+static int journal_printv_with_location(
         int priority, const char *file, const char *line, const char *func,
         const char *format, va_list ap)
 {
@@ -258,4 +232,57 @@ int journal_printv_with_location(
     if (r >= 0)
         return 0;
     return -errno;
+}
+
+/* Log the message to the configured logger */
+void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...)
+{
+	va_list ap;
+	(void)file;
+	(void)line;
+	(void)func;
+
+	va_start(ap, format);
+	switch (gcfg.log_out) {
+        default:
+		case LOG_TO_STDOUT:
+			vprintf(format, ap);
+			break;
+		case LOG_TO_SYSLOG:
+			vsyslog(priority, format, ap);
+			break;
+		case LOG_TO_JOURNAL:
+			journal_printv_with_location(priority, file, line, func, format, ap);
+			break;
+	}
+	va_end(ap);
+}
+
+int log_notify_ready(void) {
+    if(gcfg.log_out == LOG_TO_JOURNAL) {
+		return notify("READY=1");
+	}
+
+    return 0;
+}
+
+/* Setup logging
+ * This must be done before config parsing, since those rely
+ * on logging based on log_out */
+int log_init(void) {
+	if (gcfg.log_out == LOG_TO_SYSLOG) {
+		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	} else if (gcfg.log_out == LOG_TO_JOURNAL) {
+		return journal_init("tayga");
+	}
+
+    return 0;
+}
+
+void log_cleanup(void) {
+    if (gcfg.log_out == LOG_TO_SYSLOG) {
+        closelog();
+    } else if (gcfg.log_out == LOG_TO_JOURNAL) {
+        journal_cleanup();
+    }
 }
