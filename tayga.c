@@ -258,7 +258,7 @@ static void * worker(void * arg)
 
 int main(int argc, char **argv)
 {
-	int c, ret, longind;
+	int ret;
 	int pidfd;
 	struct pollfd pollfds[2];
 	char addrbuf[INET6_ADDRSTRLEN];
@@ -279,60 +279,39 @@ int main(int argc, char **argv)
 	if(config_init() < 0) return 1;
 
 	static struct option longopts[] = {
-		{ "mktun", 0, 0, 0 },
-		{ "rmtun", 0, 0, 0 },
-		{ "syslog", 0, 0, 0 },
-		{ "stdout", 0, 0, 0 },
-		{ "journal", 0, 0, 0 },
-		{ "help", 0, 0, 'h' },
-		{ "syslog", 0, 0, 0 },
-		{ "stdout", 0, 0, 0 },
-		{ "journal", 0, 0, 0 },
-		{ "help", 0, 0, 'h' },
-		{ "config", 1, 0, 'c' },
-		{ "nodetach", 0, 0, 'n' },
-		{ "user", 1, 0, 'u' },
-		{ "group", 1, 0, 'g' },
-		{ "chroot", 0, 0, 'r' },
-		{ "pidfile", 1, 0, 'p' },
-		{ "debug", 0, 0, 'd' },
-		{ "debug", 0, 0, 'd' },
-		{ 0, 0, 0, 0 }
+		{ "mktun", no_argument, NULL, 1 },
+		{ "rmtun", no_argument, NULL, 2 },
+		{ "syslog", no_argument, NULL, 3 },
+		{ "stdout", no_argument, NULL, 4 },
+		{ "journal", no_argument, NULL, 5 },
+		{ "help", no_argument, NULL, 'h' },
+		{ "config", required_argument, NULL, 'c' },
+		{ "nodetach", no_argument, NULL, 'n' },
+		{ "user", required_argument, NULL, 'u' },
+		{ "group", required_argument, NULL, 'g' },
+		{ "chroot", no_argument, NULL, 'r' },
+		{ "pidfile", required_argument, NULL, 'p' },
+		{ "debug", no_argument, NULL, 'd' },
+		{ NULL, 0, NULL, 0 }
 	};
 
 	/* Arg parsing loop */
-	for (;;) {
-		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
-		/* Reached last argument, terminate loop */
-		if (c == -1)
-			break;
+	for (int c; c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, NULL), c != -1;) {
 		switch (c) {
-		case 0:
-			switch (longind) {
-				case 0: /* --mktun */
-					if (do_rmtun) {
-						die("Error: both --mktun and --rmtun specified");
-					}
-					do_mktun = 1;
-					break;
-				case 1: /* --rmtun */
-					if (do_mktun) {
-						die("Error: both --mktun and --rmtun specified");
-					}
-					do_rmtun = 1;
-					break;
-				case 2: /* --syslog */
-					gcfg->log_out = LOG_TO_SYSLOG;
-					break;
-				case 3: /* --stdout */
-					gcfg->log_out = LOG_TO_STDOUT;
-					break;
-				case 4: /* --journal */
-					gcfg->log_out = LOG_TO_JOURNAL;
-					break;
-				default:
-					usage(1);
-			}
+		case 1: /* --mktun */
+			do_mktun = 1;
+			break;
+		case 2: /* --rmtun */
+			do_rmtun = 1;
+			break;
+		case 3: /* --syslog */
+			gcfg->log_out = LOG_TO_SYSLOG;
+			break;
+		case 4: /* --stdout */
+			gcfg->log_out = LOG_TO_STDOUT;
+			break;
+		case 5: /* --journal */
+			gcfg->log_out = LOG_TO_JOURNAL;
 			break;
 		case 'c':
 			conffile = optarg;
@@ -360,8 +339,12 @@ int main(int argc, char **argv)
 			usage(0);
 			break;
 		default:
-			die("Try `%s --help' for more information (got %c)", progname,c);
+			die("Try `%s --help' for more information", progname);
 		}
+	}
+
+	if (do_mktun && do_rmtun) {
+		die("Error: both --mktun and --rmtun specified");
 	}
 
 	/* Setup logging
