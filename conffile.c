@@ -55,11 +55,11 @@ static struct map_static *alloc_map_static(int ln)
 	m->map4.type = MAP_TYPE_STATIC;
 	m->map4.prefix_len = 32;
 	calc_ip4_mask(&m->map4.mask, NULL, 32);
-	INIT_LIST_HEAD(&m->map4.list);
+	list_init(&m->map4.list);
 	m->map6.type = MAP_TYPE_STATIC;
 	m->map6.prefix_len = 128;
 	calc_ip6_mask(&m->map6.mask, NULL, 128);
-	INIT_LIST_HEAD(&m->map6.list);
+	list_init(&m->map6.list);
 	m->line_no = ln;
 	m->origin = MAP_ORIGIN_CONFFILE;
 	return m;
@@ -332,7 +332,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 			return ERROR_REJECT;
 		}
 		ip6->prefix_len = prefix;
-		INIT_LIST_HEAD(&ip6->list);
+		list_init(&ip6->list);
 		list_add(&ip6->list,&gcfg->tun_ip6_list);
 		return ERROR_NONE;
 	}
@@ -347,7 +347,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 			return ERROR_REJECT;
 		}
 		ip4->prefix_len = prefix;
-		INIT_LIST_HEAD(&ip4->list);
+		list_init(&ip4->list);
 		list_add(&ip4->list,&gcfg->tun_ip4_list);
 		return ERROR_NONE;
 	}
@@ -396,7 +396,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 			return ERROR_REJECT;
 		}
 		ip6->prefix_len = prefix;
-		INIT_LIST_HEAD(&ip6->list);
+		list_init(&ip6->list);
 		list_add(&ip6->list,&gcfg->tun_rt6_list);
 		return ERROR_NONE;
 	}
@@ -411,7 +411,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 			return ERROR_REJECT;
 		}
 		ip4->prefix_len = prefix;
-		INIT_LIST_HEAD(&ip4->list);
+		list_init(&ip4->list);
 		list_add(&ip4->list,&gcfg->tun_rt4_list);
 		return ERROR_NONE;
 	}
@@ -517,13 +517,13 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 		return ERROR_REJECT;
 	}
 	memset(pool, 0, sizeof(struct dynamic_pool));
-	INIT_LIST_HEAD(&pool->mapped_list);
-	INIT_LIST_HEAD(&pool->dormant_list);
-	INIT_LIST_HEAD(&pool->free_list);
+	list_init(&pool->mapped_list);
+	list_init(&pool->dormant_list);
+	list_init(&pool->free_list);
 
 	m4 = &pool->map4;
 	m4->type = MAP_TYPE_DYNAMIC_POOL;
-	INIT_LIST_HEAD(&m4->list);
+	list_init(&m4->list);
 
 	if (parse_prefix(AF_INET, args[0], &m4->addr, &m4->prefix_len) ||
 			calc_ip4_mask(&m4->mask, &m4->addr, m4->prefix_len)) {
@@ -553,7 +553,7 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 
 	pool->free_head.addr = ntohl(m4->addr.s_addr);
 	pool->free_head.count = (1 << (32 - m4->prefix_len)) - 1;
-	INIT_LIST_HEAD(&pool->free_head.list);
+	list_init(&pool->free_head.list);
 	list_add(&pool->free_head.list, &pool->free_list);
 
 	gcfg->dynamic_pool = pool;
@@ -739,22 +739,22 @@ int config_init(void)
 		slog(LOG_CRIT, "Unable to allocate config memory\n");
 		return ERROR_REJECT;
 	}
-	INIT_LIST_HEAD(&gcfg->map4_list);
-	INIT_LIST_HEAD(&gcfg->map6_list);
+	list_init(&gcfg->map4_list);
+	list_init(&gcfg->map6_list);
 	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
 	gcfg->dyn_max_lease = 14 * 86400;
 	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
 	gcfg->hash_bits = 7;
 	gcfg->cache_size = 8192;
-	INIT_LIST_HEAD(&gcfg->cache_pool);
-	INIT_LIST_HEAD(&gcfg->cache_active);
+	list_init(&gcfg->cache_pool);
+	list_init(&gcfg->cache_active);
 	gcfg->wkpf_strict = 1;
 	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
 	gcfg->workers = -1;
-	INIT_LIST_HEAD(&gcfg->tun_ip4_list);
-	INIT_LIST_HEAD(&gcfg->tun_ip6_list);
-	INIT_LIST_HEAD(&gcfg->tun_rt4_list);
-	INIT_LIST_HEAD(&gcfg->tun_rt6_list);
+	list_init(&gcfg->tun_ip4_list);
+	list_init(&gcfg->tun_ip6_list);
+	list_init(&gcfg->tun_rt4_list);
+	list_init(&gcfg->tun_rt6_list);
 	gcfg->tun_up = 0;
 	return ERROR_NONE;
 }

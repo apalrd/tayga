@@ -255,24 +255,24 @@ void create_cache(void)
 		exit(1);
 	}
 	for (i = 0; i < hash_size; ++i) {
-		INIT_LIST_HEAD(&gcfg->hash_table4[i]);
-		INIT_LIST_HEAD(&gcfg->hash_table6[i]);
+		list_init(&gcfg->hash_table4[i]);
+		list_init(&gcfg->hash_table6[i]);
 	}
 
 	if (list_empty(&gcfg->cache_pool) && list_empty(&gcfg->cache_active)) {
 		c = calloc(gcfg->cache_size, sizeof(struct cache_entry));
 		for (i = 0; i < gcfg->cache_size; ++i) {
-			INIT_LIST_HEAD(&c->list);
-			INIT_LIST_HEAD(&c->hash4);
-			INIT_LIST_HEAD(&c->hash6);
+			list_init(&c->list);
+			list_init(&c->hash4);
+			list_init(&c->hash6);
 			list_add_tail(&c->list, &gcfg->cache_pool);
 			++c;
 		}
 	} else {
 		list_for_each(entry, &gcfg->cache_active) {
 			c = list_entry(entry, struct cache_entry, list);
-			INIT_LIST_HEAD(&c->hash4);
-			INIT_LIST_HEAD(&c->hash6);
+			list_init(&c->hash4);
+			list_init(&c->hash6);
 			add_to_hash_table(c, hash_ip4(&c->addr4),
 						hash_ip6(&c->addr6));
 		}
@@ -875,11 +875,11 @@ static int addrmap_entry(int ln, char **args)
 	m->map4.type = MAP_TYPE_STATIC;
 	m->map4.prefix_len = 32;
 	calc_ip4_mask(&m->map4.mask, NULL, 32);
-	INIT_LIST_HEAD(&m->map4.list);
+	list_init(&m->map4.list);
 	m->map6.type = MAP_TYPE_STATIC;
 	m->map6.prefix_len = 128;
 	calc_ip6_mask(&m->map6.mask, NULL, 128);
-	INIT_LIST_HEAD(&m->map6.list);
+	list_init(&m->map6.list);
 	m->line_no = ln;
 	m->origin = MAP_ORIGIN_MAPFILE;
 

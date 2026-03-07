@@ -35,24 +35,24 @@ static struct map_dynamic *alloc_map_dynamic(const struct in6_addr *addr6,
 		return NULL;
 	}
 	memset(d, 0, sizeof(struct map_dynamic));
-	INIT_LIST_HEAD(&d->list);
+	list_init(&d->list);
 
 	d->map4.type = MAP_TYPE_DYNAMIC_HOST;
 	d->map4.addr = *addr4;
 	d->map4.prefix_len = 32;
 	calc_ip4_mask(&d->map4.mask, NULL, 32);
-	INIT_LIST_HEAD(&d->map4.list);
+	list_init(&d->map4.list);
 
 	d->map6.type = MAP_TYPE_DYNAMIC_HOST;
 	d->map6.addr = *addr6;
 	d->map6.prefix_len = 128;
 	calc_ip6_mask(&d->map6.mask, NULL, 128);
-	INIT_LIST_HEAD(&d->map6.list);
+	list_init(&d->map6.list);
 
 	d->free.addr = a;
 	d->free.count = f->count - (a - f->addr);
 	f->count = a - f->addr - 1;
-	INIT_LIST_HEAD(&d->free.list);
+	list_init(&d->free.list);
 	list_add(&d->free.list, &f->list);
 
 	return d;
