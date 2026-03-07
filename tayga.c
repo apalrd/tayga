@@ -318,7 +318,6 @@ int main(int argc, char **argv)
 				case 1: /* --rmtun */
 					if (do_mktun) {
 						die("Error: both --mktun and --rmtun specified");
-						exit(1);
 					}
 					do_rmtun = 1;
 					break;
@@ -361,8 +360,7 @@ int main(int argc, char **argv)
 			usage(1);
 			break;
 		default:
-			die("Try `%s --help' for more information (got %c)", argv[0],c);
-			exit(1);
+			die("Try `%s --help' for more information (got %c)", progname,c);
 		}
 	}
 
