@@ -1363,8 +1363,6 @@ void test_config_validate() {
 }
 
 int main(void) {
-    print_fail_only = 1;
-
     /* Test function or config_init */
     test_config_init();
 

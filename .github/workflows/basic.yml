@@ -40,19 +40,19 @@ jobs:
       - name: run build gcc
         run: make clean && make CC=gcc CFLAGS="-Werror -Wall -O2"
       - name: run test gcc
-        run: make test CC=gcc FAIL_ONLY=1
+        run: make test CC=gcc
       - name: run build clang
         run: make clean && make CC=clang CFLAGS="-Werror -Wall -O2"
       - name: run test clang
-        run: make test CC=clang FAIL_ONLY=1
+        run: make test CC=clang
       - name: run build gcc w/o LTO
         run: make clean && make CC=gcc LDFLAGS="" CFLAGS="-Werror -Wall -O2"
       - name: run test gcc w/o LTO
-        run: make test CC=gcc LDFLAGS="" FAIL_ONLY=1
+        run: make test CC=gcc LDFLAGS=""
       - name: run build clang w/o LTO
         run: make clean && make CC=clang LDFLAGS="" CFLAGS="-Werror -Wall -O2"
       - name: run test clang w/o LTO
-        run: make test CC=clang LDFLAGS="" FAIL_ONLY=1
+        run: make test CC=clang LDFLAGS=""
       - name: run build gcc w/ Wextra
         run: make clean && make CC=gcc CFLAGS="-Werror -Wextra -O2"
       - name: run build clang w/ wextra
@@ -76,7 +76,6 @@ jobs:
         id: freebsd-test
         with:
           release: "15.0"
-          usesh: false
           prepare: |
             pkg install -y gmake llvm
           run: |

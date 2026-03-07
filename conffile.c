@@ -682,7 +682,7 @@ static int config_workers(int ln, int arg_count, char **args)
 #else
 	//args unused
 	(void)args;
-	slog(LOG_WARNING,"Error: `workers` (line %d) not supported on FreeBSD",ln);
+	slog(LOG_CRIT,"Error: `workers` (line %d) not supported on this platform",ln);
 	return ERROR_REJECT;
 #endif
 }
