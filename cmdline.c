@@ -139,5 +139,5 @@ void cmdline_parse(int argc, char **argv) {
 	}
 
 	if (arg_log_out != -1)
-		gcfg->log_out = arg_log_out;
+		gcfg.log_out = arg_log_out;
 }
