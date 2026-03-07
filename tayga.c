@@ -357,7 +357,7 @@ int main(int argc, char **argv)
 			pidfile = optarg;
 			break;
 		case 'h':
-			usage(1);
+			usage(0);
 			break;
 		default:
 			die("Try `%s --help' for more information (got %c)", progname,c);
