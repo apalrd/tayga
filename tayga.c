@@ -30,15 +30,16 @@ static const char *progname;
 static int signalfds[2];
 
 void usage(int code) {
+	int pad = strlen(progname);
 	fprintf(stderr,
 			"TAYGA version %s\n"
 			"Usage:\n"
 			"%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
-			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
-			"       [--syslog|--stdout|--journal]\n"
+			"%*c [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
+			"%*c [--syslog|--stdout|--journal]\n"
 			"%s --mktun [-c|--config CONFIGFILE]\n"
 			"%s --rmtun [-c|--config CONFIGFILE]\n"
-			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
+			"%*c [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
 			"--config FILE      : Read configuration options from FILE\n"
 			"--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
 			"--nodetach         : Do not fork the process\n"
@@ -52,7 +53,14 @@ void usage(int code) {
 			"--mktun            : Create the persistent TUN interface\n"
 			"--rmtun            : Remove the persistent TUN interface\n"
 			"--help, -h         : Show this help message\n",
-		TAYGA_VERSION, progname, progname, progname);
+		TAYGA_VERSION,
+		progname,
+		pad, ' ',
+		pad, ' ',
+		progname,
+		progname,
+		pad, ' '
+	);
 	exit(code);
 }
 
