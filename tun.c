@@ -21,6 +21,26 @@
 #include <linux/rtnetlink.h>
 #endif
 
+
+
+int set_nonblock(int fd)
+{
+	int flags;
+
+	flags = fcntl(fd, F_GETFL);
+	if (flags < 0) {
+		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
+		return ERROR_REJECT;
+	}
+	flags |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) < 0) {
+		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
+		return ERROR_REJECT;
+	}
+    return 0;
+}
+
+#ifdef __linux__
 int netlink_wait_for_ack(int fd)
 {
     char buf[4096];
@@ -261,26 +281,6 @@ int netlink_route_dev_modify(int ifidx,
 	return netlink_wait_for_ack(fd);
 }
 
-
-
-int set_nonblock(int fd)
-{
-	int flags;
-
-	flags = fcntl(fd, F_GETFL);
-	if (flags < 0) {
-		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
-		return ERROR_REJECT;
-	}
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL, flags) < 0) {
-		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		return ERROR_REJECT;
-	}
-    return 0;
-}
-
-#ifdef __linux__
 int tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
@@ -481,7 +481,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	if (do_mktun) {
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	} else if (do_rmtun) {
 
 		/* Close socket before removal */
@@ -506,7 +506,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	}
 
 	/* Set multi-AF mode */
@@ -554,7 +554,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
-    return 0;
+    return ERROR_NONE;
 }
 #endif
 

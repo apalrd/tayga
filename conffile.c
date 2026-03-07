@@ -649,6 +649,11 @@ static int config_workers(int ln, int arg_count, char **args)
 {
 	//arg_count unused
 	(void)arg_count;
+
+	/* If we are not configured for workers, print a warning */
+#if MAX_WORKERS > 0
+	char *endptr;
+	long int workers;
 	
 	/* Offlink MTU already set? */
 	if (gcfg->workers != -1) {
@@ -657,8 +662,7 @@ static int config_workers(int ln, int arg_count, char **args)
 		return ERROR_REJECT;
 	}
 	/* Try to convert the argument to an integer */
-	char *endptr;
-	long int workers = strtol(args[0], &endptr, 10);
+	workers = strtol(args[0], &endptr, 10);
 	if (*endptr != '\0') {
 		slog(LOG_CRIT, "Error: unable to parse workers on line %d\n", ln);
 		return ERROR_REJECT;
@@ -675,6 +679,12 @@ static int config_workers(int ln, int arg_count, char **args)
 	/* Set the offlink MTU */
 	gcfg->workers = workers;
 	return ERROR_NONE;
+#else
+	//args unused
+	(void)args;
+	slog(LOG_CRIT,"Error: `workers` (line %d) not supported on this platform",ln);
+	return ERROR_REJECT;
+#endif
 }
 
 

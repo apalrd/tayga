@@ -248,6 +248,7 @@ void test_config_compare(void) {
  * @brief Test function config_init
  */
 void test_config_init(void) {
+    printf("TEST CASES FOR CONFIG INIT\n");
     /* Setup gcfg invalid */
     gcfg = NULL;
 
@@ -269,13 +270,13 @@ void test_config_init(void) {
      * Only run this test case on amd64, since struct packing is not
      * the same on all platforms
      */
-#ifdef __amd64__
-    printf("TEST CASE: config struct size\n");
+#if defined(__amd64__) && defined(__linux__)
+    if(!print_fail_only) printf("TEST CASE: config struct size\n");
     expectl(sizeof(struct config),1680,"sizeof");
 #endif
 
     /* Compare to our initialized tcfg */
-    printf("TEST CASE: config_init\n");
+    if(!print_fail_only) printf("TEST CASE: config_init\n");
     test_config_compare();
 }
 
@@ -284,18 +285,20 @@ void test_config_read(void) {
     char * conffile;
     char * testcase;
 
+    printf("TEST CASES FOR CONFIG READ\n");
+
     /* conf file pointer is null */
-    printf("TEST CASE: conffile is null\n");
+    if(!print_fail_only) printf("TEST CASE: conffile is null\n");
     expect(config_read(NULL),"Failed");
 
     /* conf file does not exist */
-    printf("TEST CASE: conffile does not exist\n");
+    if(!print_fail_only) printf("TEST CASE: conffile does not exist\n");
     expect(config_read("empty.conf"),"Failed");
 
 
     /* Example config */
     conffile = "tayga.conf.example";
-    printf("TEST CASE: example conf file\n");
+    if(!print_fail_only) printf("TEST CASE: example conf file\n");
     free(gcfg);
     config_init();
     expect(!config_read(conffile),"Passed");
@@ -313,7 +316,7 @@ void test_config_read(void) {
 
     /* Test Case 1 - blank conf file */
     conffile = "unit_conffile.conf";
-    printf("TEST CASE: blank conf file\n");
+    if(!print_fail_only) printf("TEST CASE: blank conf file\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -332,7 +335,7 @@ void test_config_read(void) {
     test_config_compare();
 
     /* Test Case - duplicate tun devs */
-    printf("TEST CASE: duplicate tun dev\n");
+    if(!print_fail_only) printf("TEST CASE: duplicate tun dev\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -344,7 +347,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - duplicate ipv4-addr's */
-    printf("TEST CASE: duplicate ipv4-addr\n");
+    if(!print_fail_only) printf("TEST CASE: duplicate ipv4-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -356,7 +359,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - ipv4-addr is not a v4-addr */
-    printf("TEST CASE: invalid ipv4-addr\n");
+    if(!print_fail_only) printf("TEST CASE: invalid ipv4-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -368,7 +371,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - ipv4-addr is reserved */
-    printf("TEST CASE: reserved v4-addr\n");
+    if(!print_fail_only) printf("TEST CASE: reserved v4-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -380,7 +383,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - ipv6-addr duplicate */
-    printf("TEST CASE: duplicate ipv6-addr\n");
+    if(!print_fail_only) printf("TEST CASE: duplicate ipv6-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -392,7 +395,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - invalid ipv6-addr */
-    printf("TEST CASE: invalid ipv6-addr\n");
+    if(!print_fail_only) printf("TEST CASE: invalid ipv6-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -404,7 +407,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - ipv4-6-addr reserved */
-    printf("TEST CASE: reserved ipv6-addr\n");
+    if(!print_fail_only) printf("TEST CASE: reserved ipv6-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -416,7 +419,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - prefix has host bits set */
-    printf("TEST CASE: prefix has host bits set\n");
+    if(!print_fail_only) printf("TEST CASE: prefix has host bits set\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -428,7 +431,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - prefix reserved */
-    printf("TEST CASE: prefix reserved\n");
+    if(!print_fail_only) printf("TEST CASE: prefix reserved\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -440,7 +443,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - prefix invalid length */
-    printf("TEST CASE: prefix invalid length\n");
+    if(!print_fail_only) printf("TEST CASE: prefix invalid length\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -452,7 +455,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - prefix duplicate */
-    printf("TEST CASE: prefix duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: prefix duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -464,7 +467,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - wkpf strict not a known string */
-    printf("TEST CASE: wkpf invalid\n");
+    if(!print_fail_only) printf("TEST CASE: wkpf invalid\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -476,7 +479,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - udp cksum mode invalid */
-    printf("TEST CASE: udp cksum mode invalid\n");
+    if(!print_fail_only) printf("TEST CASE: udp cksum mode invalid\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -488,7 +491,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - map invalid v4 addr */
-    printf("TEST CASE: map invalid v4\n");
+    if(!print_fail_only) printf("TEST CASE: map invalid v4\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -500,7 +503,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - map invalid v6 addr */
-    printf("TEST CASE: map invalid v6\n");
+    if(!print_fail_only) printf("TEST CASE: map invalid v6\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -512,7 +515,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - map non-matching mask */
-    printf("TEST CASE: map non-matching mask\n");
+    if(!print_fail_only) printf("TEST CASE: map non-matching mask\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -524,7 +527,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - v4 has reserved addr */
-    printf("TEST CASE: map reserved 4\n");
+    if(!print_fail_only) printf("TEST CASE: map reserved 4\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -536,7 +539,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - v6 has reserved addr */
-    printf("TEST CASE: map reserved 6\n");
+    if(!print_fail_only) printf("TEST CASE: map reserved 6\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -548,7 +551,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - conflict */
-    printf("TEST CASE: map4 overlaps\n");
+    if(!print_fail_only) printf("TEST CASE: map4 overlaps\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -560,7 +563,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - conflict */
-    printf("TEST CASE: map6 overlaps\n");
+    if(!print_fail_only) printf("TEST CASE: map6 overlaps\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -572,7 +575,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - dyn pool duplicate */
-    printf("TEST CASE: dynamic pool duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: dynamic pool duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -584,7 +587,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - dyn pool invalid v4 */
-    printf("TEST CASE: dynamic pool duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: dynamic pool duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -596,7 +599,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - dyn pool reserved */
-    printf("TEST CASE: dynamic pool reserved\n");
+    if(!print_fail_only) printf("TEST CASE: dynamic pool reserved\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -608,7 +611,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - dyn pool /32 */
-    printf("TEST CASE: dynamic pool /32\n");
+    if(!print_fail_only) printf("TEST CASE: dynamic pool /32\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -620,7 +623,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - data dir duplicate */
-    printf("TEST CASE: data dir duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: data dir duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -632,7 +635,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - data dir invalid */
-    printf("TEST CASE: data dir relative\n");
+    if(!print_fail_only) printf("TEST CASE: data dir relative\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -644,7 +647,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - offlink mtu  */
-    printf("TEST CASE: offlink mtu duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: offlink mtu duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -656,7 +659,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - offlink mtu  */
-    printf("TEST CASE: offlink mtu too low\n");
+    if(!print_fail_only) printf("TEST CASE: offlink mtu too low\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -668,7 +671,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - offlink mtu  */
-    printf("TEST CASE: offlink mtu too high\n");
+    if(!print_fail_only) printf("TEST CASE: offlink mtu too high\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -680,7 +683,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - offlink mtu  */
-    printf("TEST CASE: offlink mtu not a number\n");
+    if(!print_fail_only) printf("TEST CASE: offlink mtu not a number\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -693,7 +696,7 @@ void test_config_read(void) {
 
 
     /* Test Case - workers  */
-    printf("TEST CASE: workers duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: workers duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -705,7 +708,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - workers  */
-    printf("TEST CASE: workers too low\n");
+    if(!print_fail_only) printf("TEST CASE: workers too low\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -717,7 +720,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - workers */
-    printf("TEST CASE: workers too high\n");
+    if(!print_fail_only) printf("TEST CASE: workers too high\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -728,8 +731,23 @@ void test_config_read(void) {
     config_init();
     expect(config_read(conffile),"Failed");
 
+#if MAX_WORKERS <= 0
+    /* Test Case - workers are zero, but max workers is configured to zero */
+    if(!print_fail_only) printf("TEST CASE: workers compiled to zero\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "workers 0\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+#endif
+
     /* Test Case - workers  */
-    printf("TEST CASE: workers not a number\n");
+    if(!print_fail_only) printf("TEST CASE: workers not a number\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -741,7 +759,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - log duplicate*/
-    printf("TEST CASE: log duplicate\n");
+    if(!print_fail_only) printf("TEST CASE: log duplicate\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -753,7 +771,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - log invalid arg*/
-    printf("TEST CASE: log invalid arg\n");
+    if(!print_fail_only) printf("TEST CASE: log invalid arg\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -766,7 +784,7 @@ void test_config_read(void) {
 
 
     /* Test Case - tun-up invalid  */
-    printf("TEST CASE: tun-up invalid\n");
+    if(!print_fail_only) printf("TEST CASE: tun-up invalid\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -778,7 +796,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-up blank  */
-    printf("TEST CASE: tun-up blank\n");
+    if(!print_fail_only) printf("TEST CASE: tun-up blank\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -790,7 +808,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip blank */
-    printf("TEST CASE: tun-ip blank\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip blank\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -802,7 +820,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip garbage */
-    printf("TEST CASE: tun-ip garbage\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip garbage\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -814,7 +832,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv6 too long */
-    printf("TEST CASE: tun-ip invalid ipv6 too long\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv6 too long\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -826,7 +844,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv6 too short */
-    printf("TEST CASE: tun-ip invalid ipv6 too short\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv6 too short\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -838,7 +856,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv6 not a number */
-    printf("TEST CASE: tun-ip invalid ipv6 not a number\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv6 not a number\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -851,7 +869,7 @@ void test_config_read(void) {
 
 
     /* Test Case - tun-ip invalid ipv4 hex*/
-    printf("TEST CASE: tun-ip invalid ipv4 hex\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv4 hex\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -863,7 +881,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv4 not enough digits*/
-    printf("TEST CASE: tun-ip invalid ipv4 not enough digits\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv4 not enough digits\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -875,7 +893,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv4 prefix low*/
-    printf("TEST CASE: tun-ip invalid ipv4 prefix low\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv4 prefix low\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -887,7 +905,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-ip invalid ipv4 prefix high*/
-    printf("TEST CASE: tun-ip invalid ipv4 prefix high\n");
+    if(!print_fail_only) printf("TEST CASE: tun-ip invalid ipv4 prefix high\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -899,7 +917,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route garbage */
-    printf("TEST CASE: tun-route garbage\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route garbage\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -911,7 +929,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv6 too long */
-    printf("TEST CASE: tun-route invalid ipv6 too long\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv6 too long\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -923,7 +941,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv6 too short */
-    printf("TEST CASE: tun-route invalid ipv6 too short\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv6 too short\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -935,7 +953,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv6 not a number */
-    printf("TEST CASE: tun-route invalid ipv6 not a number\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv6 not a number\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -948,7 +966,7 @@ void test_config_read(void) {
 
 
     /* Test Case - tun-route invalid ipv4 hex*/
-    printf("TEST CASE: tun-route invalid ipv4 hex\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv4 hex\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -960,7 +978,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv4 not enough digits*/
-    printf("TEST CASE: tun-route invalid ipv4 not enough digits\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv4 not enough digits\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -972,7 +990,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv4 prefix low*/
-    printf("TEST CASE: tun-route invalid ipv4 prefix low\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv4 prefix low\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -984,7 +1002,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - tun-route invalid ipv4 prefix high*/
-    printf("TEST CASE: tun-route invalid ipv4 prefix high\n");
+    if(!print_fail_only) printf("TEST CASE: tun-route invalid ipv4 prefix high\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -996,7 +1014,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - unknown option  */
-    printf("TEST CASE: unknown option\n");
+    if(!print_fail_only) printf("TEST CASE: unknown option\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1008,7 +1026,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - unknown option  */
-    printf("TEST CASE: too many tokens\n");
+    if(!print_fail_only) printf("TEST CASE: too many tokens\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1020,7 +1038,7 @@ void test_config_read(void) {
     expect(config_read(conffile),"Failed");
 
     /* Test Case - unknown option  */
-    printf("TEST CASE: wrong number of args\n");
+    if(!print_fail_only) printf("TEST CASE: wrong number of args\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1030,8 +1048,6 @@ void test_config_read(void) {
     free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
-
-    
 
     /* Parse all config options */
     testcase = "#config for tayga\n"
@@ -1047,13 +1063,15 @@ void test_config_read(void) {
         "udp-cksum-mode drop\n"
         "log drop reject icmp self dyn \n"
         "offlink-mtu 1492\n"
+#if MAX_WORKERS > 0
         "workers 7\n"
+#endif
         "tun-up yes\n"
         "tun-ip 192.168.0.0/24\n"
         "tun-ip 2001:db8:6969::/64\n"
         "tun-route 192.168.255.0/24\n"
         "tun-route 64:ff9b::/96\n";
-    printf("TEST CASE: all config options\n");
+    if(!print_fail_only) printf("TEST CASE: all config options\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1061,6 +1079,7 @@ void test_config_read(void) {
     fclose(fd);
     free(gcfg);
     config_init();
+    expect((long)gcfg,"config_init");
     expect(!config_read(conffile),"Passed");
     strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
@@ -1069,7 +1088,11 @@ void test_config_read(void) {
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);
     tcfg.local_addr6.s6_addr32[3] = htonl(0x00000002);
     tcfg.ipv6_offlink_mtu = 1492;
+#if MAX_WORKERS > 0
     tcfg.workers = 7;
+#else
+    tcfg.workers = -1;
+#endif
     tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
     tcfg.tun_up = 1;
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
@@ -1097,15 +1120,16 @@ void test_config_validate() {
     tmap4[0] = 0;
     tmap6[0] = 0;
 
+    printf("TEST CASES FOR CONFIG VALIDATE\n");
 
     /* No config loading has been done */
-    printf("TEST CASE: no config loaded\n");
+    if(!print_fail_only) printf("TEST CASE: no config loaded\n");
     free(gcfg);
     config_init();
     expect(config_validate(),"Validate Failed");
 
     /* Empty conf file */
-    printf("TEST CASE: read an empty conf file\n");
+    if(!print_fail_only) printf("TEST CASE: read an empty conf file\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1119,7 +1143,7 @@ void test_config_validate() {
 
 
     /* Only a prefix */
-    printf("TEST CASE: prefix only\n");
+    if(!print_fail_only) printf("TEST CASE: prefix only\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1135,7 +1159,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* ipv4-addr */
-    printf("TEST CASE: prefix, ipv4\n");
+    if(!print_fail_only) printf("TEST CASE: prefix, ipv4\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1152,7 +1176,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* ipv4-addr overlaps with map */
-    printf("TEST CASE: ipv4 overlaps with map\n");
+    if(!print_fail_only) printf("TEST CASE: ipv4 overlaps with map\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1171,7 +1195,7 @@ void test_config_validate() {
 
 
     /* ipv6-addr is within well known prefix */
-    printf("TEST CASE: ipv6 within wkpf\n");
+    if(!print_fail_only) printf("TEST CASE: ipv6 within wkpf\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1189,7 +1213,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* ipv6-addr is within configured prefix */
-    printf("TEST CASE: ipv6 within prefix\n");
+    if(!print_fail_only) printf("TEST CASE: ipv6 within prefix\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1207,7 +1231,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* ipv6-addr overlap */
-    printf("TEST CASE: ipv6 within prefix\n");
+    if(!print_fail_only) printf("TEST CASE: ipv6 within prefix\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1226,7 +1250,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* prefix not specified */
-    printf("TEST CASE: no prefix no ipv6-addr\n");
+    if(!print_fail_only) printf("TEST CASE: no prefix no ipv6-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1243,7 +1267,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* no tun device */
-    printf("TEST CASE: no tun-device\n");
+    if(!print_fail_only) printf("TEST CASE: no tun-device\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1260,7 +1284,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* wkfp not strict and non global addr */
-    printf("TEST CASE: no prefix no ipv6-addr\n");
+    if(!print_fail_only) printf("TEST CASE: no prefix no ipv6-addr\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1283,7 +1307,7 @@ void test_config_validate() {
     expects(gcfg->data_dir,"/var/lib/tayga",15,"data_dir");
 
     /* state directory not absolute */
-    printf("TEST CASE: state dir not absolute\n");
+    if(!print_fail_only) printf("TEST CASE: state dir not absolute\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1301,7 +1325,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* state directory too long */
-    printf("TEST CASE: state dir too long\n");
+    if(!print_fail_only) printf("TEST CASE: state dir too long\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1319,7 +1343,7 @@ void test_config_validate() {
     expectl(getenv_case,0,"Getenv Called");
 
     /* state directory multiple paths */
-    printf("TEST CASE: state dir multiple paths\n");
+    if(!print_fail_only) printf("TEST CASE: state dir multiple paths\n");
     fd = fopen(conffile,"w");
     expect((long)fd,"fopen");
     if(!fd) return;
@@ -1346,7 +1370,7 @@ int main(void) {
     test_config_read();
 
     /* Test function for config_validate */
-    //test_config_validate();
+    test_config_validate();
 
     /* Return final status */
     return overall();
