@@ -84,9 +84,12 @@ void cmdline_parse(int argc, char **argv) {
 	};
 
 	/* Arg parsing loop */
-	for (int c; c = getopt_long(argc, argv, "c:dhnu:g:rp:", long_opts, NULL), c != -1;) {
+	for (int c; c = getopt_long(argc, argv, "-c:dhnu:g:rp:", long_opts, NULL), c != -1;) {
 		switch (c) {
 		case 0:
+			break;
+		case 1:
+			fprintf(stderr, "Warning: skipping positional argument `%s`\n", optarg);
 			break;
 		case 'c':
 			arg_conffile = optarg;
