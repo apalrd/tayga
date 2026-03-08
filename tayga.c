@@ -66,64 +66,6 @@ void die(const char *format, ...) {
 	exit(1);
 }
 
-static void signal_handler(int signal)
-{
-	(void)!write(signalfds[1], &signal, sizeof(signal));
-}
-
-static void signal_setup(void)
-{
-	struct sigaction act;
-
-	if (pipe(signalfds) < 0) {
-		slog(LOG_INFO, "unable to create signal pipe, aborting: %s\n",
-				strerror(errno));
-		exit(1);
-	}
-	if(set_nonblock(signalfds[0])) exit(1);
-	if(set_nonblock(signalfds[1])) exit(1);
-	memset(&act, 0, sizeof(act));
-	act.sa_handler = signal_handler;
-	sigaction(SIGINT, &act, NULL);
-	sigaction(SIGHUP, &act, NULL);
-	sigaction(SIGUSR1, &act, NULL);
-	sigaction(SIGUSR2, &act, NULL);
-	sigaction(SIGQUIT, &act, NULL);
-	sigaction(SIGTERM, &act, NULL);
-}
-
-
-static void read_from_signalfd(void)
-{
-	int ret, sig;
-
-	for (;;) {
-		ret = read(signalfds[0], &sig, sizeof(sig));
-		if (ret < 0) {
-			if (errno == EAGAIN)
-				return;
-			slog(LOG_CRIT, "got error %s from signalfd\n",
-					strerror(errno));
-			exit(1);
-		}
-		if (ret == 0) {
-			slog(LOG_CRIT, "signal fd was closed\n");
-			exit(1);
-		}
-		if (gcfg->dynamic_pool) {
-			pthread_mutex_lock(&gcfg->map_mutex);
-			dynamic_maint(gcfg->dynamic_pool, 1);
-			pthread_mutex_unlock(&gcfg->map_mutex);
-		}
-		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
-		if (gcfg->log_out == LOG_TO_SYSLOG) {
-			closelog();
-		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-			journal_cleanup();
-		}
-		exit(0);
-	}
-}
 
 static void print_op_info(void)
 {
@@ -131,6 +73,7 @@ static void print_op_info(void)
 	struct map4 *s4;
 	struct map6 *s6;
 	struct map6 *m6;
+	struct map_static *s;
 	char addrbuf[64],addrbuf2[64];
 
 	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
@@ -175,19 +118,109 @@ static void print_op_info(void)
 	slog(LOG_DEBUG,"Map4 List:\n");
 	list_for_each(entry, &gcfg->map4_list) {
 		s4 = list_entry(entry, struct map4, list);
-
-		slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
-			inet_ntop(AF_INET,&s4->addr,addrbuf,64),
-			s4->prefix_len,s4->type,
-			inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
+		if(s4->type == MAP_TYPE_STATIC) {
+			s = container_of(s4, struct map_static, map4);
+			slog(LOG_DEBUG,"Entry %s/%d type %d mask %s origin %d line-no %d\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,64),
+				s4->prefix_len,s4->type,
+				inet_ntop(AF_INET,&s4->mask,addrbuf2,64),
+				s->origin,s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,64),
+				s4->prefix_len,s4->type,
+				inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
+		}
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
 	list_for_each(entry, &gcfg->map6_list) {
 		s6 = list_entry(entry, struct map6, list);
+		if(s6->type == MAP_TYPE_STATIC) {
+			s = container_of(s6, struct map_static, map6);
+			slog(LOG_DEBUG,"Entry %s/%d type %d origin %d line-no %d\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
+				s6->prefix_len,s6->type,
+				s->origin, s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %d\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
+				s6->prefix_len,s6->type);			
+		}
+	}
+}
 
-		slog(LOG_DEBUG,"Entry %s/%d type %d\n",
-			inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
-			s6->prefix_len,s6->type);
+static void signal_handler(int signal)
+{
+	(void)!write(signalfds[1], &signal, sizeof(signal));
+}
+
+static void signal_setup(void)
+{
+	struct sigaction act;
+
+	if (pipe(signalfds) < 0) {
+		slog(LOG_INFO, "unable to create signal pipe, aborting: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+	if(set_nonblock(signalfds[0])) exit(1);
+	if(set_nonblock(signalfds[1])) exit(1);
+	memset(&act, 0, sizeof(act));
+	act.sa_handler = signal_handler;
+	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGHUP, &act, NULL);
+	sigaction(SIGUSR1, &act, NULL);
+	sigaction(SIGUSR2, &act, NULL);
+	sigaction(SIGQUIT, &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
+}
+
+
+static void signal_read(void)
+{
+	int ret, sig;
+
+	for (;;) {
+		/* Read from signalfd and check for read errors */
+		ret = read(signalfds[0], &sig, sizeof(sig));
+		if (ret < 0) {
+			if (errno == EAGAIN)
+				return;
+			slog(LOG_CRIT, "got error %s from signalfd\n",
+					strerror(errno));
+			exit(1);
+		}
+		if (ret == 0) {
+			slog(LOG_CRIT, "signal fd was closed\n");
+			exit(1);
+		}
+		/* If we got SIGHUP, then reload configuration */
+		if(sig == SIGHUP) {
+    		clock_t start = clock();
+			slog(LOG_DEBUG,"Received SIGHUP, reloading..\n");
+			/* Flush dynamic map to file TBD */
+			/* Reload map-file */
+			addrmap_reload();
+			/* Dump map for testing */
+			print_op_info();
+    		clock_t end = clock();
+    		double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+			slog(LOG_DEBUG,"Reload completed in %f seconds\n",time_spent);
+			continue;
+		}
+		/* For any other signal prepare to exit cleanly */
+		if (gcfg->dynamic_pool) {
+			pthread_mutex_lock(&gcfg->map_mutex);
+			dynamic_maint(gcfg->dynamic_pool, 1);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+		}
+		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
+		if (gcfg->log_out == LOG_TO_SYSLOG) {
+			closelog();
+		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+			journal_cleanup();
+		}
+		exit(0);
 	}
 }
 
@@ -342,14 +375,8 @@ int main(int argc, char **argv)
 	/* Parse config file options */
 	if(config_read(conffile) < 0) return 1;
 
-	/* Validate config */
+	/* Validate config (and load map file) */
 	if(config_validate() < 0) return 1;
-
-	/* If we have a map-file specified, load it now */
-	if(gcfg->map_file[0] && addrmap_reload()) {
-		slog(LOG_CRIT,"Unable to load map file\n");
-		return 1;
-	}
 
 	/* Check if we are doing tunnel operations only
 	 * Must be done after config reading so we know tun name
@@ -595,7 +622,7 @@ int main(int argc, char **argv)
 		}
 		time(&now);
 		if (pollfds[0].revents)
-			read_from_signalfd();
+			signal_read();
 		if (pollfds[1].revents)
 			tun_read(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
