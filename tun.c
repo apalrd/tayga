@@ -21,6 +21,26 @@
 #include <linux/rtnetlink.h>
 #endif
 
+
+
+int set_nonblock(int fd)
+{
+	int flags;
+
+	flags = fcntl(fd, F_GETFL);
+	if (flags < 0) {
+		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
+		return ERROR_REJECT;
+	}
+	flags |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) < 0) {
+		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
+		return ERROR_REJECT;
+	}
+    return 0;
+}
+
+#ifdef __linux__
 int netlink_wait_for_ack(int fd)
 {
     char buf[4096];
@@ -261,26 +281,6 @@ int netlink_route_dev_modify(int ifidx,
 	return netlink_wait_for_ack(fd);
 }
 
-
-
-int set_nonblock(int fd)
-{
-	int flags;
-
-	flags = fcntl(fd, F_GETFL);
-	if (flags < 0) {
-		slog(LOG_CRIT, "fcntl F_GETFL returned %s\n", strerror(errno));
-		return ERROR_REJECT;
-	}
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL, flags) < 0) {
-		slog(LOG_CRIT, "fcntl F_SETFL returned %s\n", strerror(errno));
-		return ERROR_REJECT;
-	}
-    return 0;
-}
-
-#ifdef __linux__
 int tun_setup(int do_mktun, int do_rmtun)
 {
 	struct ifreq ifr;
@@ -380,7 +380,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	}
 
 	/* Add IPs to the tun dev */
-	char addrbuf[64];
+	char addrbuf[INET6_ADDRSTRLEN];
 	struct list_head *entry;
 	list_for_each(entry, &gcfg->tun_ip4_list) {
 		struct tun_ip4 *ip4;
@@ -388,7 +388,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_addr_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 address %s/%d to tun device %s\n",
-			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip4->prefix_len,gcfg->tundev);
 	}
 	list_for_each(entry, &gcfg->tun_ip6_list) {
@@ -397,7 +397,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_addr_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 address %s/%d to tun device %s\n",
-			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip6->prefix_len,gcfg->tundev);
 	}
 
@@ -408,7 +408,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_route_dev_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 route %s/%d to tun device %s\n",
-			inet_ntop(AF_INET,&ip4->addr,addrbuf,64),
+			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip4->prefix_len,gcfg->tundev);
 	}
 	list_for_each(entry, &gcfg->tun_rt6_list) {
@@ -417,7 +417,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 		if(netlink_route_dev_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 route %s/%d to tun device %s\n",
-			inet_ntop(AF_INET6,&ip6->addr,addrbuf,128),
+			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
 			ip6->prefix_len,gcfg->tundev);
 	}
 
@@ -481,7 +481,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	if (do_mktun) {
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	} else if (do_rmtun) {
 
 		/* Close socket before removal */
@@ -506,7 +506,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
 				gcfg->tundev);
-		return;
+		return ERROR_NONE;
 	}
 
 	/* Set multi-AF mode */
@@ -554,7 +554,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
 			gcfg->mtu);
-    return 0;
+    return ERROR_NONE;
 }
 #endif
 

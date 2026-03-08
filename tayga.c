@@ -192,6 +192,7 @@ static void print_op_info(void)
 }
 
 /* Worker thread for multiqueue tun interface */
+#ifdef __linux__
 static void * worker(void * arg)
 {
 	int idx = *(int *)arg;
@@ -208,6 +209,7 @@ static void * worker(void * arg)
 		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
 	}	
 }
+#endif //__linux__
 
 int main(int argc, char **argv)
 {

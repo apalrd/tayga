@@ -18,7 +18,7 @@ permissions: { }
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  test:
+  test-linux:
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
@@ -57,3 +57,28 @@ jobs:
         run: make clean && make CC=gcc CFLAGS="-Werror -Wextra -O2"
       - name: run build clang w/ wextra
         run: make clean && make CC=clang CFLAGS="-Werror -Wextra -O2"
+
+  test-freebsd:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ver || github.ref }}
+      - name: test on FreeBSD 15
+        uses: vmactions/freebsd-vm@v1
+        id: freebsd-test
+        with:
+          release: "15.0"
+          prepare: |
+            pkg install -y gmake llvm
+          run: |
+            gmake clean && gmake CFLAGS="-Werror -Wall -O2"
+            gmake test
+            gmake clean && gmake CFLAGS="-Werror -Wextra -O2"

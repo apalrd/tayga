@@ -26,6 +26,7 @@ time_t now;
 /* Overall test status (1 on failure, 0 on pass) */
 int test_stat = 0;
 int print_fail_only = 0;
+int at_end = 0;
 
 /* Capture slog to the output */
 int has_slogged = 0;
@@ -50,8 +51,14 @@ void slog_impl(int priority, const char *file, const char *line, const char *fun
 /* Capture exit events */
 void _exit(int status);
 void exit(int status) {
+    /* Expected end, deal with it */
+    if(at_end) {
+        fflush(NULL);
+        _exit(0);
+    }
     /* oh no, bad things have happened here */
     printf("FAIL: UNEXPECTED CALL TO EXIT\n");
+    fflush(stdout);
     _exit(1);
 }
 
@@ -101,6 +108,7 @@ void expect(int check,const char *res) {
 
 /* Final test status */
 int overall() {
+    at_end = 1;
     if(test_stat) {
         printf("OVERALL FAIL\n");
         return 1;
