@@ -14,7 +14,6 @@ tayga-cov
 *.log
 html/*
 latex/*
-version.h
 .vscode/*
 callgrind*
 unit_conffile
