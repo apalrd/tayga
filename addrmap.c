@@ -785,6 +785,28 @@ static void cache_evict_map4(const struct map4 *m4)
 }
 
 /**
+ * @brief Evict an entry from cache by its map6
+ *
+ * This assumes that the parent is a static map.
+ */
+static void cache_evict_map6(const struct map6 *m6)
+{
+    struct list_head *entry, *next;
+    struct cache_entry *c;
+
+    pthread_mutex_lock(&gcfg->cache_mutex);
+    list_for_each_safe(entry, next, &gcfg->cache_active) {
+        c = list_entry(entry, struct cache_entry, list);
+		if (IN6_IS_IN_NET(&c->addr6, &m6->addr, &m6->mask)){
+            list_del(&c->hash4);
+            list_del(&c->hash6);
+            list_add(&c->list, &gcfg->cache_pool);
+        }
+    }
+    pthread_mutex_unlock(&gcfg->cache_mutex);
+}
+
+/**
  * @brief Delete the parent map entry of this map4
  *
  * This assumes that the parent is a static map.
@@ -800,7 +822,8 @@ static void addrmap_delete4(struct map4 *m4)
         list_del(&m->map6.list);
 
         /* Evict matching cache entries */
-        cache_evict_map4(m4);
+        cache_evict_map4(&m->map4);
+        cache_evict_map6(&m->map6);
 		free(m);
     }
 }
@@ -821,8 +844,20 @@ static void addrmap_delete6(struct map6 *m6)
 
         /* Evict matching cache entries */
         cache_evict_map4(&m->map4);
+        cache_evict_map6(&m->map6);
 		free(m);
     }
+}
+
+/* Temporary function to print a log message with the associated map entry */
+static void print_entry(struct map_static *m, char * msg) {
+	char addrbuf[64],addrbuf2[64];
+	slog(LOG_DEBUG,"OP: map v4 %s/%d v6 %s/%d type %d origin %d line-no %d case %s\n",
+		inet_ntop(AF_INET,&m->map4.addr,addrbuf,64),
+		m->map4.prefix_len,
+		inet_ntop(AF_INET6,&m->map6.addr,addrbuf2,64),
+		m->map6.prefix_len, 
+		m->map4.type,m->origin, m->line_no, msg);
 }
 
 /**
@@ -928,7 +963,7 @@ static int addrmap_entry(int ln, char **args)
 	pthread_mutex_lock(&gcfg->map_mutex);
 
 	/*
-	 * Attempt to insert both sides.  insert_map4/6 return -1 and set
+	 * Attempt to insert both sides.  insert_map4/6 returns -1 and sets
 	 * m4/m6 when an entry with the same address already exists.
 	 * After this pair of calls:
 	 *
@@ -937,8 +972,6 @@ static int addrmap_entry(int ln, char **args)
 	 *   m4 != NULL, m6 == NULL  -> IPv4 side already existed
 	 *   m4 == NULL, m6 != NULL  -> IPv6 side already existed
 	 *
-	 * Note: when insert returns 0 (success) the entry is already linked
-	 * into the list; when it returns -1 the entry was NOT linked.
 	 */
 	insert_map4(&m->map4, &m4);
 	insert_map6(&m->map6, &m6);
@@ -947,11 +980,16 @@ static int addrmap_entry(int ln, char **args)
 		/*
 		 * Brand-new mapping on both sides – nothing more to do,
 		 * m is now fully inserted.
+		 * Still evict from cache, in case there is a larger mapping entry
 		 */
+    	cache_evict_map4(&m->map4);
+	    cache_evict_map6(&m->map6);
+		print_entry(m,"First Insertion Success");
 	} else if (m4 && m6) {
 		/*
 		 * Both sides conflicted with existing entries.
 		 */
+		print_entry(m,"Both Sides Conflict");
 		if (m4->type != MAP_TYPE_STATIC || m6->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: Existing incompatible (non-static) "
 			     "map entry found for mapping on line %d "
@@ -964,6 +1002,8 @@ static int addrmap_entry(int ln, char **args)
 		/* Get parents of both entries */
 		n1 = container_of(m4, struct map_static, map4);
 		n2 = container_of(m6, struct map_static, map6);
+		print_entry(n1,"Conflict4");
+		print_entry(n2,"Conflict6");
 
 		if (n1 == n2) {
 			/*
@@ -973,6 +1013,7 @@ static int addrmap_entry(int ln, char **args)
 			 */
 			n1->line_no = ln;
 			n1->origin  = MAP_ORIGIN_MAPFILE;
+			slog(LOG_DEBUG,"Conflict is same object, refresh\n");
 			free(m);
 		} else {
 			/*
@@ -992,6 +1033,7 @@ static int addrmap_entry(int ln, char **args)
 		/*
 		 * IPv4 side conflicted; IPv6 side was inserted cleanly.
 		 */
+		print_entry(m,"V4 side conflicted");
 		if (m4->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv4 entry on line %d conflicts "
 			     "with non-static map (type %d)\n", ln, m4->type);
@@ -1001,13 +1043,19 @@ static int addrmap_entry(int ln, char **args)
 			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT;
 		}
+		/* Delete overlapping entry and re-insert */
+		n1 = container_of(m4, struct map_static, map4);
+		print_entry(n1,"Conflict4");
 		addrmap_delete4(m4);
 		m4 = NULL;
 		insert_map4(&m->map4, &m4);
+		/* Purge IPv6 from cache since it has changed */
+		cache_evict_map6(&m->map6);
 	} else {
 		/*
 		 * IPv6 side conflicted; IPv4 side was inserted cleanly.
 		 */
+		print_entry(m,"V6 side conflicted");
 		if (m6->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv6 entry on line %d conflicts "
 			     "with non-static map (type %d)\n", ln, m6->type);
@@ -1017,9 +1065,14 @@ static int addrmap_entry(int ln, char **args)
 			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT;
 		}
+		/* Delete overlapping entry and re-insert */
+		n2 = container_of(m6, struct map_static, map6);
+		print_entry(n2,"Conflict6");
 		addrmap_delete6(m6);
 		m6 = NULL;
 		insert_map6(&m->map6, &m6);
+		/* Purge IPv4 from cache since it has changed */
+		cache_evict_map4(&m->map4);
 	}
 
 	/* Finished without error */
@@ -1074,8 +1127,10 @@ int addrmap_reload(void)
 		m4 = list_entry(entry, struct map4, list);
 		if (m4->type == MAP_TYPE_STATIC) {
 			s = container_of(m4, struct map_static, map4);
-			if (s->origin == MAP_ORIGIN_MAPFILE)
-				s->line_no = -1;
+			if (s->origin == MAP_ORIGIN_MAPFILE) {
+				print_entry(s,"Markng for potential deletion");
+				s->line_no *= -1;
+			}
 		}
 	}
 	pthread_mutex_unlock(&gcfg->map_mutex);
@@ -1137,6 +1192,7 @@ int addrmap_reload(void)
 		if (m4->type == MAP_TYPE_STATIC) {
 			s = container_of(m4, struct map_static, map4);
 			if (s->origin == MAP_ORIGIN_MAPFILE && s->line_no < 0) {
+				print_entry(s,"Actually deleting");
 				slog(LOG_DEBUG, "MAP-FILE: Removing entry that is "
 				     "no longer present in map file\n");
 				addrmap_delete4(m4);

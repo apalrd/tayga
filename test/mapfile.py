@@ -126,17 +126,8 @@ def send_v6_rejected(v6_dst, label):
 # Test 1: Reloading
 #
 # Each iteration writes a new map file, reloads, then probes all three
-# address pairs (+0, +1, +2) to verify what is and isn't mapped.
+# address pairs (+1, +2, +3) to verify what is and isn't mapped.
 # The sequence exercises every overlap branch in addrmap_entry/addrmap_reload:
-#
-#   startup   [1->1, 2->2]          initial load, both new (!m4 && !m6)
-#   iter 1    [1->1, 2->2]          no-op (n1==n2, line_no refresh only)
-#   iter 2    [1->1, 2->2, 3->3]    add entry 3 (!m4 && !m6)
-#   iter 3    [1->1, 3->3]          delete entry 2
-#   iter 4    [1->3, 3->3]          update IPv6 side of 1 (m4-only conflict)
-#   iter 5    [3->1, 3->3]          update IPv4 side (m6-only conflict)
-#   iter 6    [1->3]                collapse two entries into one (n1!=n2)
-#   iter 7    []                    remove all entries
 # ---------------------------------------------------------------------------
 def test_reloading():
     test.flush()
@@ -193,7 +184,6 @@ def test_reloading():
     send_v6_mapped(map_v6+2, map_v4+2, "iter 2: v6 2->2 present")
     send_v6_mapped(map_v6+3, map_v4+3, "iter 2: v6 3->3 present")
 
-    return
     # iter 3: [1->1, 3->3] — delete entry 2
     test.tayga_conf.map_file_entries = [
         f"{map_v4+1} {map_v6+1}",
@@ -207,58 +197,105 @@ def test_reloading():
     send_v6_rejected(map_v6+2,         "iter 3: v6 2 absent")
     send_v6_mapped(map_v6+3, map_v4+3, "iter 3: v6 3->3 present")
 
-    return
-
-    # iter 4: [0->2, 3->3] — update IPv6 side of entry 0 (m4-only conflict)
-    # v4+0 was mapped to v6+0; now mapped to v6+2 which is already taken by entry 2
+    # iter 4: [1->1, 3->1] — update IPv6 side of entry 2 (both-sides-conflict)
+    # This will conflict with previous version of 3->3, and new 1->1
+    # This will evict the 1->1 mapping with the later 3->1 mapping
     test.tayga_conf.map_file_entries = [
-        f"{map_v4+0} {map_v6+2}",
+        f"{map_v4+1} {map_v6+1}",
+        f"{map_v4+3} {map_v6+1}",
+    ]
+    test.reconf()
+    send_v4_rejected(map_v4+1,         "iter 4: v4 1 absent")
+    send_v4_rejected(map_v4+2,         "iter 4: v4 2 absent")
+    send_v4_mapped(map_v4+3, map_v6+1, "iter 4: v4 3->1 present")
+    send_v6_mapped(map_v6+1, map_v4+3, "iter 4: v6 1->3 present")
+    send_v6_rejected(map_v6+2,         "iter 4: v6 2 absent")
+    send_v6_rejected(map_v6+3,         "iter 4: v6 3 absent")
+
+    # iter 5: [2->2, 1->2] — update IPv4 side of entry 1 (both-sides-conflict)
+    # This will conflict with the new 2->2, and the old 3->1
+    # This will evict the 2->2 mapping with the later 2->1 mapping
+    test.tayga_conf.map_file_entries = [
         f"{map_v4+2} {map_v6+2}",
+        f"{map_v4+2} {map_v6+1}",
     ]
     test.reconf()
-    send_v4_mapped(map_v4+0, map_v6+2, "iter 4: v4+0->v6+2 present")
-    send_v6_mapped(map_v6+2, map_v4+0, "iter 4: v6+2->v4+0 present")
-    send_v4_rejected(map_v4+1,                   "iter 4: v4+1 absent")
-    send_v4_rejected(map_v4+2,                   "iter 4: v4+2 absent")
-    send_v6_rejected(map_v6+0,                   "iter 4: v6+0 absent")
-    send_v6_rejected(map_v6+1,                   "iter 4: v6+1 absent")
+    send_v4_rejected(map_v4+1,         "iter 5: v4 1 absent")
+    send_v4_mapped(map_v4+2, map_v6+1, "iter 5: v4 2->1 present")
+    send_v4_rejected(map_v4+3,         "iter 5: v4 3 absent")
+    send_v6_mapped(map_v6+1, map_v4+2, "iter 5: v6 1->2 present")
+    send_v6_rejected(map_v6+2,         "iter 5: v6 2 absent")
+    send_v6_rejected(map_v6+3,         "iter 5: v6 3 absent")
 
-    # iter 5: [2->0, 3->3] — update IPv4 side (m6-only conflict)
-    # v6+2 was mapped from v4+0; now mapped from v4+2 which is already taken
+    # iter 6: [2->3] — update IPv6 side (m4-only conflict)
     test.tayga_conf.map_file_entries = [
-        f"{map_v4+2} {map_v6+0}",
-        f"{map_v4+2} {map_v6+2}",
+        f"{map_v4+2} {map_v6+1}",
+        f"{map_v4+2} {map_v6+3}",
     ]
     test.reconf()
-    send_v4_mapped(map_v4+2, map_v6+0, "iter 5: v4+2->v6+0 present")
-    send_v6_mapped(map_v6+0, map_v4+2, "iter 5: v6+0->v4+2 present")
-    send_v4_rejected(map_v4+0,                   "iter 5: v4+0 absent")
-    send_v4_rejected(map_v4+1,                   "iter 5: v4+1 absent")
-    send_v6_rejected(map_v6+1,                   "iter 5: v6+1 absent")
-    send_v6_rejected(map_v6+2,                   "iter 5: v6+2 absent")
+    send_v4_rejected(map_v4+1,         "iter 6: v4 1 absent")
+    send_v4_mapped(map_v4+2, map_v6+3, "iter 6: v4 2->3 present")
+    send_v4_rejected(map_v4+3,         "iter 6: v4 3 absent")
+    send_v6_rejected(map_v6+1,         "iter 6: v6 1 absent")
+    send_v6_rejected(map_v6+2,         "iter 6: v6 2 absent")
+    send_v6_mapped(map_v6+3, map_v4+2, "iter 6: v6 3->2 present")
 
-    # iter 6: [0->2] — v4+0 conflicts with nothing on v4, v6+2 conflicts with
-    # the existing entry on v6; two different containers (n1!=n2)
+    # iter 7: [2->1] — update IPv4 side (m6-only conflict)
     test.tayga_conf.map_file_entries = [
-        f"{map_v4+0} {map_v6+2}",
+        f"{map_v4+2} {map_v6+3}",
+        f"{map_v4+1} {map_v6+3}",
     ]
     test.reconf()
-    send_v4_mapped(map_v4+0, map_v6+2, "iter 6: v4+0->v6+2 present")
-    send_v6_mapped(map_v6+2, map_v4+0, "iter 6: v6+2->v4+0 present")
-    send_v4_rejected(map_v4+1,                   "iter 6: v4+1 absent")
-    send_v4_rejected(map_v4+2,                   "iter 6: v4+2 absent")
-    send_v6_rejected(map_v6+0,                   "iter 6: v6+0 absent")
-    send_v6_rejected(map_v6+1,                   "iter 6: v6+1 absent")
+    send_v4_mapped(map_v4+1, map_v6+3, "iter 7: v4 1->3 present")
+    send_v4_rejected(map_v4+2,         "iter 7: v4 2 absent")
+    send_v4_rejected(map_v4+3,         "iter 7: v4 3 absent")
+    send_v6_rejected(map_v6+1,         "iter 7: v6 1 absent")
+    send_v6_rejected(map_v6+2,         "iter 7: v6 2 absent")
+    send_v6_mapped(map_v6+3, map_v4+1, "iter 7: v6 3->1 present")
 
-    # iter 7: [] — empty file removes last entry
+    # iter 8: replace host entry with shorter-prefix (wider net) covering it
+    # 1->3 mapping entry should be replaced since it overlaps with a later map
+    # Note that overlapping entries is still considered a configuration error
+    map_v4_net = ipaddress.ip_network(f"{map_v4}/30", strict=True)
+    map_v6_net = ipaddress.ip_network(f"{map_v6}/126", strict=True)
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+3}",
+        f"{map_v4_net} {map_v6_net}",
+    ]
+    test.reconf()
+    send_v4_mapped(map_v4+0, map_v6+0, "iter 8: v4 0->0 present via net")
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 8: v4 1->1 present via net")
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 8: v4 2->2 present via net")
+    send_v4_mapped(map_v4+3, map_v6+3, "iter 8: v4 3->3 present via net")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 8: v6 0->0 present via net")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 8: v6 1->1 present via net")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 8: v6 2->2 present via net")
+    send_v6_mapped(map_v6+3, map_v4+3, "iter 8: v6 3->3 present via net")
+
+    # iter 9: replace net with longer-prefix (narrower) host entry overlapping it
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4_net} {map_v6_net}",
+        f"{map_v4+3} {map_v6+3}",
+    ]
+    test.reconf()
+    send_v4_rejected(map_v4+0,         "iter 9: v4 0 absent (net gone)")
+    send_v4_rejected(map_v4+1,         "iter 9: v4 1 absent (net gone)")
+    send_v4_rejected(map_v4+2,         "iter 9: v4 2 absent (net gone)")
+    send_v4_mapped(map_v4+3, map_v6+3, "iter 9: v4 3->3 present via host")
+    send_v6_rejected(map_v6+0,         "iter 9: v6 0 absent (net gone)")
+    send_v6_rejected(map_v6+1,         "iter 9: v6 1 absent (net gone)")
+    send_v6_rejected(map_v6+2,         "iter 9: v6 2 absent (net gone)")
+    send_v6_mapped(map_v6+3, map_v4+3, "iter 9: v6 3->3 present via host")
+
+    # iter 10: empty file removes all map-file entries
     test.tayga_conf.map_file_entries = []
     test.reconf()
-    send_v4_rejected(map_v4+0, "iter 7: v4+0 absent")
-    send_v4_rejected(map_v4+1, "iter 7: v4+1 absent")
-    send_v4_rejected(map_v4+2, "iter 7: v4+2 absent")
-    send_v6_rejected(map_v6+0, "iter 7: v6+0 absent")
-    send_v6_rejected(map_v6+1, "iter 7: v6+1 absent")
-    send_v6_rejected(map_v6+2, "iter 7: v6+2 absent")
+    send_v4_rejected(map_v4+1, "iter 10: v4 1 absent")
+    send_v4_rejected(map_v4+2, "iter 10: v4 2 absent")
+    send_v4_rejected(map_v4+3, "iter 10: v4 3 absent")
+    send_v6_rejected(map_v6+1, "iter 10: v6 1 absent")
+    send_v6_rejected(map_v6+2, "iter 10: v6 2 absent")
+    send_v6_rejected(map_v6+3, "iter 10: v6 3 absent")
 
     test.section("Map-File: Reloading")
 

@@ -133,6 +133,7 @@ class confgen:
         self.udp_cksum_mode = None
         self.map_file_entries = []
         self.map_file_path = "test/tayga.map"
+        self.map_file_created = False
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -151,7 +152,8 @@ class confgen:
                 conf_file.write("data-dir "+self.data_dir+"\n")
             for entry in self.map:
                 conf_file.write("map "+entry+"\n")
-            if self.map_file_entries:
+            if self.map_file_entries or self.map_file_created:
+                self.map_file_created = True
                 with open(self.map_file_path, 'w') as map_file:
                     for entry in self.map_file_entries:
                         map_file.write("map " + entry + "\n")
@@ -381,14 +383,14 @@ class test_env:
 
     def reconf(self):
         print("Reconfiguring tayga while running")
-        if self.tayga_conf.map_file_entries:
+        if self.tayga_conf.map_file_created:
             with open(self.tayga_conf.map_file_path, 'w') as map_file:
                 for entry in self.tayga_conf.map_file_entries:
                     map_file.write("map " + entry + "\n")
         #send sighup to tayga
         if self.tayga_proc and self.tayga_proc.poll() is None:
             os.kill(self.tayga_proc.pid, signal.SIGHUP)
-            time.sleep(1)
+            time.sleep(0.2)
         else:
             print("reconf called but tayga is not running")
 
