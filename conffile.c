@@ -955,13 +955,6 @@ int config_validate(void)
 		return ERROR_REJECT;
 	}
 
-	/* If a map-file is provided, it must be at least readable */
-	if(gcfg->map_file[0] && addrmap_reload() != ERROR_NONE) {
-		slog(LOG_CRIT, "Error: map-file %s is configured but not readable\n",
-			gcfg->map_file);
-		return ERROR_REJECT;
-	}
-
 	/* Guess there are no errors? */
 	return ERROR_NONE;
 }

@@ -394,7 +394,7 @@ int main(int argc, char **argv)
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
-		if(tun_setup(do_mktun, do_rmtun)) exit(1);
+		if(tun_setup(do_mktun, do_rmtun)) return 1;
 		return 0;
 	}
 
@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 		pw = getpwnam(user);
 		if (!pw) {
 			slog(LOG_CRIT, "Error: user %s does not exist\n", user);
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -413,7 +413,7 @@ int main(int argc, char **argv)
 		if (!gr) {
 			slog(LOG_CRIT, "Error: group %s does not exist\n",
 					group);
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -422,31 +422,31 @@ int main(int argc, char **argv)
 		if (do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
 					"is specified in %s\n", conffile);
-			exit(1);
+			return 1;
 		}
 		if (chdir("/")) {
 			slog(LOG_CRIT, "Error: unable to chdir to /, aborting: %s\n",
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 	} else if (chdir(gcfg->data_dir) < 0) {
 		if (user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
 					"aborting: %s\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 		if (mkdir(gcfg->data_dir, 0777) < 0) {
 			slog(LOG_CRIT, "Error: unable to create %s, aborting: "
 					"%s\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 		if (chdir(gcfg->data_dir) < 0) {
 			slog(LOG_CRIT, "Error: created %s but unable to chdir "
 					"to it!?? (%s)\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -454,7 +454,14 @@ int main(int argc, char **argv)
 		slog(LOG_CRIT, "Error: chroot is ineffective without also "
 				"specifying the -u option to switch to an "
 				"unprivileged user\n");
-		exit(1);
+		return 1;
+	}
+
+	/* If using a map-file, read it after doing chroot/chdir */
+	if(gcfg->map_file[0] && addrmap_reload() != ERROR_NONE) {
+		slog(LOG_CRIT, "Error: map-file %s is configured but not readable\n",
+			gcfg->map_file);
+		return 1;
 	}
 
 	if (pidfile) {
