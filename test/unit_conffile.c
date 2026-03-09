@@ -273,7 +273,7 @@ void test_config_init(void) {
      */
 #if defined(__amd64__) && defined(__linux__)
     if(!print_fail_only) printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),1680,"sizeof");
+    expectl(sizeof(struct config),2192,"sizeof");
 #endif
 
     /* Compare to our initialized tcfg */
@@ -1071,6 +1071,7 @@ void test_config_read(void) {
         "wkpf-strict yes\n"
         "dynamic-pool 192.168.255.0/24\n"
         "data-dir /var/lib/tayga\n"
+        "map-file static.map\n"
         "map 192.168.5.42 2001:db8:1:4444::1\n"
         "map 192.168.6.0/24 2001:db8:1:4445::/120\n"
         "udp-cksum-mode drop\n"
@@ -1096,6 +1097,7 @@ void test_config_read(void) {
     expect(!config_read(conffile),"Passed");
     strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
+    strcpy(tcfg.map_file,"static.map");
     tcfg.local_addr4.s_addr = htonl(0xc0a8ff01);
     tcfg.local_addr6.s6_addr32[0] = htonl(0x20010db8);
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);
