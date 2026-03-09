@@ -771,6 +771,11 @@ static void cache_evict_map4(const struct map4 *m4)
 {
     struct list_head *entry, *next;
     struct cache_entry *c;
+	char addrbuf[64];
+
+	slog(LOG_DEBUG,"About to evict v4 %s/%d\n",
+		inet_ntop(AF_INET,&m4->addr,addrbuf,64),
+		m4->prefix_len);
 
     pthread_mutex_lock(&gcfg->cache_mutex);
     list_for_each_safe(entry, next, &gcfg->cache_active) {
@@ -793,6 +798,11 @@ static void cache_evict_map6(const struct map6 *m6)
 {
     struct list_head *entry, *next;
     struct cache_entry *c;
+	char addrbuf[64];
+
+	slog(LOG_DEBUG,"About to evict v6 %s/%d\n",
+		inet_ntop(AF_INET6,&m6->addr,addrbuf,64),
+		m6->prefix_len);
 
     pthread_mutex_lock(&gcfg->cache_mutex);
     list_for_each_safe(entry, next, &gcfg->cache_active) {
@@ -1005,7 +1015,14 @@ static int addrmap_entry(int ln, char **args)
 		print_entry(n1,"Conflict4");
 		print_entry(n2,"Conflict6");
 
-		if (n1 == n2) {
+		if (n1->origin != MAP_ORIGIN_MAPFILE || n2->origin != MAP_ORIGIN_MAPFILE) {
+			/* This map cannot be replaced, so same behavior as a non-static map */
+			slog(LOG_ERR, "MAP-FILE: Existing fixed map entry found with non-writable"
+				" origin on line %d (m4 orgin %d, m6 origin %d)\n", ln, n1->origin, n2->origin);
+			free(m);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+			return ERROR_REJECT;
+		} else if (n1 == n2) {
 			/*
 			 * Exact same entry already present – just refresh
 			 * the tracking fields on the *existing* object and
@@ -1036,16 +1053,26 @@ static int addrmap_entry(int ln, char **args)
 		print_entry(m,"V4 side conflicted");
 		if (m4->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv4 entry on line %d conflicts "
-			     "with non-static map (type %d)\n", ln, m4->type);
+			     "with non-static type (%d)\n", ln, m4->type);
 			/* Remove the IPv6 half we just inserted */
 			list_del(&m->map6.list);
 			free(m);
 			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT;
 		}
-		/* Delete overlapping entry and re-insert */
+		/* Get parent static map entry */
 		n1 = container_of(m4, struct map_static, map4);
 		print_entry(n1,"Conflict4");
+		/* We cannot overwrite conf-file mappings */
+		if (n1->origin != MAP_ORIGIN_MAPFILE) {
+			slog(LOG_ERR, "MAP-FILE: IPv4 entry on line %d conflicts "
+			     "with non-writable origin (%d)\n", ln, n1->origin);
+			/* Remove the IPv6 half we just inserted */
+			list_del(&m->map6.list);
+			free(m);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+			return ERROR_REJECT;
+		}
 		addrmap_delete4(m4);
 		m4 = NULL;
 		insert_map4(&m->map4, &m4);
@@ -1058,16 +1085,26 @@ static int addrmap_entry(int ln, char **args)
 		print_entry(m,"V6 side conflicted");
 		if (m6->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv6 entry on line %d conflicts "
-			     "with non-static map (type %d)\n", ln, m6->type);
+			     "with non-static type (%d)\n", ln, m6->type);
 			/* Remove the IPv4 half we just inserted */
 			list_del(&m->map4.list);
 			free(m);
 			pthread_mutex_unlock(&gcfg->map_mutex);
 			return ERROR_REJECT;
 		}
-		/* Delete overlapping entry and re-insert */
+		/* Get parent static map entry */
 		n2 = container_of(m6, struct map_static, map6);
 		print_entry(n2,"Conflict6");
+		/* We cannot overwrite conf-file mappings */
+		if (n2->origin != MAP_ORIGIN_MAPFILE) {
+			slog(LOG_ERR, "MAP-FILE: IPv6 entry on line %d conflicts "
+			     "with non-writable origin (%d)\n", ln, n2->origin);
+			/* Remove the IPv4 half we just inserted */
+			list_del(&m->map4.list);
+			free(m);
+			pthread_mutex_unlock(&gcfg->map_mutex);
+			return ERROR_REJECT;
+		}
 		addrmap_delete6(m6);
 		m6 = NULL;
 		insert_map6(&m->map6, &m6);

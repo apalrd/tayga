@@ -123,11 +123,12 @@ def send_v6_rejected(v6_dst, label):
 
 
 # ---------------------------------------------------------------------------
-# Test 1: Reloading
+# Reloading test cases
 #
 # Each iteration writes a new map file, reloads, then probes all three
 # address pairs (+1, +2, +3) to verify what is and isn't mapped.
-# The sequence exercises every overlap branch in addrmap_entry/addrmap_reload:
+# The sequence exercises every branch in addrmap_entry/addrmap_reload
+# where both mapping types are static maps
 # ---------------------------------------------------------------------------
 def test_reloading():
     test.flush()
@@ -301,117 +302,269 @@ def test_reloading():
 
 
 # ---------------------------------------------------------------------------
-# Test 2: Conflicts
+# Conflict test cases
 #
-# 2a. Map-file entry conflicts with a conf-file static entry: conf wins,
-#     both at startup and after SIGHUP.
-# 2b. Map-file entry conflicts with a dynamic pool address: rejected,
-#     both at startup and after SIGHUP; pool continues to function.
+# These test cases where the map-file entries conflict with other entries
+# which cannot be dynamically modified. 
 # ---------------------------------------------------------------------------
 def test_conflicts():
-    # --- 2a: conflict with conf-file static entry ---
-    test.flush()
-    test.tayga_conf.default()
-    test.tayga_conf.dynamic_pool = None
-    test.tayga_conf.map.append(f"{test.public_ipv4+0} {test.public_ipv6+0}")
-    test.tayga_conf.map_file_entries = [f"{test.public_ipv4+0} {test.public_ipv6+1}"]
-    test.reload()
-
-    send_v4_mapped(test.public_ipv4+0, test.public_ipv6+0, "conf conflict: conf entry wins at startup")
-    send_v6_rejected(test.public_ipv6+1,                   "conf conflict: map-file target absent at startup")
-
-    test.reconf()
-
-    send_v4_mapped(test.public_ipv4+0, test.public_ipv6+0, "conf conflict: conf entry still wins after SIGHUP")
-    send_v6_rejected(test.public_ipv6+1,                   "conf conflict: map-file target still absent after SIGHUP")
-
-    # --- 2b: conflict with dynamic pool address ---
-    test.flush()
-    test.tayga_conf.default()
-    test.tayga_conf.dynamic_pool = "169.254.0.0/24"
-    pool_v4 = ipaddress.ip_address("169.254.0.50")
-    test.tayga_conf.map_file_entries = [f"{pool_v4} {test.public_ipv6+0}"]
-    test.reload()
-
     global expect_sa, expect_da, expect_len, expect_proto, expect_data
+    #Route pref64 to test system to avoid packet loops
+    #Must be more specific than /96 to take precedence
+    rt_pref = router("3fff:6464::c000:0000/100",route_dest.ROUTE_TEST)
+    rt_pref.apply()
 
-    def pool_val(pkt):
-        res = test_result()
-        res.check("Contains IPv4", isinstance(pkt.getlayer(1), IP))
-        if res.has_fail:
-            return res
-        res.compare("Proto", pkt[IP].proto, 16)
-        res.check("Src in pool",
-                  ipaddress.ip_address(pkt[IP].src)
-                  in ipaddress.ip_network("169.254.0.0/24"))
-        res.compare("Dest", pkt[IP].dst, str(test.public_ipv4))
-        return res
-
-    pkt = IPv6(dst=str(test.public_ipv4_xlate),
-               src=str(test.public_ipv6), nh=16) / Raw(randbytes(128))
-    test.send_and_check(pkt, pool_val,
-                        "pool conflict: dynamic pool allocates at startup")
-
-    send_v6_rejected(test.public_ipv6+0, "pool conflict: map-file entry rejected at startup")
-
-    test.reconf()
-
-    pkt = IPv6(dst=str(test.public_ipv4_xlate),
-               src=str(test.public_ipv6), nh=16) / Raw(randbytes(128))
-    test.send_and_check(pkt, pool_val,
-                        "pool conflict: dynamic pool still allocates after SIGHUP")
-
-    send_v6_rejected(test.public_ipv6+0, "pool conflict: map-file entry still rejected after SIGHUP")
-
-    test.section("Map-File: Conflicts")
-
-
-# ---------------------------------------------------------------------------
-# Test 3: File handling
-#
-# 3a. Empty file at startup: no entries, SIGHUP clears nothing, RFC6052 works.
-# 3b. No map-file directive: reconf() sends SIGHUP with no file configured,
-#     RFC6052 continues to work.
-# ---------------------------------------------------------------------------
-def test_file_handling():
-    # --- 3a: empty file ---
+    # iter 1a/b: map file conflicts with conf file (v4 conflict case)
     test.flush()
     test.tayga_conf.default()
     test.tayga_conf.dynamic_pool = None
+
+    map_v4 = ipaddress.ip_address("192.168.2.0")
+    map_v6 = ipaddress.ip_address("2001:db8:1::0")
+
+    # map file: [1->1, 2->2]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+1}",
+        f"{map_v4+2} {map_v6+2}",
+    ]
+    # conf fle: [2->3]
+    test.tayga_conf.map.append(f"{map_v4+2} {map_v6+3}")
+    test.reload()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 1a: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 1a: v6 1->1 present")
+    #[2->3] should take precedence
+    send_v4_mapped(map_v4+2, map_v6+3, "iter 1a: v4 2->3 present")
+    send_v6_mapped(map_v6+3, map_v4+2, "iter 1a: v6 3->2 present")
+    send_v4_rejected(map_v4+3,         "iter 1a: v4 3 absent")
+    send_v6_rejected(map_v6+2,         "iter 1a: v6 2 absent")
+
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
+    test.reconf()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 1b: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 1b: v6 1->1 present")
+    #[2->3] should take precedence
+    send_v4_mapped(map_v4+2, map_v6+3, "iter 1b: v4 2->3 present")
+    send_v6_mapped(map_v6+3, map_v4+2, "iter 1b: v6 3->2 present")
+    send_v4_rejected(map_v4+3,         "iter 1b: v4 3 absent")
+    send_v6_rejected(map_v6+2,         "iter 1b: v6 2 absent")
+
+
+    # iter 2a/b: map file conflicts with conf file (v6 conflict case)
+    test.tayga_conf.default()
+    test.tayga_conf.dynamic_pool = None
+
+    # map file: [1->1, 2->2]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+1}",
+        f"{map_v4+2} {map_v6+2}",
+    ]
+    # conf fle: [2->3]
+    test.tayga_conf.map.append(f"{map_v4+3} {map_v6+2}")
+    test.reload()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 2a: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 2a: v6 1->1 present")
+    #[3->2] should take precedence
+    send_v4_mapped(map_v4+3, map_v6+2, "iter 2a: v4 3->2 present")
+    send_v6_mapped(map_v6+2, map_v4+3, "iter 2a: v6 2->3 present")
+    send_v4_rejected(map_v4+2,         "iter 2a: v4 2 absent")
+    send_v6_rejected(map_v6+3,         "iter 2a: v6 3 absent")
+
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
+    test.reconf()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 2b: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 2b: v6 1->1 present")
+    #[3->2] should take precedence
+    send_v4_mapped(map_v4+3, map_v6+2, "iter 2b: v4 3->2 present")
+    send_v6_mapped(map_v6+2, map_v4+3, "iter 2b: v6 2->3 present")
+    send_v4_rejected(map_v4+2,         "iter 2b: v4 2 absent")
+    send_v6_rejected(map_v6+3,         "iter 2b: v6 3 absent")
+
+
+    # iter 3a/b/c: map file conflicts with conf file (both same)
+    test.tayga_conf.default()
+    test.tayga_conf.dynamic_pool = None
+
+    # map file: [1->1, 2->2]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+1}",
+        f"{map_v4+2} {map_v6+2}",
+    ]
+    # conf fle: [2->3]
+    test.tayga_conf.map.append(f"{map_v4+2} {map_v6+2}")
+    test.reload()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 3a: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 3a: v6 1->1 present")
+    #[2->2] should load either way
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 3a: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 3a: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 3a: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 3a: v6 3 absent")
+
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
+    test.reconf()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 3b: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 3b: v6 1->1 present")
+    #[2->2] should load either way
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 3b: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 3b: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 3b: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 3b: v6 3 absent")
+
+    #Now, remove map-file entry and ensure that conf file entry not deleted
+    # map file: [1->1]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+1}",
+    ]
+    test.reconf()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 3c: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 3c: v6 1->1 present")
+    #[2->2] should remain since it is from the conf file
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 3c: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 3c: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 3c: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 3c: v6 3 absent")
+
+
+    # iter 4a/b/c: map file conflicts with conf file (both different)
+    test.tayga_conf.default()
+    test.tayga_conf.dynamic_pool = None
+
+    # map file: [1->1, 2->2]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+2}",
+        f"{map_v4+2} {map_v6+1}",
+    ]
+    # conf fle: [2->3]
+    test.tayga_conf.map.append(f"{map_v4+2} {map_v6+2}")
+    test.reload()
+
+    # addresses 1 should be overwritten since they overlap with conf file
+    send_v4_rejected(map_v4+1,         "iter 4a: v4 1 absent")
+    send_v6_rejected(map_v6+1,         "iter 4a: v6 1 absent")
+    #[2->2] should load from conf file
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 4a: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 4a: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 4a: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 4a: v6 3 absent")
+
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
+    test.reconf()
+
+    # addresses 1 should be overwritten since they overlap with conf file
+    send_v4_rejected(map_v4+1,         "iter 4b: v4 1 absent")
+    send_v6_rejected(map_v6+1,         "iter 4b: v6 1 absent")
+    #[2->2] should load from conf file
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 4b: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 4b: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 4b: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 4b: v6 3 absent")
+
+    #Now, remove map-file entries and ensure that conf file entry not deleted
+    # map file: [1->1]
     test.tayga_conf.map_file_entries = []
-    test.reload()
-
-    send_v4_rejected(test.public_ipv4+0, "empty file: no entries at startup")
-
     test.reconf()
+    # addresses 1 should be overwritten since they overlap with conf file
+    send_v4_rejected(map_v4+1,         "iter 4c: v4 1 absent")
+    send_v6_rejected(map_v6+1,         "iter 4c: v6 1 absent")
+    #[2->2] should load from conf file
+    send_v4_mapped(map_v4+2, map_v6+2, "iter 4c: v4 2->2 present")
+    send_v6_mapped(map_v6+2, map_v4+2, "iter 4c: v6 2->2 present")
+    send_v4_rejected(map_v4+3,         "iter 4c: v4 3 absent")
+    send_v6_rejected(map_v6+3,         "iter 4c: v6 3 absent")
 
-    send_v4_rejected(test.public_ipv4+0, "empty file: still no entries after SIGHUP")
 
-    # --- 3b: no map-file directive ---
-    test.flush()
+    # iter 5a/b/c: map file conflicts with tayga's own ipv4 address
     test.tayga_conf.default()
     test.tayga_conf.dynamic_pool = None
-    # map_file_entries defaults to [] — no file written, no directive emitted
+
+    # map file
+    test.tayga_conf.map_file_entries = [
+        f"{test.tayga_ipv4} {map_v6+2}"
+    ]
     test.reload()
 
-    global expect_sa, expect_da, expect_len, expect_proto, expect_data
-    expect_proto = 16
-    expect_len   = 128
-    expect_data  = randbytes(128)
-    expect_sa    = test.public_ipv6_xlate
-    expect_da    = test.xlate(str(test.public_ipv4+0))
-    pkt = IP(dst=str(test.public_ipv4+0), src=str(test.public_ipv4), proto=16) / Raw(expect_data)
-    test.send_and_check(pkt, ip6_val, "no map-file: RFC6052 works before SIGHUP")
+    # Tayga will kick back 'ICMP Protocol Unreachable' in this case
+    # and not allow the mapping to be created (no v6->v4 path)
+    expect_proto = 1
+    expect_data  = None
+    expect_sa = test.tayga_ipv4
+    expect_da = test.public_ipv4
+    expect_len = -1
+    pkt = IP(dst=str(test.tayga_ipv4), src=str(test.public_ipv4), proto=16) / Raw(randbytes(128))
+    test.send_and_check(pkt, ip_val, "iter 5a: v4 icmp proto unreach")
+    send_v6_rejected(map_v6+2,       "iter 5a: v6 absent")
 
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
     test.reconf()
+    expect_proto = 1
+    expect_data  = None
+    expect_sa = test.tayga_ipv4
+    expect_da = test.public_ipv4
+    expect_len = -1
+    pkt = IP(dst=str(test.tayga_ipv4), src=str(test.public_ipv4), proto=16) / Raw(randbytes(128))
+    test.send_and_check(pkt, ip_val, "iter 5b: v4 icmp proto unreach")
+    send_v6_rejected(map_v6+2,       "iter 5b: v6 absent")
 
-    expect_data  = randbytes(128)
-    expect_sa    = test.public_ipv6_xlate
-    expect_da    = test.xlate(str(test.public_ipv4+0))
-    pkt = IP(dst=str(test.public_ipv4+0), src=str(test.public_ipv4), proto=16) / Raw(expect_data)
-    test.send_and_check(pkt, ip6_val, "no map-file: RFC6052 works after SIGHUP")
+    #Now, remove map-file entries and ensure that the mapping is not deleted still
+    # map file: [1->1]
+    test.tayga_conf.map_file_entries = []
+    test.reconf()
+    expect_proto = 1
+    expect_data  = None
+    expect_sa = test.tayga_ipv4
+    expect_da = test.public_ipv4
+    expect_len = -1
+    pkt = IP(dst=str(test.tayga_ipv4), src=str(test.public_ipv4), proto=16) / Raw(randbytes(128))
+    test.send_and_check(pkt, ip_val, "iter 5c: v4 icmp proto unreach")
+    send_v6_rejected(map_v6+2,       "iter 5c: v6 absent")
 
-    test.section("Map-File: File Handling")
+    # iter 6a/b: v6 entry is within pref64
+    test.tayga_conf.default()
+    test.tayga_conf.dynamic_pool = None
+
+    # map file: [1->1, 2->pref64]
+    test.tayga_conf.map_file_entries = [
+        f"{map_v4+1} {map_v6+1}",
+        f"{map_v4+2} 3fff:6464::69",
+    ]
+    test.reload()
+
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 6a: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 6a: v6 1->1 present")
+    #[2->pref64] should not exist at all
+    send_v4_rejected(map_v4+2,         "iter 6a: v4 2 absent")
+    pkt = IPv6(dst="3fff:6464::69", src=str(test.public_ipv6), nh=16) / Raw(randbytes(128))
+    test.send_and_none(pkt, "iter 6a: v6 pref64 absent")
+
+    #Now, force reconf via SIGHUP and verify it has not modified behavior 
+    test.reconf()
+    #[1->1] has no conflict and should load correctly
+    send_v4_mapped(map_v4+1, map_v6+1, "iter 6b: v4 1->1 present")
+    send_v6_mapped(map_v6+1, map_v4+1, "iter 6b: v6 1->1 present")
+    #[2->pref64] should not exist at all
+    send_v4_rejected(map_v4+2,         "iter 6b: v4 2 absent")
+    pkt = IPv6(dst="3fff:6464::69", src=str(test.public_ipv6), nh=16) / Raw(randbytes(128))
+    test.send_and_none(pkt, "iter 6a: v6 pref64 absent")
+
+    # Overlapping with dynamic-pool is not guaranteed at this point
+    test.tfail("Map-file overlaps with dynamic-pool","Not Implemented")
+    
+    test.section("Map-File: Conflicts")
 
 
 # Test was created at top of file
@@ -423,10 +576,9 @@ test.setup()
 
 #Test cases
 test_reloading()
-#test_conflicts()
-#test_file_handling()
+test_conflicts()
 
 #Cleanup and test report
 time.sleep(1)
 test.cleanup()
-test.report(58, 0)
+test.report(144,1)

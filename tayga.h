@@ -236,6 +236,7 @@ struct map6 {
 
 /// Origin of static mapping entry
 enum {
+	MAP_ORIGIN_SELF,			//Map is Tayga's own address
 	MAP_ORIGIN_CONFFILE,		//Map originated from tayga.conf
 	MAP_ORIGIN_MAPFILE,			//Map originated from map-file
 };

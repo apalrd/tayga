@@ -890,6 +890,7 @@ int config_validate(void)
 	m = alloc_map_static(0);
 	if(!m) return ERROR_REJECT;
 	m->map4.addr = gcfg->local_addr4;
+	m->origin = MAP_ORIGIN_SELF;
 	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
 		return ERROR_REJECT;
