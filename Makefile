@@ -102,12 +102,13 @@ ifeq ($(CC),gcc)
 TEST_CFLAGS += -coverage
 endif
 TEST_FILES := test/unit.c
-unit_conffile: $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c
+unit_conffile: $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c tayga.h list.h
 	$(CC) $(TEST_CFLAGS) -I. -o unit_conffile $(TEST_FILES) test/unit_conffile.c conffile.c addrmap.c $(LDFLAGS)
 
 .PHONY: integration
 integration: tayga
 	-$(IP) netns add tayga-test
+	$(IP) netns exec tayga-test python3 test/mapfile.py
 	$(IP) netns exec tayga-test python3 test/addressing.py
 	$(IP) netns exec tayga-test python3 test/mapping.py
 	$(IP) netns exec tayga-test python3 test/translate.py

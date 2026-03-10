@@ -93,11 +93,12 @@ static void signal_setup(void)
 }
 
 
-static void read_from_signalfd(void)
+static void signal_read(void)
 {
 	int ret, sig;
 
 	for (;;) {
+		/* Read from signalfd and check for read errors */
 		ret = read(signalfds[0], &sig, sizeof(sig));
 		if (ret < 0) {
 			if (errno == EAGAIN)
@@ -110,10 +111,19 @@ static void read_from_signalfd(void)
 			slog(LOG_CRIT, "signal fd was closed\n");
 			exit(1);
 		}
+		/* If we got SIGHUP, then reload configuration */
+		if(sig == SIGHUP) {
+			slog(LOG_DEBUG,"Received SIGHUP, reloading\n");
+			/* Reload map-file */
+			addrmap_reload();
+			/* Dynamic map flush to file */
+			if (gcfg->dynamic_pool)
+				dynamic_maint(gcfg->dynamic_pool, 1);
+			continue;
+		}
+		/* For any other signal prepare to exit cleanly */
 		if (gcfg->dynamic_pool) {
-			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 1);
-			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		if (gcfg->log_out == LOG_TO_SYSLOG) {
@@ -131,12 +141,16 @@ static void print_op_info(void)
 	struct map4 *s4;
 	struct map6 *s6;
 	struct map6 *m6;
-	char addrbuf[64],addrbuf2[64];
+	struct map_static *s;
+	char addrbuf[INET6_ADDRSTRLEN];
+	static const char * map_types[] = MAP_TYPE_LIST;
+	static const char * map_origins[] = MAP_ORIGIN_LIST;
+	unsigned int type, origin;
 
 	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "tayga's IPv4 address: %s\n", addrbuf);
+	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
 	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "tayga's IPv6 address: %s\n", addrbuf);
+	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
 	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
 	if (m6->type == MAP_TYPE_RFC6052) {
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
@@ -162,9 +176,7 @@ static void print_op_info(void)
 				addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
 				gcfg->dynamic_pool->map4.prefix_len);
-		if (gcfg->data_dir[0])
-			load_dynamic(gcfg->dynamic_pool);
-		else
+		if (!gcfg->data_dir[0])
 			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
 					"will not be saved across restarts.  "
 					"Specify data-dir in config if you would "
@@ -175,19 +187,44 @@ static void print_op_info(void)
 	slog(LOG_DEBUG,"Map4 List:\n");
 	list_for_each(entry, &gcfg->map4_list) {
 		s4 = list_entry(entry, struct map4, list);
-
-		slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
-			inet_ntop(AF_INET,&s4->addr,addrbuf,64),
-			s4->prefix_len,s4->type,
-			inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
+		type = (unsigned int)s4->type;
+		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
+		if(s4->type == MAP_TYPE_STATIC) {
+			s = container_of(s4, struct map_static, map4);
+			origin = (unsigned int)s->origin;
+			origin = (origin > MAP_ORIGIN_MAX) ? MAP_ORIGIN_MAX : origin;
+			slog(LOG_DEBUG,"Entry %s/%d type %s origin %s line-no %d\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,sizeof(addrbuf)),
+				s4->prefix_len,
+				map_types[type],
+				map_origins[origin],
+				s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %s\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,sizeof(addrbuf)),
+				s4->prefix_len,map_types[type]);
+		}
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
 	list_for_each(entry, &gcfg->map6_list) {
 		s6 = list_entry(entry, struct map6, list);
-
-		slog(LOG_DEBUG,"Entry %s/%d type %d\n",
-			inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
-			s6->prefix_len,s6->type);
+		type = (unsigned int)s6->type;
+		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
+		if(s6->type == MAP_TYPE_STATIC) {
+			s = container_of(s6, struct map_static, map6);
+			origin = (unsigned int)s->origin;
+			origin = (origin > MAP_ORIGIN_MAX) ? MAP_ORIGIN_MAX : origin;
+			slog(LOG_DEBUG,"Entry %s/%d type %s origin %s line-no %d\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,sizeof(addrbuf)),
+				s6->prefix_len,
+				map_types[type],
+				map_origins[origin],
+				s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %s\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,sizeof(addrbuf)),
+				s6->prefix_len,map_types[type]);			
+		}
 	}
 }
 
@@ -342,7 +379,7 @@ int main(int argc, char **argv)
 	/* Parse config file options */
 	if(config_read(conffile) < 0) return 1;
 
-	/* Validate config */
+	/* Validate config (and load map file) */
 	if(config_validate() < 0) return 1;
 
 	/* Check if we are doing tunnel operations only
@@ -361,7 +398,7 @@ int main(int argc, char **argv)
 			die("Error: cannot specify -r or --chroot "
 					"with mktun/rmtun operation\n");
 		}
-		if(tun_setup(do_mktun, do_rmtun)) exit(1);
+		if(tun_setup(do_mktun, do_rmtun)) return 1;
 		return 0;
 	}
 
@@ -370,7 +407,7 @@ int main(int argc, char **argv)
 		pw = getpwnam(user);
 		if (!pw) {
 			slog(LOG_CRIT, "Error: user %s does not exist\n", user);
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -380,7 +417,7 @@ int main(int argc, char **argv)
 		if (!gr) {
 			slog(LOG_CRIT, "Error: group %s does not exist\n",
 					group);
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -389,31 +426,31 @@ int main(int argc, char **argv)
 		if (do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
 					"is specified in %s\n", conffile);
-			exit(1);
+			return 1;
 		}
 		if (chdir("/")) {
 			slog(LOG_CRIT, "Error: unable to chdir to /, aborting: %s\n",
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 	} else if (chdir(gcfg->data_dir) < 0) {
 		if (user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
 					"aborting: %s\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 		if (mkdir(gcfg->data_dir, 0777) < 0) {
 			slog(LOG_CRIT, "Error: unable to create %s, aborting: "
 					"%s\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 		if (chdir(gcfg->data_dir) < 0) {
 			slog(LOG_CRIT, "Error: created %s but unable to chdir "
 					"to it!?? (%s)\n", gcfg->data_dir,
 					strerror(errno));
-			exit(1);
+			return 1;
 		}
 	}
 
@@ -421,7 +458,14 @@ int main(int argc, char **argv)
 		slog(LOG_CRIT, "Error: chroot is ineffective without also "
 				"specifying the -u option to switch to an "
 				"unprivileged user\n");
-		exit(1);
+		return 1;
+	}
+
+	/* If using a map-file, read it after doing chroot/chdir */
+	if(gcfg->map_file[0] && addrmap_reload() != ERROR_NONE) {
+		slog(LOG_CRIT, "Error: map-file %s is configured but not readable\n",
+			gcfg->map_file);
+		return 1;
 	}
 
 	if (pidfile) {
@@ -528,6 +572,10 @@ int main(int argc, char **argv)
 	/* Print running information */
 	print_op_info();
 
+	/* Load dynamic maps if configured */
+	if (gcfg->data_dir[0])
+		load_dynamic(gcfg->dynamic_pool);
+
 	if (gcfg->cache_size)
 		create_cache();
 
@@ -589,7 +637,7 @@ int main(int argc, char **argv)
 		}
 		time(&now);
 		if (pollfds[0].revents)
-			read_from_signalfd();
+			signal_read();
 		if (pollfds[1].revents)
 			tun_read(recv_buf,gcfg->tun_fd);
 		if (gcfg->cache_size && (gcfg->last_cache_maint +
@@ -601,10 +649,8 @@ int main(int argc, char **argv)
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
 					gcfg->last_dynamic_maint > now)) {
-			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
-			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 	}
 	return 0;

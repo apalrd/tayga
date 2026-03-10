@@ -81,6 +81,7 @@ void test_config_compare(void) {
     /* Compare every field in the struct */
     expects(gcfg->tundev, tcfg.tundev, IFNAMSIZ, "tundev");
     expects(gcfg->data_dir, tcfg.data_dir, 512, "data_dir");
+    expects(gcfg->map_file, tcfg.map_file, 512, "map_file");
     expectl(gcfg->local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
     expectl(gcfg->local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
     expectl(gcfg->local_addr6.s6_addr32[1],tcfg.local_addr6.s6_addr32[1], "local_addr6[1]");
@@ -272,7 +273,7 @@ void test_config_init(void) {
      */
 #if defined(__amd64__) && defined(__linux__)
     if(!print_fail_only) printf("TEST CASE: config struct size\n");
-    expectl(sizeof(struct config),1680,"sizeof");
+    expectl(sizeof(struct config),2192,"sizeof");
 #endif
 
     /* Compare to our initialized tcfg */
@@ -640,6 +641,18 @@ void test_config_read(void) {
     expect((long)fd,"fopen");
     if(!fd) return;
     testcase = "data-dir var/spool/tayga\n";
+    fwrite(testcase,strlen(testcase),1,fd);
+    fclose(fd);
+    free(gcfg);
+    config_init();
+    expect(config_read(conffile),"Failed");
+
+    /* Test Case - map file duplicate */
+    printf("TEST CASE: map file duplicate\n");
+    fd = fopen(conffile,"w");
+    expect((long)fd,"fopen");
+    if(!fd) return;
+    testcase = "map-file /var/lib/tayga/static.map\nmap-file static.map\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
     free(gcfg);
@@ -1058,6 +1071,7 @@ void test_config_read(void) {
         "wkpf-strict yes\n"
         "dynamic-pool 192.168.255.0/24\n"
         "data-dir /var/lib/tayga\n"
+        "map-file static.map\n"
         "map 192.168.5.42 2001:db8:1:4444::1\n"
         "map 192.168.6.0/24 2001:db8:1:4445::/120\n"
         "udp-cksum-mode drop\n"
@@ -1083,6 +1097,7 @@ void test_config_read(void) {
     expect(!config_read(conffile),"Passed");
     strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
+    strcpy(tcfg.map_file,"static.map");
     tcfg.local_addr4.s_addr = htonl(0xc0a8ff01);
     tcfg.local_addr6.s6_addr32[0] = htonl(0x20010db8);
     tcfg.local_addr6.s6_addr32[1] = htonl(0x00010000);

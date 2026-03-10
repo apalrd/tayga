@@ -373,6 +373,9 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 	struct map_dynamic *d;
 	struct free_addr *f;
 
+	/* Acquire map mutex */
+	pthread_mutex_lock(&gcfg->map_mutex);
+
 	list_for_each_safe(entry, next, &pool->mapped_list) {
 		d = list_entry(entry, struct map_dynamic, list);
 		if (d->cache_entry)
@@ -393,6 +396,8 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 		list_del(&d->list);
 		free(d);
 	}
+
+	/* Write file if we have a data-dir */
 	if (gcfg->data_dir[0]) {
 		if (shutdown || gcfg->map_write_pending ||
 				gcfg->last_map_write +
@@ -403,4 +408,7 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown)
 			gcfg->map_write_pending = 0;
 		}
 	}
+
+	/* Release map mutex when done */
+	pthread_mutex_unlock(&gcfg->map_mutex);
 }

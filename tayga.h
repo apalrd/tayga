@@ -186,6 +186,9 @@ static_assert(sizeof(struct icmp) == 8,"Struct ICMP must be 8 bytes long");
 /* Minimum MTU allowed by IPv6 */
 #define MTU_MIN 1280
 
+/* Maximum config arguments in parser */
+#define MAX_ARGS 10
+
 
 /* TAYGA data definitions */
 
@@ -207,11 +210,15 @@ static_assert((offsetof(struct pkt, data) & (alignof(struct ip6) - 1)) == 0,"Pac
 
 /// Type of mapping in mapping list
 enum {
-	MAP_TYPE_STATIC,
-	MAP_TYPE_RFC6052,
-	MAP_TYPE_DYNAMIC_POOL,
-	MAP_TYPE_DYNAMIC_HOST,
+	MAP_TYPE_STATIC,			//Static map
+	MAP_TYPE_RFC6052,			//Map generated from RFC6052 prefix
+	MAP_TYPE_DYNAMIC_POOL,		//Dynamic map pool without specific host mapping
+	MAP_TYPE_DYNAMIC_HOST,		//Dynamic map host
+	MAP_TYPE_MAX
 };
+
+/// String verson of mapping list above
+#define MAP_TYPE_LIST {"STATIC","RFC6052","DYNAMIC_POOL","DYNAMIC_HOST","UNKNOWN"}
 
 /// Mapping entry (IPv4)
 struct map4 {
@@ -231,11 +238,23 @@ struct map6 {
 	struct list_head list; /* gcfg->map6_list */
 };
 
+/// Origin of static mapping entry
+enum {
+	MAP_ORIGIN_SELF,			//Map is Tayga's own address
+	MAP_ORIGIN_CONFFILE,		//Map originated from tayga.conf
+	MAP_ORIGIN_MAPFILE,			//Map originated from map-file
+	MAP_ORIGIN_MAX
+};
+
+/// String verson of origin above
+#define MAP_ORIGIN_LIST {"SELF","CONF-FILE","MAP-FILE","UNKNOWN"}
+
 /// Mapping entry (Static Maps)
 struct map_static {
 	struct map4 map4;
 	struct map6 map6;
-	int conffile_lineno;
+	int line_no;
+	int origin;
 };
 
 /// Free addresses
@@ -331,6 +350,9 @@ struct config {
 	int dyn_max_lease;
 	int max_commit_delay;
 	struct dynamic_pool *dynamic_pool;
+
+	//Reloadable map file parameters
+	char map_file[512];
 
 	//Cache
 	int hash_bits;
@@ -430,6 +452,7 @@ int append_to_prefix(struct in6_addr *addr6, const struct in_addr *addr4,
 int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4);
 int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6, int dyn_alloc);
 void addrmap_maint(void);
+int addrmap_reload(void);
 
 /* conffile.c */
 int config_init(void);

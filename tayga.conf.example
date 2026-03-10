@@ -177,6 +177,20 @@ dynamic-pool 192.168.255.0/24
 #workers 4
 
 #
+# Map File
+#
+# tayga will read this file to find additional `map` directives. 
+#
+# The map file will be reloaded when tayga receives SIGHUP. `map` directives
+# in tayga.conf will not be reloaded by SIGHUP. 
+#
+# Path may be absolute or relative to `data-dir`, but you must ensure that
+# tayga has sufficient permissions to read this file after dropping permissions
+# (if using --user/--group).
+#
+#map-file static.map
+
+#
 # If Tayga should bring up the tun device (Linux only)
 #
 # Default no, valid values are 'yes' or 'up'

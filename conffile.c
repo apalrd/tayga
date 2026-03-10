@@ -48,7 +48,7 @@ static struct map_static *alloc_map_static(int ln)
 
 	m = (struct map_static *)malloc(sizeof(struct map_static));
 	if (!m) {
-		slog(LOG_CRIT, "Unable to allocate config memory\n");
+		slog(LOG_CRIT, "Unable to allocate config static map memory\n");
 		return NULL;
 	}
 	memset(m, 0, sizeof(struct map_static));
@@ -60,7 +60,8 @@ static struct map_static *alloc_map_static(int ln)
 	m->map6.prefix_len = 128;
 	calc_ip6_mask(&m->map6.mask, NULL, 128);
 	INIT_LIST_HEAD(&m->map6.list);
-	m->conffile_lineno = ln;
+	m->line_no = ln;
+	m->origin = MAP_ORIGIN_CONFFILE;
 	return m;
 }
 
@@ -72,8 +73,8 @@ static void abort_on_conflict4(char *msg, int ln, struct map4 *old)
 
 	if (old->type == MAP_TYPE_STATIC || old->type == MAP_TYPE_RFC6052) {
 		s = container_of(old, struct map_static, map4);
-		if (s->conffile_lineno)
-			sprintf(oldline, " from line %d", s->conffile_lineno);
+		if (s->line_no)
+			sprintf(oldline, " from line %d", s->line_no);
 	}
 
 	inet_ntop(AF_INET, &old->addr, oldaddr, sizeof(oldaddr));
@@ -95,8 +96,8 @@ static void abort_on_conflict6(char *msg, int ln, struct map6 *old)
 
 	if (old->type == MAP_TYPE_STATIC || old->type == MAP_TYPE_RFC6052) {
 		s = container_of(old, struct map_static, map6);
-		if (s->conffile_lineno)
-			sprintf(oldline, " from line %d", s->conffile_lineno);
+		if (s->line_no)
+			sprintf(oldline, " from line %d", s->line_no);
 	}
 
 	inet_ntop(AF_INET6, &old->addr, oldaddr, sizeof(oldaddr));
@@ -577,6 +578,20 @@ static int config_data_dir(int ln, int arg_count, char **args)
 	return ERROR_NONE;
 }
 
+static int config_map_file(int ln, int arg_count, char **args)
+{
+	//arg_count unused
+	(void)arg_count;
+
+	if (gcfg->map_file[0]) {
+		slog(LOG_CRIT, "Error: duplicate map-file directive on line "
+				"%d\n", ln);
+		return ERROR_REJECT;
+	}
+	strcpy(gcfg->map_file, args[0]);
+	return ERROR_NONE;
+}
+
 static int config_strict_fh(int ln, int arg_count, char **args)
 {
 	//unused
@@ -708,6 +723,7 @@ struct {
 	{ "map", 			config_map, 			2 },
 	{ "dynamic-pool", 	config_dynamic_pool,	1 },
 	{ "data-dir", 		config_data_dir, 		1 },
+	{ "map-file", 		config_map_file, 		1 },
 	{ "strict-frag-hdr",config_strict_fh, 		1 },
 	{ "log"	,			config_log, 		   -1 },
 	{ "offlink-mtu"	,  	config_offlink_mtu,		1 },
@@ -750,7 +766,6 @@ int config_read(char *conffile)
 	int ln = 0;
 	char line[512];
 	char *c, *tokptr;
-#define MAX_ARGS 10
 	char *args[MAX_ARGS];
 	int arg_count;
 	int i;
@@ -875,6 +890,7 @@ int config_validate(void)
 	m = alloc_map_static(0);
 	if(!m) return ERROR_REJECT;
 	m->map4.addr = gcfg->local_addr4;
+	m->origin = MAP_ORIGIN_SELF;
 	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
 		return ERROR_REJECT;
@@ -939,5 +955,6 @@ int config_validate(void)
 		return ERROR_REJECT;
 	}
 
+	/* Guess there are no errors? */
 	return ERROR_NONE;
 }

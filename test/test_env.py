@@ -1,4 +1,4 @@
-import os
+import os, signal
 import subprocess
 import sys
 from pyroute2 import IPRoute
@@ -124,13 +124,16 @@ class confgen:
         self.prefix = "3fff:6464::/96"
         self.wkpf_strict = False
         self.dynamic_pool = "172.16.0.0/24"
-        self.data_dir = None
+        self.data_dir = os.getcwd()
         self.map = []
         self.map.append("172.16.0.1 2001:db8::1")
         self.map.append("172.16.0.2 2001:db8::2")
         self.log = "drop reject icmp self"
         self.offlink_mtu = 0
         self.udp_cksum_mode = None
+        self.map_file_entries = []
+        self.map_file_path = "test/tayga.map"
+        self.map_file_created = False
 
     def generate(self):
         with open("test/tayga.conf", 'w') as conf_file:
@@ -149,6 +152,12 @@ class confgen:
                 conf_file.write("data-dir "+self.data_dir+"\n")
             for entry in self.map:
                 conf_file.write("map "+entry+"\n")
+            if self.map_file_entries or self.map_file_created:
+                self.map_file_created = True
+                with open(self.map_file_path, 'w') as map_file:
+                    for entry in self.map_file_entries:
+                        map_file.write("map " + entry + "\n")
+                conf_file.write("map-file " + self.map_file_path + "\n")
             if self.log is not None:
                 conf_file.write("log "+self.log+"\n")
             if self.offlink_mtu > 0:
@@ -361,6 +370,9 @@ class test_env:
             if self.debug:
                 print("tayga process not found, skipping process termination")
 
+        # Delete dynamic.map if it exists
+        if os.path.exists("dynamic.map"):
+            os.remove("dynamic.map")
         # Reset link MTU
         ifi = ipr.link_lookup(ifname='nat64')[0]
         ipr.link("set", index=ifi, mtu=self.mtu)
@@ -368,6 +380,19 @@ class test_env:
         ipr.link("set", index=ifi, mtu=self.mtu)
         # Regenerate the conf file and restart
         self.setup_tayga()
+
+    def reconf(self):
+        print("Reconfiguring tayga while running")
+        if self.tayga_conf.map_file_created:
+            with open(self.tayga_conf.map_file_path, 'w') as map_file:
+                for entry in self.tayga_conf.map_file_entries:
+                    map_file.write("map " + entry + "\n")
+        #send sighup to tayga
+        if self.tayga_proc and self.tayga_proc.poll() is None:
+            os.kill(self.tayga_proc.pid, signal.SIGHUP)
+            time.sleep(0.2)
+        else:
+            print("reconf called but tayga is not running")
 
     def xlate(self, ipv4, prefix = None):
         if prefix is None:
