@@ -214,7 +214,11 @@ enum {
 	MAP_TYPE_RFC6052,			//Map generated from RFC6052 prefix
 	MAP_TYPE_DYNAMIC_POOL,		//Dynamic map pool without specific host mapping
 	MAP_TYPE_DYNAMIC_HOST,		//Dynamic map host
+	MAP_TYPE_MAX
 };
+
+/// String verson of mapping list above
+#define MAP_TYPE_LIST {"STATIC","RFC6052","DYNAMIC_POOL","DYNAMIC_HOST","UNKNOWN"}
 
 /// Mapping entry (IPv4)
 struct map4 {
@@ -239,7 +243,11 @@ enum {
 	MAP_ORIGIN_SELF,			//Map is Tayga's own address
 	MAP_ORIGIN_CONFFILE,		//Map originated from tayga.conf
 	MAP_ORIGIN_MAPFILE,			//Map originated from map-file
+	MAP_ORIGIN_MAX
 };
+
+/// String verson of origin above
+#define MAP_ORIGIN_LIST {"SELF","CONF-FILE","MAP-FILE","UNKNOWN"}
 
 /// Mapping entry (Static Maps)
 struct map_static {
