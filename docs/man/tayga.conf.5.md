@@ -132,6 +132,24 @@ tayga.conf.
     is stopped. Also, use of the **\-\-chroot** command-line option will
     not be possible.
 
+    If the *map-file* directive is used, it may be relative to **data-dir**
+
+**map-file** *path*
+:   The path to a file which contains reloadable map entries. As with the
+    **tayga.conf** file, this file may contain multiple *map* entries. 
+    The contents of this file will be loaded on startup, and reloaded
+    when Tayga receives SIGHUP. 
+
+    Mapping entries loaded from the **map-file** cannot modify mapping
+    entries created from **tayga.conf**, or non-static map types. 
+
+    **map-file** reload is guaranteed to not affect packet processing
+    for entries which are not modified and do not conflict with each other.
+
+    **map-file** must be an absolute path or relative to **data-dir**. 
+    You must ensure that Tayga has sufficient permissions to read this file
+    after it has dropped permissions using *user* and *chroot*.
+
 **udp-cksum-mode** *drop|fwd|calc*
 :   Handling of UDP packets with zero checksum. Per RFC7915, we can
     either **\[drop\]** the packet, or calculating **\[calc\]** a new
