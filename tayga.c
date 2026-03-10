@@ -113,14 +113,12 @@ static void signal_read(void)
 		}
 		/* If we got SIGHUP, then reload configuration */
 		if(sig == SIGHUP) {
-    		clock_t start = clock();
-			slog(LOG_DEBUG,"Received SIGHUP, reloading..\n");
-			/* Flush dynamic map to file TBD */
+			slog(LOG_DEBUG,"Received SIGHUP, reloading\n");
 			/* Reload map-file */
 			addrmap_reload();
-    		clock_t end = clock();
-    		double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
-			slog(LOG_DEBUG,"Reload completed in %f seconds\n",time_spent);
+			/* Dynamic map flush to file */
+			if (gcfg->dynamic_pool)
+				dynamic_maint(gcfg->dynamic_pool, 1);
 			continue;
 		}
 		/* For any other signal prepare to exit cleanly */
