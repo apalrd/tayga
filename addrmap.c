@@ -771,11 +771,6 @@ static void cache_evict_map4(const struct map4 *m4)
 {
     struct list_head *entry, *next;
     struct cache_entry *c;
-	char addrbuf[64];
-
-	slog(LOG_DEBUG,"About to evict v4 %s/%d\n",
-		inet_ntop(AF_INET,&m4->addr,addrbuf,64),
-		m4->prefix_len);
 
     pthread_mutex_lock(&gcfg->cache_mutex);
     list_for_each_safe(entry, next, &gcfg->cache_active) {
@@ -798,11 +793,6 @@ static void cache_evict_map6(const struct map6 *m6)
 {
     struct list_head *entry, *next;
     struct cache_entry *c;
-	char addrbuf[64];
-
-	slog(LOG_DEBUG,"About to evict v6 %s/%d\n",
-		inet_ntop(AF_INET6,&m6->addr,addrbuf,64),
-		m6->prefix_len);
 
     pthread_mutex_lock(&gcfg->cache_mutex);
     list_for_each_safe(entry, next, &gcfg->cache_active) {
@@ -859,17 +849,6 @@ static void addrmap_delete6(struct map6 *m6)
     }
 }
 
-/* Temporary function to print a log message with the associated map entry */
-static void print_entry(struct map_static *m, char * msg) {
-	char addrbuf[64],addrbuf2[64];
-	slog(LOG_DEBUG,"OP: map v4 %s/%d v6 %s/%d type %d origin %d line-no %d case %s\n",
-		inet_ntop(AF_INET,&m->map4.addr,addrbuf,64),
-		m->map4.prefix_len,
-		inet_ntop(AF_INET6,&m->map6.addr,addrbuf2,64),
-		m->map6.prefix_len, 
-		m->map4.type,m->origin, m->line_no, msg);
-}
-
 /**
  * @brief Parse and insert/update a single map entry from the map file.
  *
@@ -889,7 +868,7 @@ static int addrmap_entry(int ln, char **args)
 	/* Allocate and initialize a new static map entry */
 	m = (struct map_static *)malloc(sizeof(struct map_static));
 	if (!m) {
-		slog(LOG_CRIT, "Unable to allocate map-file static map memory\n");
+		slog(LOG_CRIT, "MAP-FILE: Unable to allocate map-file static map memory\n");
 		return ERROR_REJECT;
 	}
 	memset(m, 0, sizeof(struct map_static));
@@ -994,12 +973,10 @@ static int addrmap_entry(int ln, char **args)
 		 */
     	cache_evict_map4(&m->map4);
 	    cache_evict_map6(&m->map6);
-		print_entry(m,"First Insertion Success");
 	} else if (m4 && m6) {
 		/*
 		 * Both sides conflicted with existing entries.
 		 */
-		print_entry(m,"Both Sides Conflict");
 		if (m4->type != MAP_TYPE_STATIC || m6->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: Existing incompatible (non-static) "
 			     "map entry found for mapping on line %d "
@@ -1012,8 +989,6 @@ static int addrmap_entry(int ln, char **args)
 		/* Get parents of both entries */
 		n1 = container_of(m4, struct map_static, map4);
 		n2 = container_of(m6, struct map_static, map6);
-		print_entry(n1,"Conflict4");
-		print_entry(n2,"Conflict6");
 
 		if (n1->origin != MAP_ORIGIN_MAPFILE || n2->origin != MAP_ORIGIN_MAPFILE) {
 			/* This map cannot be replaced, so same behavior as a non-static map */
@@ -1030,7 +1005,6 @@ static int addrmap_entry(int ln, char **args)
 			 */
 			n1->line_no = ln;
 			n1->origin  = MAP_ORIGIN_MAPFILE;
-			slog(LOG_DEBUG,"Conflict is same object, refresh\n");
 			free(m);
 		} else {
 			/*
@@ -1050,7 +1024,6 @@ static int addrmap_entry(int ln, char **args)
 		/*
 		 * IPv4 side conflicted; IPv6 side was inserted cleanly.
 		 */
-		print_entry(m,"V4 side conflicted");
 		if (m4->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv4 entry on line %d conflicts "
 			     "with non-static type (%d)\n", ln, m4->type);
@@ -1062,7 +1035,7 @@ static int addrmap_entry(int ln, char **args)
 		}
 		/* Get parent static map entry */
 		n1 = container_of(m4, struct map_static, map4);
-		print_entry(n1,"Conflict4");
+
 		/* We cannot overwrite conf-file mappings */
 		if (n1->origin != MAP_ORIGIN_MAPFILE) {
 			slog(LOG_ERR, "MAP-FILE: IPv4 entry on line %d conflicts "
@@ -1082,7 +1055,6 @@ static int addrmap_entry(int ln, char **args)
 		/*
 		 * IPv6 side conflicted; IPv4 side was inserted cleanly.
 		 */
-		print_entry(m,"V6 side conflicted");
 		if (m6->type != MAP_TYPE_STATIC) {
 			slog(LOG_ERR, "MAP-FILE: IPv6 entry on line %d conflicts "
 			     "with non-static type (%d)\n", ln, m6->type);
@@ -1094,7 +1066,7 @@ static int addrmap_entry(int ln, char **args)
 		}
 		/* Get parent static map entry */
 		n2 = container_of(m6, struct map_static, map6);
-		print_entry(n2,"Conflict6");
+
 		/* We cannot overwrite conf-file mappings */
 		if (n2->origin != MAP_ORIGIN_MAPFILE) {
 			slog(LOG_ERR, "MAP-FILE: IPv6 entry on line %d conflicts "
@@ -1148,7 +1120,7 @@ int addrmap_reload(void)
 	if (!gcfg->map_file[0]) {
 		return ERROR_NONE;
 	}
-	slog(LOG_DEBUG,"Loading map-file %s\n",gcfg->map_file);
+	slog(LOG_DEBUG,"MAP-FILE: loading file %s\n",gcfg->map_file);
 
 	/* Step 1 - open file and check for file-access errors */
 	in = fopen(gcfg->map_file, "r");
@@ -1165,7 +1137,6 @@ int addrmap_reload(void)
 		if (m4->type == MAP_TYPE_STATIC) {
 			s = container_of(m4, struct map_static, map4);
 			if (s->origin == MAP_ORIGIN_MAPFILE) {
-				print_entry(s,"Markng for potential deletion");
 				s->line_no *= -1;
 			}
 		}
@@ -1229,9 +1200,6 @@ int addrmap_reload(void)
 		if (m4->type == MAP_TYPE_STATIC) {
 			s = container_of(m4, struct map_static, map4);
 			if (s->origin == MAP_ORIGIN_MAPFILE && s->line_no < 0) {
-				print_entry(s,"Actually deleting");
-				slog(LOG_DEBUG, "MAP-FILE: Removing entry that is "
-				     "no longer present in map file\n");
 				addrmap_delete4(m4);
 			}
 		}
