@@ -66,89 +66,6 @@ void die(const char *format, ...) {
 	exit(1);
 }
 
-
-static void print_op_info(void)
-{
-	struct list_head *entry;
-	struct map4 *s4;
-	struct map6 *s6;
-	struct map6 *m6;
-	struct map_static *s;
-	char addrbuf[64],addrbuf2[64];
-
-	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "tayga's IPv4 address: %s\n", addrbuf);
-	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
-	slog(LOG_INFO, "tayga's IPv6 address: %s\n", addrbuf);
-	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
-	if (m6->type == MAP_TYPE_RFC6052) {
-		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
-		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
-				addrbuf, m6->prefix_len);
-		if (m6->addr.s6_addr32[0] == WKPF
-			&& !m6->addr.s6_addr32[1]
-			&& !m6->addr.s6_addr32[2]
-			&& gcfg->wkpf_strict)
-			slog(LOG_NOTICE, "Note: traffic between IPv6 hosts and "
-					"private IPv4 addresses (i.e. to/from "
-					"64:ff9b::10.0.0.0/104, "
-					"64:ff9b::192.168.0.0/112, etc) "
-					"will be dropped.  Use a translation "
-					"prefix within your organization's "
-					"IPv6 address space instead of "
-					"64:ff9b::/96 if you need your "
-					"IPv6 hosts to communicate with "
-					"private IPv4 addresses.\n");
-	}
-	if (gcfg->dynamic_pool) {
-		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
-				addrbuf, sizeof(addrbuf));
-		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
-				gcfg->dynamic_pool->map4.prefix_len);
-		if (gcfg->data_dir[0])
-			load_dynamic(gcfg->dynamic_pool);
-		else
-			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
-					"will not be saved across restarts.  "
-					"Specify data-dir in config if you would "
-					"like dynamic mappings to be "
-					"persistent.\n");
-	}
-
-	slog(LOG_DEBUG,"Map4 List:\n");
-	list_for_each(entry, &gcfg->map4_list) {
-		s4 = list_entry(entry, struct map4, list);
-		if(s4->type == MAP_TYPE_STATIC) {
-			s = container_of(s4, struct map_static, map4);
-			slog(LOG_DEBUG,"Entry %s/%d type %d mask %s origin %d line-no %d\n",
-				inet_ntop(AF_INET,&s4->addr,addrbuf,64),
-				s4->prefix_len,s4->type,
-				inet_ntop(AF_INET,&s4->mask,addrbuf2,64),
-				s->origin,s->line_no);
-		} else {
-			slog(LOG_DEBUG,"Entry %s/%d type %d mask %s\n",
-				inet_ntop(AF_INET,&s4->addr,addrbuf,64),
-				s4->prefix_len,s4->type,
-				inet_ntop(AF_INET,&s4->mask,addrbuf2,64));
-		}
-	}
-	slog(LOG_DEBUG,"Map6 List:\n");
-	list_for_each(entry, &gcfg->map6_list) {
-		s6 = list_entry(entry, struct map6, list);
-		if(s6->type == MAP_TYPE_STATIC) {
-			s = container_of(s6, struct map_static, map6);
-			slog(LOG_DEBUG,"Entry %s/%d type %d origin %d line-no %d\n",
-				inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
-				s6->prefix_len,s6->type,
-				s->origin, s->line_no);
-		} else {
-			slog(LOG_DEBUG,"Entry %s/%d type %d\n",
-				inet_ntop(AF_INET6,&s6->addr,addrbuf,64),
-				s6->prefix_len,s6->type);			
-		}
-	}
-}
-
 static void signal_handler(int signal)
 {
 	(void)!write(signalfds[1], &signal, sizeof(signal));
@@ -201,8 +118,6 @@ static void signal_read(void)
 			/* Flush dynamic map to file TBD */
 			/* Reload map-file */
 			addrmap_reload();
-			/* Dump map for testing */
-			print_op_info();
     		clock_t end = clock();
     		double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
 			slog(LOG_DEBUG,"Reload completed in %f seconds\n",time_spent);
@@ -219,6 +134,99 @@ static void signal_read(void)
 			journal_cleanup();
 		}
 		exit(0);
+	}
+}
+
+static void print_op_info(void)
+{
+	struct list_head *entry;
+	struct map4 *s4;
+	struct map6 *s6;
+	struct map6 *m6;
+	struct map_static *s;
+	char addrbuf[INET6_ADDRSTRLEN];
+	static const char * map_types[] = MAP_TYPE_LIST;
+	static const char * map_origins[] = MAP_ORIGIN_LIST;
+	unsigned int type, origin;
+
+	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
+	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
+	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
+	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
+	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+	if (m6->type == MAP_TYPE_RFC6052) {
+		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
+		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
+				addrbuf, m6->prefix_len);
+		if (m6->addr.s6_addr32[0] == WKPF
+			&& !m6->addr.s6_addr32[1]
+			&& !m6->addr.s6_addr32[2]
+			&& gcfg->wkpf_strict)
+			slog(LOG_NOTICE, "Note: traffic between IPv6 hosts and "
+					"private IPv4 addresses (i.e. to/from "
+					"64:ff9b::10.0.0.0/104, "
+					"64:ff9b::192.168.0.0/112, etc) "
+					"will be dropped.  Use a translation "
+					"prefix within your organization's "
+					"IPv6 address space instead of "
+					"64:ff9b::/96 if you need your "
+					"IPv6 hosts to communicate with "
+					"private IPv4 addresses.\n");
+	}
+	if (gcfg->dynamic_pool) {
+		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
+				addrbuf, sizeof(addrbuf));
+		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
+				gcfg->dynamic_pool->map4.prefix_len);
+		if (!gcfg->data_dir[0])
+			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
+					"will not be saved across restarts.  "
+					"Specify data-dir in config if you would "
+					"like dynamic mappings to be "
+					"persistent.\n");
+	}
+
+	slog(LOG_DEBUG,"Map4 List:\n");
+	list_for_each(entry, &gcfg->map4_list) {
+		s4 = list_entry(entry, struct map4, list);
+		type = (unsigned int)s4->type;
+		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
+		if(s4->type == MAP_TYPE_STATIC) {
+			s = container_of(s4, struct map_static, map4);
+			origin = (unsigned int)s->origin;
+			origin = (origin > MAP_ORIGIN_MAX) ? MAP_ORIGIN_MAX : origin;
+			slog(LOG_DEBUG,"Entry %s/%d type %s origin %s line-no %d\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,sizeof(addrbuf)),
+				s4->prefix_len,
+				map_types[type],
+				map_origins[origin],
+				s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %s\n",
+				inet_ntop(AF_INET,&s4->addr,addrbuf,sizeof(addrbuf)),
+				s4->prefix_len,map_types[type]);
+		}
+	}
+	slog(LOG_DEBUG,"Map6 List:\n");
+	list_for_each(entry, &gcfg->map6_list) {
+		s6 = list_entry(entry, struct map6, list);
+		type = (unsigned int)s6->type;
+		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
+		if(s6->type == MAP_TYPE_STATIC) {
+			s = container_of(s6, struct map_static, map6);
+			origin = (unsigned int)s->origin;
+			origin = (origin > MAP_ORIGIN_MAX) ? MAP_ORIGIN_MAX : origin;
+			slog(LOG_DEBUG,"Entry %s/%d type %s origin %s line-no %d\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,sizeof(addrbuf)),
+				s6->prefix_len,
+				map_types[type],
+				map_origins[origin],
+				s->line_no);
+		} else {
+			slog(LOG_DEBUG,"Entry %s/%d type %s\n",
+				inet_ntop(AF_INET6,&s6->addr,addrbuf,sizeof(addrbuf)),
+				s6->prefix_len,map_types[type]);			
+		}
 	}
 }
 
@@ -565,6 +573,10 @@ int main(int argc, char **argv)
 
 	/* Print running information */
 	print_op_info();
+
+	/* Load dynamic maps if configured */
+	if (gcfg->data_dir[0])
+		load_dynamic(gcfg->dynamic_pool);
 
 	if (gcfg->cache_size)
 		create_cache();
