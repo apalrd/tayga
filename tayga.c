@@ -210,9 +210,7 @@ static void signal_read(void)
 		}
 		/* For any other signal prepare to exit cleanly */
 		if (gcfg->dynamic_pool) {
-			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 1);
-			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
 		if (gcfg->log_out == LOG_TO_SYSLOG) {
@@ -641,10 +639,8 @@ int main(int argc, char **argv)
 		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
 					gcfg->last_dynamic_maint > now)) {
-			pthread_mutex_lock(&gcfg->map_mutex);
 			dynamic_maint(gcfg->dynamic_pool, 0);
 			gcfg->last_dynamic_maint = now;
-			pthread_mutex_unlock(&gcfg->map_mutex);
 		}
 	}
 	return 0;
