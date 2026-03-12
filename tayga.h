@@ -52,7 +52,10 @@
 #else
 #error "Could not find headers for platform"
 #endif
+
 #include "list.h"
+#include "cmdline.h"
+#include "log.h"
 
 #ifdef COVERAGE_TESTING
 //for coverage testing
@@ -226,7 +229,7 @@ struct map4 {
 	struct in_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list; /* gcfg->map4_list */
+	struct list_head list; /* gcfg.map4_list */
 };
 
 /// Mapping entry (IPv6)
@@ -235,7 +238,7 @@ struct map6 {
 	struct in6_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list; /* gcfg->map6_list */
+	struct list_head list; /* gcfg.map6_list */
 };
 
 /// Origin of static mapping entry
@@ -292,23 +295,23 @@ struct cache_entry {
 	time_t last_use;
 	uint32_t flags;
 	uint16_t ip4_ident;
-	struct list_head list;  /* gcfg->cache_active or gcfg->cache_pool */
-	struct list_head hash4; /* gcfg->hash_table4 */
-	struct list_head hash6; /* gcfg->hash_table6 */
+	struct list_head list;  /* gcfg.cache_active or gcfg.cache_pool */
+	struct list_head hash4; /* gcfg.hash_table4 */
+	struct list_head hash6; /* gcfg.hash_table6 */
 };
 
 /// IP Address or Route Entry (IPv4)
 struct tun_ip4 {
 	struct in_addr addr;
 	int prefix_len;
-	struct list_head list; /* gcfg->tun_ip4_list and gcfg->tun_rt4_list */
+	struct list_head list; /* gcfg.tun_ip4_list and gcfg.tun_rt4_list */
 };
 
 /// IP Address or Route Entry (IPv6)
 struct tun_ip6 {
 	struct in6_addr addr;
 	int prefix_len;
-	struct list_head list; /* gcfg->tun_ip6_list and gcfg->tun_rt6_list */
+	struct list_head list; /* gcfg.tun_ip6_list and gcfg.tun_rt6_list */
 };
 
 /// Cache flag bits
@@ -393,6 +396,15 @@ enum {
 	LOG_OPT_ICMP   = (1<<2),	//Packet kicked back an ICMP for any reason
 	LOG_OPT_SELF   = (1<<3),	//Packet was destined to ourselves
 	LOG_OPT_DYN    = (1<<4),	//Events involving dynamic pool
+
+	LOG_OPT_ALL    = (			//Log everything
+		LOG_OPT_REJECT
+		| LOG_OPT_DROP
+		| LOG_OPT_ICMP
+		| LOG_OPT_SELF
+		| LOG_OPT_DYN
+	),
+
 	LOG_OPT_CONFIG = (1<<15),	//Log has been configured (used in conf file validation)
 };
 
@@ -433,7 +445,7 @@ enum {
 
 
 /* TAYGA function prototypes */
-extern struct config *gcfg;
+extern struct config gcfg;
 extern time_t now;
 
 /* addrmap.c */
@@ -455,7 +467,7 @@ void addrmap_maint(void);
 int addrmap_reload(void);
 
 /* conffile.c */
-int config_init(void);
+void config_init(void);
 int config_read(char *conffile);
 int config_validate(void);
 
@@ -467,18 +479,6 @@ void dynamic_maint(struct dynamic_pool *pool, int shutdown);
 /* nat64.c */
 void handle_ip4(struct pkt *p);
 void handle_ip6(struct pkt *p);
-
-/* log.c */
-#define STRINGIFY_IMPL(x) #x
-#define STRINGIFY(x) STRINGIFY_IMPL(x)
-#define slog(prio, ...) slog_impl(prio, "CODE_FILE=" __FILE__, "CODE_LINE=" STRINGIFY(__LINE__), __func__, __VA_ARGS__)
-void slog_impl(int priority, const char *file, const char *line, const char *func, const char *format, ...);
-int notify(const char *msg);
-int journal_init(const char *progname);
-void journal_cleanup(void);
-int journal_printv_with_location(
-        int priority, const char *file, const char *line, const char *func,
-        const char *format, va_list ap);
 
 /* tun.c */
 int tun_setup(int do_mktun, int do_rmtun);

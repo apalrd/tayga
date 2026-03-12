@@ -163,13 +163,15 @@ tayga.conf.
 
     *drop* - Log packets which were dropped.
 
-    *reject* - Log packets which were rejected (ICMP returned)
+    *reject* - Log packets which were rejected (ICMP returned).
 
     *icmp* - Log packets which returned an ICMP for any reason,
     including packets which are part of 'normal' internet traffic (i.e.
-    Packet Too Big or Time Exceeded)
+    Packet Too Big or Time Exceeded).
 
-    *self* - Log packets which were destined for Tayga itself
+    *self* - Log packets which were destined for Tayga itself.
+
+    *all* - Log everything.
 
     No packet logging is enabled by default
 

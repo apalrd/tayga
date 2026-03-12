@@ -20,51 +20,11 @@
 
 #include <stdarg.h>
 #include <signal.h>
-#include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
 
-extern struct config *gcfg;
 time_t now;
-static const char *progname;
 static int signalfds[2];
-
-void usage(int code) {
-	fprintf(stderr,
-			"TAYGA version %s\n"
-			"Usage:\n"
-			"%s [-c|--config CONFIGFILE] [-d|--debug] [-n|--nodetach]\n"
-			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n"
-			"       [--syslog|--stdout|--journal]\n"
-			"%s --mktun [-c|--config CONFIGFILE]\n"
-			"%s --rmtun [-c|--config CONFIGFILE]\n"
-			"       [-u|--user USERID] [-g|--group GROUPID] [-r|--chroot] [-p|--pidfile PIDFILE]\n\n"
-			"--config FILE      : Read configuration options from FILE\n"
-			"--debug, -d        : Enable debug messages (implies --nodetach and --stdout)\n"
-			"--nodetach         : Do not fork the process\n"
-			"--syslog           : Log messages to syslog (default)\n"
-			"--stdout           : Log messages to stdout\n"
-			"--journal          : Log messages to the systemd journal\n"
-			"--user USERID      : Set uid to USERID after initialization\n"
-			"--group GROUPID    : Set gid to GROUPID after initialization\n"
-			"--chroot           : chroot() to data-dir (specified in config file)\n"
-			"--pidfile FILE     : Write process ID of daemon to FILE\n"
-			"--mktun            : Create the persistent TUN interface\n"
-			"--rmtun            : Remove the persistent TUN interface\n"
-			"--help, -h         : Show this help message\n",
-		TAYGA_VERSION, progname, progname, progname);
-	exit(code);
-}
-
-/* Used during argument parsing, before logging is setup */
-void die(const char *format, ...) {
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(stderr, format, ap);
-	va_end(ap);
-	putc('\n', stderr);
-	exit(1);
-}
 
 static void signal_handler(int signal)
 {
@@ -117,20 +77,16 @@ static void signal_read(void)
 			/* Reload map-file */
 			addrmap_reload();
 			/* Dynamic map flush to file */
-			if (gcfg->dynamic_pool)
-				dynamic_maint(gcfg->dynamic_pool, 1);
+			if (gcfg.dynamic_pool)
+				dynamic_maint(gcfg.dynamic_pool, 1);
 			continue;
 		}
 		/* For any other signal prepare to exit cleanly */
-		if (gcfg->dynamic_pool) {
-			dynamic_maint(gcfg->dynamic_pool, 1);
+		if (gcfg.dynamic_pool) {
+			dynamic_maint(gcfg.dynamic_pool, 1);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
-		if (gcfg->log_out == LOG_TO_SYSLOG) {
-			closelog();
-		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-			journal_cleanup();
-		}
+		log_cleanup();
 		exit(0);
 	}
 }
@@ -147,11 +103,11 @@ static void print_op_info(void)
 	static const char * map_origins[] = MAP_ORIGIN_LIST;
 	unsigned int type, origin;
 
-	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET, &gcfg.local_addr4, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
-	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET6, &gcfg.local_addr6, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
-	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+	m6 = list_entry(gcfg.map6_list.prev, struct map6, list);
 	if (m6->type == MAP_TYPE_RFC6052) {
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
@@ -159,7 +115,7 @@ static void print_op_info(void)
 		if (m6->addr.s6_addr32[0] == WKPF
 			&& !m6->addr.s6_addr32[1]
 			&& !m6->addr.s6_addr32[2]
-			&& gcfg->wkpf_strict)
+			&& gcfg.wkpf_strict)
 			slog(LOG_NOTICE, "Note: traffic between IPv6 hosts and "
 					"private IPv4 addresses (i.e. to/from "
 					"64:ff9b::10.0.0.0/104, "
@@ -171,12 +127,12 @@ static void print_op_info(void)
 					"IPv6 hosts to communicate with "
 					"private IPv4 addresses.\n");
 	}
-	if (gcfg->dynamic_pool) {
-		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
+	if (gcfg.dynamic_pool) {
+		inet_ntop(AF_INET, &gcfg.dynamic_pool->map4.addr,
 				addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
-				gcfg->dynamic_pool->map4.prefix_len);
-		if (!gcfg->data_dir[0])
+				gcfg.dynamic_pool->map4.prefix_len);
+		if (!gcfg.data_dir[0])
 			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
 					"will not be saved across restarts.  "
 					"Specify data-dir in config if you would "
@@ -185,7 +141,7 @@ static void print_op_info(void)
 	}
 
 	slog(LOG_DEBUG,"Map4 List:\n");
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
 		s4 = list_entry(entry, struct map4, list);
 		type = (unsigned int)s4->type;
 		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
@@ -206,7 +162,7 @@ static void print_op_info(void)
 		}
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
 		s6 = list_entry(entry, struct map6, list);
 		type = (unsigned int)s6->type;
 		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
@@ -243,141 +199,35 @@ static void * worker(void * arg)
 	/* Enter worker loop */
 	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
+		tun_read(recv_buf,gcfg.tun_fd_addl[idx]);
 	}	
 }
 #endif //__linux__
 
 int main(int argc, char **argv)
 {
-	int c, ret, longind;
-	int pidfd;
+	int ret;
+	int pidfd = -1;
 	struct pollfd pollfds[2];
 	char addrbuf[INET6_ADDRSTRLEN];
-
-	char *conffile = TAYGA_CONF_PATH;
-	char *user = NULL;
-	char *group = NULL;
-	char *pidfile = NULL;
-	int do_chroot = 0;
-	int detach = 1;
-	int do_mktun = 0;
-	int do_rmtun = 0;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
-	progname = argv[0];
 
 	/* Init config structure */
-	if(config_init() < 0) return 1;
+	config_init();
 
-	static struct option longopts[] = {
-		{ "mktun", 0, 0, 0 },
-		{ "rmtun", 0, 0, 0 },
-		{ "syslog", 0, 0, 0 },
-		{ "stdout", 0, 0, 0 },
-		{ "journal", 0, 0, 0 },
-		{ "help", 0, 0, 'h' },
-		{ "syslog", 0, 0, 0 },
-		{ "stdout", 0, 0, 0 },
-		{ "journal", 0, 0, 0 },
-		{ "help", 0, 0, 'h' },
-		{ "config", 1, 0, 'c' },
-		{ "nodetach", 0, 0, 'n' },
-		{ "user", 1, 0, 'u' },
-		{ "group", 1, 0, 'g' },
-		{ "chroot", 0, 0, 'r' },
-		{ "pidfile", 1, 0, 'p' },
-		{ "debug", 0, 0, 'd' },
-		{ "debug", 0, 0, 'd' },
-		{ 0, 0, 0, 0 }
-	};
+	/* Parse command line arguments */
+	cmdline_parse(argc, argv);
 
-	/* Arg parsing loop */
-	for (;;) {
-		c = getopt_long(argc, argv, "c:dhnu:g:rp:", longopts, &longind);
-		/* Reached last argument, terminate loop */
-		if (c == -1)
-			break;
-		switch (c) {
-		case 0:
-			switch (longind) {
-				case 0: /* --mktun */
-					if (do_rmtun) {
-						die("Error: both --mktun and --rmtun specified");
-					}
-					do_mktun = 1;
-					break;
-				case 1: /* --rmtun */
-					if (do_mktun) {
-						die("Error: both --mktun and --rmtun specified");
-						exit(1);
-					}
-					do_rmtun = 1;
-					break;
-				case 2: /* --syslog */
-					gcfg->log_out = LOG_TO_SYSLOG;
-					break;
-				case 3: /* --stdout */
-					gcfg->log_out = LOG_TO_STDOUT;
-					break;
-				case 4: /* --journal */
-					gcfg->log_out = LOG_TO_JOURNAL;
-					break;
-				default:
-					usage(1);
-			}
-			break;
-		case 'c':
-			conffile = optarg;
-			break;
-		case 'd':
-			gcfg->log_out = LOG_TO_STDOUT;
-			detach = 0;
-			break;
-		case 'n':
-			detach = 0;
-			break;
-		case 'u':
-			user = optarg;
-			break;
-		case 'g':
-			group = optarg;
-			break;
-		case 'r':
-			do_chroot = 1;
-			break;
-		case 'p':
-			pidfile = optarg;
-			break;
-		case 'h':
-			usage(1);
-			break;
-		default:
-			die("Try `%s --help' for more information (got %c)", argv[0],c);
-			exit(1);
-		}
-	}
-
-	/* Setup logging
-	 * But not if we are only doing mktun / rmtun
-	 * This must be done before config parsing, since those rely
-	 * on logging based on log_out
-	 */
-	if(do_mktun || do_rmtun) {
-		//Force stdout for these options
-		gcfg->log_out = LOG_TO_STDOUT;
-	} else if (gcfg->log_out == LOG_TO_SYSLOG) {
-		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
-		int r = journal_init("tayga");
-		if (r < 0) {
-			fprintf(stderr,"Error: Unable to initialize journal: %s\n", strerror(-r));
-			return 1;
-		}
+	/* Init logging infrastructure */
+	ret = log_init();
+	if (ret < 0) {
+		fprintf(stderr, "Error: Unable to initialize log: %s\n", strerror(-ret));
+		return 1;
 	}
 
 	/* Parse config file options */
-	if(config_read(conffile) < 0) return 1;
+	if(config_read(arg_conffile) < 0) return 1;
 
 	/* Validate config (and load map file) */
 	if(config_validate() < 0) return 1;
@@ -385,47 +235,35 @@ int main(int argc, char **argv)
 	/* Check if we are doing tunnel operations only
 	 * Must be done after config reading so we know tun name
 	 */
-	if (do_mktun || do_rmtun) {
-		if (user) {
-			die("Error: cannot specify -u or --user "
-					"with mktun/rmtun operation");
-		}
-		if (group) {
-			die("Error: cannot specify -g or --group "
-					"with mktun/rmtun operation\n");
-		}
-		if (do_chroot) {
-			die("Error: cannot specify -r or --chroot "
-					"with mktun/rmtun operation\n");
-		}
-		if(tun_setup(do_mktun, do_rmtun)) return 1;
+	if (arg_do_mktun || arg_do_rmtun) {
+		if(tun_setup(arg_do_mktun, arg_do_rmtun)) return 1;
 		return 0;
 	}
 
 	/* Change user */
-	if (user) {
-		pw = getpwnam(user);
+	if (arg_user) {
+		pw = getpwnam(arg_user);
 		if (!pw) {
-			slog(LOG_CRIT, "Error: user %s does not exist\n", user);
+			slog(LOG_CRIT, "Error: user %s does not exist\n", arg_user);
 			return 1;
 		}
 	}
 
 	/* Change group */
-	if (group) {
-		gr = getgrnam(group);
+	if (arg_group) {
+		gr = getgrnam(arg_group);
 		if (!gr) {
 			slog(LOG_CRIT, "Error: group %s does not exist\n",
-					group);
+					arg_group);
 			return 1;
 		}
 	}
 
 	/* Chroot */
-	if (!gcfg->data_dir[0]) {
-		if (do_chroot) {
+	if (!gcfg.data_dir[0]) {
+		if (arg_do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
-					"is specified in %s\n", conffile);
+					"is specified in %s\n", arg_conffile);
 			return 1;
 		}
 		if (chdir("/")) {
@@ -433,28 +271,28 @@ int main(int argc, char **argv)
 					strerror(errno));
 			return 1;
 		}
-	} else if (chdir(gcfg->data_dir) < 0) {
-		if (user || errno != ENOENT) {
+	} else if (chdir(gcfg.data_dir) < 0) {
+		if (arg_user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
-					"aborting: %s\n", gcfg->data_dir,
+					"aborting: %s\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
-		if (mkdir(gcfg->data_dir, 0777) < 0) {
+		if (mkdir(gcfg.data_dir, 0777) < 0) {
 			slog(LOG_CRIT, "Error: unable to create %s, aborting: "
-					"%s\n", gcfg->data_dir,
+					"%s\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
-		if (chdir(gcfg->data_dir) < 0) {
+		if (chdir(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Error: created %s but unable to chdir "
-					"to it!?? (%s)\n", gcfg->data_dir,
+					"to it!?? (%s)\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
 	}
 
-	if (do_chroot && (!pw || pw->pw_uid == 0)) {
+	if (arg_do_chroot && (!pw || pw->pw_uid == 0)) {
 		slog(LOG_CRIT, "Error: chroot is ineffective without also "
 				"specifying the -u option to switch to an "
 				"unprivileged user\n");
@@ -462,29 +300,29 @@ int main(int argc, char **argv)
 	}
 
 	/* If using a map-file, read it after doing chroot/chdir */
-	if(gcfg->map_file[0] && addrmap_reload() != ERROR_NONE) {
+	if(gcfg.map_file[0] && addrmap_reload() != ERROR_NONE) {
 		slog(LOG_CRIT, "Error: map-file %s is configured but not readable\n",
-			gcfg->map_file);
+			gcfg.map_file);
 		return 1;
 	}
 
-	if (pidfile) {
-		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (arg_pidfile) {
+		pidfd = open(arg_pidfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (pidfd < 0) {
 			slog(LOG_CRIT, "Error, unable to open %s for "
-					"writing: %s\n", pidfile,
+					"writing: %s\n", arg_pidfile,
 					strerror(errno));
 			exit(1);
 		}
 	}
 
-	if (detach && daemon(1, 0) < 0) {
+	if (arg_detach && daemon(1, 0) < 0) {
 		slog(LOG_CRIT, "Error, unable to fork and detach: %s\n",
 				strerror(errno));
 		exit(1);
 	}
 
-	if (pidfile) {
+	if (pidfd >= 0) {
 		snprintf(addrbuf, sizeof(addrbuf), "%ld\n", (long)getpid());
 		if (write(pidfd, addrbuf, strlen(addrbuf)) != (ssize_t)strlen(addrbuf)) {
 			slog(LOG_CRIT, "Error, unable to write PID file.\n");
@@ -497,7 +335,7 @@ int main(int argc, char **argv)
 	slog(LOG_DEBUG, "Compiled from " TAYGA_BRANCH "\n");
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		int urandom_fd = open("/dev/urandom", O_RDONLY);
 		if (urandom_fd < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/urandom, "
@@ -505,7 +343,7 @@ int main(int argc, char **argv)
 			exit(1);
 		}		
 		int len = 8 * sizeof(uint32_t);
-		int ret = read(urandom_fd, gcfg->rand, len);
+		int ret = read(urandom_fd, gcfg.rand, len);
 		if (ret < 0) {
 			slog(LOG_CRIT, "read /dev/urandom returned %s\n",
 					strerror(errno));
@@ -516,11 +354,11 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
+		gcfg.rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 	
 	/* If workers is -1 (default), set to cpu cores */
-	if(gcfg->workers < 0) {
+	if(gcfg.workers < 0) {
 		int cpu_cores = sysconf(_SC_NPROCESSORS_ONLN);
 		if(cpu_cores > MAX_WORKERS) cpu_cores = MAX_WORKERS;
 		if(cpu_cores < 0) {
@@ -530,15 +368,15 @@ int main(int argc, char **argv)
 		else {
 			slog(LOG_DEBUG,"Using %d workers based on CPU core count\n",cpu_cores);
 		}
-		gcfg->workers = cpu_cores;
+		gcfg.workers = cpu_cores;
 	}
 
 	if(tun_setup(0, 0)) exit(1);
 
-	if (do_chroot) {
-		if (chroot(gcfg->data_dir) < 0) {
+	if (arg_do_chroot) {
+		if (chroot(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Unable to chroot to %s: %s\n",
-					gcfg->data_dir, strerror(errno));
+					gcfg.data_dir, strerror(errno));
 			exit(1);
 		}
 		if (chdir("/")) {
@@ -573,18 +411,18 @@ int main(int argc, char **argv)
 	print_op_info();
 
 	/* Load dynamic maps if configured */
-	if (gcfg->data_dir[0])
-		load_dynamic(gcfg->dynamic_pool);
+	if (gcfg.data_dir[0])
+		load_dynamic(gcfg.dynamic_pool);
 
-	if (gcfg->cache_size)
+	if (gcfg.cache_size)
 		create_cache();
 
 	/* Initialize mutexes */
-	if (pthread_mutex_init(&gcfg->cache_mutex, NULL) != 0) {
+	if (pthread_mutex_init(&gcfg.cache_mutex, NULL) != 0) {
 		slog(LOG_CRIT, "Failed to initialize cache mutex\n");
 		exit(1);
 	}
-	if (pthread_mutex_init(&gcfg->map_mutex, NULL) != 0) {
+	if (pthread_mutex_init(&gcfg.map_mutex, NULL) != 0) {
 		slog(LOG_CRIT, "Failed to initialize map mutex\n");
 		exit(1);
 	}
@@ -599,24 +437,22 @@ int main(int argc, char **argv)
 	memset(pollfds, 0, 2 * sizeof(struct pollfd));
 	pollfds[0].fd = signalfds[0];
 	pollfds[0].events = POLLIN;
-	pollfds[1].fd = gcfg->tun_fd;
+	pollfds[1].fd = gcfg.tun_fd;
 	pollfds[1].events = POLLIN;
 
-	/* Tell systemd logger we are ready */
-	if(gcfg->log_out == LOG_TO_JOURNAL) {
-		int r = notify("READY=1");
-		if (r < 0) {
-			slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
-			exit(1);
-		}
+	/* Tell the logger we are ready */
+	ret = log_notify_ready();
+	if (ret < 0) {
+		slog(LOG_CRIT, "Failed to notify readiness: %s\n", strerror(-ret));
+		exit(1);
 	}
 
 #ifdef __linux__
 	/* Launch worker threads */
 	static int thread_ids[MAX_WORKERS];
-	for(int i = 0; i < gcfg->workers; i++) {
+	for(int i = 0; i < gcfg.workers; i++) {
 		thread_ids[i] = i;
-		ret = pthread_create(&gcfg->threads[i], NULL, worker, &thread_ids[i]);
+		ret = pthread_create(&gcfg.threads[i], NULL, worker, &thread_ids[i]);
 		if (ret != 0) {
 			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
 				i, strerror(ret));
@@ -639,18 +475,18 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			signal_read();
 		if (pollfds[1].revents)
-			tun_read(recv_buf,gcfg->tun_fd);
-		if (gcfg->cache_size && (gcfg->last_cache_maint +
+			tun_read(recv_buf,gcfg.tun_fd);
+		if (gcfg.cache_size && (gcfg.last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
-					gcfg->last_cache_maint > now)) {
+					gcfg.last_cache_maint > now)) {
 			addrmap_maint();
-			gcfg->last_cache_maint = now;
+			gcfg.last_cache_maint = now;
 		}
-		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
+		if (gcfg.dynamic_pool && (gcfg.last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
-					gcfg->last_dynamic_maint > now)) {
-			dynamic_maint(gcfg->dynamic_pool, 0);
-			gcfg->last_dynamic_maint = now;
+					gcfg.last_dynamic_maint > now)) {
+			dynamic_maint(gcfg.dynamic_pool, 0);
+			gcfg.last_dynamic_maint = now;
 		}
 	}
 	return 0;

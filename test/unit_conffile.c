@@ -74,41 +74,37 @@ char * getenv(const char * var) {
 
 /* Function to compare tcfg to gcfg */
 void test_config_compare(void) {
-    /* Check pointer */
-    expect(gcfg != NULL,"GCFG is not null");
-    if(!gcfg) return;
-
     /* Compare every field in the struct */
-    expects(gcfg->tundev, tcfg.tundev, IFNAMSIZ, "tundev");
-    expects(gcfg->data_dir, tcfg.data_dir, 512, "data_dir");
-    expects(gcfg->map_file, tcfg.map_file, 512, "map_file");
-    expectl(gcfg->local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
-    expectl(gcfg->local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
-    expectl(gcfg->local_addr6.s6_addr32[1],tcfg.local_addr6.s6_addr32[1], "local_addr6[1]");
-    expectl(gcfg->local_addr6.s6_addr32[2],tcfg.local_addr6.s6_addr32[2], "local_addr6[2]");
-    expectl(gcfg->local_addr6.s6_addr32[3],tcfg.local_addr6.s6_addr32[3], "local_addr6[3]");
-    expectl(gcfg->dyn_min_lease, tcfg.dyn_min_lease, "dyn_min_lease");
-    expectl(gcfg->dyn_max_lease, tcfg.dyn_max_lease, "dyn_max_lease");
-    expectl(gcfg->max_commit_delay, tcfg.max_commit_delay, "max_commit_delay");
-    expectl(gcfg->hash_bits,tcfg.hash_bits, "hash_bits");
-    expectl(gcfg->cache_size,tcfg.cache_size, "cache_size");
-    expectl(gcfg->ipv6_offlink_mtu,tcfg.ipv6_offlink_mtu, "ipv6_offlink_mtu");
-    expectl(gcfg->workers,tcfg.workers, "workers");
-    expectl(gcfg->mtu,tcfg.mtu, "mtu");
-    expectl(gcfg->wkpf_strict, tcfg.wkpf_strict, "wkpf_strict");
-    expectl(gcfg->log_opts, tcfg.log_opts, "log_opts");
-    expectl(gcfg->udp_cksum_mode, tcfg.udp_cksum_mode, "udp_cksum_mode");
-    expectl(gcfg->tun_up, tcfg.tun_up, "tun_up");
+    expects(gcfg.tundev, tcfg.tundev, IFNAMSIZ, "tundev");
+    expects(gcfg.data_dir, tcfg.data_dir, 512, "data_dir");
+    expects(gcfg.map_file, tcfg.map_file, 512, "map_file");
+    expectl(gcfg.local_addr4.s_addr, tcfg.local_addr4.s_addr, "local_addr4");
+    expectl(gcfg.local_addr6.s6_addr32[0],tcfg.local_addr6.s6_addr32[0], "local_addr6[0]");
+    expectl(gcfg.local_addr6.s6_addr32[1],tcfg.local_addr6.s6_addr32[1], "local_addr6[1]");
+    expectl(gcfg.local_addr6.s6_addr32[2],tcfg.local_addr6.s6_addr32[2], "local_addr6[2]");
+    expectl(gcfg.local_addr6.s6_addr32[3],tcfg.local_addr6.s6_addr32[3], "local_addr6[3]");
+    expectl(gcfg.dyn_min_lease, tcfg.dyn_min_lease, "dyn_min_lease");
+    expectl(gcfg.dyn_max_lease, tcfg.dyn_max_lease, "dyn_max_lease");
+    expectl(gcfg.max_commit_delay, tcfg.max_commit_delay, "max_commit_delay");
+    expectl(gcfg.hash_bits,tcfg.hash_bits, "hash_bits");
+    expectl(gcfg.cache_size,tcfg.cache_size, "cache_size");
+    expectl(gcfg.ipv6_offlink_mtu,tcfg.ipv6_offlink_mtu, "ipv6_offlink_mtu");
+    expectl(gcfg.workers,tcfg.workers, "workers");
+    expectl(gcfg.mtu,tcfg.mtu, "mtu");
+    expectl(gcfg.wkpf_strict, tcfg.wkpf_strict, "wkpf_strict");
+    expectl(gcfg.log_opts, tcfg.log_opts, "log_opts");
+    expectl(gcfg.udp_cksum_mode, tcfg.udp_cksum_mode, "udp_cksum_mode");
+    expectl(gcfg.tun_up, tcfg.tun_up, "tun_up");
 
     /* Pointers in gcfg which are not touched by conffile.c */
-    expectl(gcfg->tun_fd, 0, "tun_fd");
+    expectl(gcfg.tun_fd, 0, "tun_fd");
 
     int count = 0, expect_count = 0;
 	struct list_head *entry;
     char addrbuf[64], addrbuf2[64];
     char linebuf[512], namebuf[64];
     /* Iterate over map4 list and compare length */
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
         count++;
     }
     for(expect_count = 0; tmap4[expect_count];expect_count++) ;
@@ -118,7 +114,7 @@ void test_config_compare(void) {
     if(count == expect_count) {
         count = 0;
         /* Compare contents of lists as strings */
-        list_for_each(entry, &gcfg->map4_list) {
+        list_for_each(entry, &gcfg.map4_list) {
             struct map4 *s4;
             sprintf(namebuf,"map4[%d]",count);
             s4 = list_entry(entry, struct map4, list);
@@ -133,7 +129,7 @@ void test_config_compare(void) {
 
     /* Iterate over map6 list and compare length */
     count = 0;
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
         count++;
     }
     for(expect_count = 0; tmap6[expect_count];expect_count++) ;
@@ -143,7 +139,7 @@ void test_config_compare(void) {
     if(count == expect_count) {
         count = 0;
         /* Compare contents of lists as strings */
-        list_for_each(entry, &gcfg->map6_list) {
+        list_for_each(entry, &gcfg.map6_list) {
             struct map6 *s6;
             sprintf(namebuf,"map6[%d]",count);
             s6 = list_entry(entry, struct map6, list);
@@ -159,10 +155,10 @@ void test_config_compare(void) {
 
     /* Iterate over ip4 + ip6 list and compare length */
     count = 0;
-	list_for_each(entry, &gcfg->tun_ip4_list) {
+	list_for_each(entry, &gcfg.tun_ip4_list) {
         count++;
     }
-	list_for_each(entry, &gcfg->tun_ip6_list) {
+	list_for_each(entry, &gcfg.tun_ip6_list) {
         count++;
     }
     for(expect_count = 0; tun_ip[expect_count];expect_count++) ;
@@ -173,7 +169,7 @@ void test_config_compare(void) {
     if(count == expect_count) {
         count = 0;
         /* Compare contents of ip4 list as strings */
-        list_for_each(entry, &gcfg->tun_ip4_list) {
+        list_for_each(entry, &gcfg.tun_ip4_list) {
             struct tun_ip4 *ip4;
             sprintf(namebuf,"tun_ip[%d]",count);
             ip4 = list_entry(entry, struct tun_ip4, list);
@@ -185,7 +181,7 @@ void test_config_compare(void) {
         }
 
         /* Compare contents of ip6 list as strings */
-        list_for_each(entry, &gcfg->tun_ip6_list) {
+        list_for_each(entry, &gcfg.tun_ip6_list) {
             struct tun_ip6 *ip6;
             sprintf(namebuf,"tun_ip[%d]",count);
             ip6 = list_entry(entry, struct tun_ip6, list);
@@ -199,10 +195,10 @@ void test_config_compare(void) {
 
     /* Iterate over rt4 and rt6 lists and compare length */
     count = 0;
-	list_for_each(entry, &gcfg->tun_rt4_list) {
+	list_for_each(entry, &gcfg.tun_rt4_list) {
         count++;
     }
-	list_for_each(entry, &gcfg->tun_rt6_list) {
+	list_for_each(entry, &gcfg.tun_rt6_list) {
         count++;
     }
     for(expect_count = 0; tun_route[expect_count];expect_count++) ;
@@ -212,7 +208,7 @@ void test_config_compare(void) {
     if(count == expect_count) {
         count = 0;
         /* Compare contents of ip4 list as strings */
-        list_for_each(entry, &gcfg->tun_rt4_list) {
+        list_for_each(entry, &gcfg.tun_rt4_list) {
             struct tun_ip4 *ip4;
             sprintf(namebuf,"tun_route[%d]",count);
             ip4 = list_entry(entry, struct tun_ip4, list);
@@ -224,7 +220,7 @@ void test_config_compare(void) {
         }
 
         /* Compare contents of ip6 list as strings */
-        list_for_each(entry, &gcfg->tun_rt6_list) {
+        list_for_each(entry, &gcfg.tun_rt6_list) {
             struct tun_ip6 *ip6;
             sprintf(namebuf,"tun_route[%d]",count);
             ip6 = list_entry(entry, struct tun_ip6, list);
@@ -237,11 +233,11 @@ void test_config_compare(void) {
     }
 
     /* Structs */
-    //expect(gcfg->map6_list == tcfg.map6_list, "map6_list");
-    //expect(gcfg->map4_list == tcfg.map4_list, "map4_list");
-    //expect(gcfg->dynamic_pool == tcfg.dynamic_pool, "dynamic_pool");
-    //expect(gcfg->hash_table4 == tcfg.hash_table4, "hash_table4");
-    //expect(gcfg->hash_table6 == tcfg.hash_table6, "hash_table6");
+    //expect(gcfg.map6_list == tcfg.map6_list, "map6_list");
+    //expect(gcfg.map4_list == tcfg.map4_list, "map4_list");
+    //expect(gcfg.dynamic_pool == tcfg.dynamic_pool, "dynamic_pool");
+    //expect(gcfg.hash_table4 == tcfg.hash_table4, "hash_table4");
+    //expect(gcfg.hash_table6 == tcfg.hash_table6, "hash_table6");
 
 }
 
@@ -250,8 +246,6 @@ void test_config_compare(void) {
  */
 void test_config_init(void) {
     printf("TEST CASES FOR CONFIG INIT\n");
-    /* Setup gcfg invalid */
-    gcfg = NULL;
 
     /* Call config_init */
     config_init();
@@ -300,7 +294,6 @@ void test_config_read(void) {
     /* Example config */
     conffile = "tayga.conf.example";
     if(!print_fail_only) printf("TEST CASE: example conf file\n");
-    free(gcfg);
     config_init();
     expect(!config_read(conffile),"Passed");
     tcfg.wkpf_strict = 0;
@@ -324,7 +317,6 @@ void test_config_read(void) {
     testcase = "#this file is empty\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(!config_read(conffile),"Passed");
     tcfg.data_dir[0] = 0;
@@ -343,7 +335,6 @@ void test_config_read(void) {
     testcase = "tun-device nat64\ntun-device clat";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -355,7 +346,6 @@ void test_config_read(void) {
     testcase = "ipv4-addr 192.168.255.1\nipv4-addr 192.168.255.2\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -367,7 +357,6 @@ void test_config_read(void) {
     testcase = "ipv4-addr hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -379,7 +368,6 @@ void test_config_read(void) {
     testcase = "ipv4-addr 127.0.1.1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -391,7 +379,6 @@ void test_config_read(void) {
     testcase = "ipv6-addr 2001:db8::1\nipv6-addr 2001:db8::2";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -403,7 +390,6 @@ void test_config_read(void) {
     testcase = "ipv6-addr 2001:db8::hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -415,7 +401,6 @@ void test_config_read(void) {
     testcase = "ipv6-addr fe80::1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -427,7 +412,6 @@ void test_config_read(void) {
     testcase = "prefix 64:ff9b::6/96\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -439,7 +423,6 @@ void test_config_read(void) {
     testcase = "prefix fe80::/96\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -451,7 +434,6 @@ void test_config_read(void) {
     testcase = "prefix 64:ff9b::/95\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -463,7 +445,6 @@ void test_config_read(void) {
     testcase = "prefix 64:ff9b::/96\nprefix 64:ff9b:1::/96";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -475,7 +456,6 @@ void test_config_read(void) {
     testcase = "wkpf-strict hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -487,7 +467,6 @@ void test_config_read(void) {
     testcase = "udp-cksum-mode hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -499,7 +478,6 @@ void test_config_read(void) {
     testcase = "map 192.168.fe.0 2001:db8::3\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -511,7 +489,6 @@ void test_config_read(void) {
     testcase = "map 192.168.255.0 2001:db8::hi\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -523,7 +500,6 @@ void test_config_read(void) {
     testcase = "map 192.168.254.0/24 2001:db8::/116\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -535,7 +511,6 @@ void test_config_read(void) {
     testcase = "map 233.0.1.1/24 2001:db8::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -547,7 +522,6 @@ void test_config_read(void) {
     testcase = "map 192.168.0.0/24 fe80::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -559,7 +533,6 @@ void test_config_read(void) {
     testcase = "map 192.168.254.0/24 2001:db8::/120\nmap 192.168.254.0/24 2001:db8::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -571,7 +544,6 @@ void test_config_read(void) {
     testcase = "map 192.168.253.0/24 2001:db8::/120\nmap 192.168.254.0/24 2001:db8::/120\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -583,7 +555,6 @@ void test_config_read(void) {
     testcase = "dynamic-pool 192.168.255.0/24\ndynamic-pool 192.168.254.0/24\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -595,7 +566,6 @@ void test_config_read(void) {
     testcase = "dynamic-pool 192.268.254.0/24\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -607,7 +577,6 @@ void test_config_read(void) {
     testcase = "dynamic-pool 225.0.0.1/16\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -619,7 +588,6 @@ void test_config_read(void) {
     testcase = "dynamic-pool 192.168.100.1/32\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -631,7 +599,6 @@ void test_config_read(void) {
     testcase = "data-dir /var/lib/tayga\ndata-dir /var/spool/tayga\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -643,7 +610,6 @@ void test_config_read(void) {
     testcase = "data-dir var/spool/tayga\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -655,7 +621,6 @@ void test_config_read(void) {
     testcase = "map-file /var/lib/tayga/static.map\nmap-file static.map\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -667,7 +632,6 @@ void test_config_read(void) {
     testcase = "offlink-mtu 1500\nofflink-mtu 1440\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -679,7 +643,6 @@ void test_config_read(void) {
     testcase = "offlink-mtu 1200\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -691,7 +654,6 @@ void test_config_read(void) {
     testcase = "offlink-mtu 120000\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -703,7 +665,6 @@ void test_config_read(void) {
     testcase = "offlink-mtu 0x1235\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -716,7 +677,6 @@ void test_config_read(void) {
     testcase = "workers 6\nworkesr 4\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -728,7 +688,6 @@ void test_config_read(void) {
     testcase = "workers -1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -740,7 +699,6 @@ void test_config_read(void) {
     testcase = "workers 12000\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -753,7 +711,6 @@ void test_config_read(void) {
     testcase = "workers 0\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -767,7 +724,6 @@ void test_config_read(void) {
     testcase = "workers 0x6\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -779,7 +735,6 @@ void test_config_read(void) {
     testcase = "log drop\nlog reject\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -791,7 +746,6 @@ void test_config_read(void) {
     testcase = "log something\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -804,7 +758,6 @@ void test_config_read(void) {
     testcase = "tun-up hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -816,7 +769,6 @@ void test_config_read(void) {
     testcase = "tun-up\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -828,7 +780,6 @@ void test_config_read(void) {
     testcase = "tun-ip\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -840,7 +791,6 @@ void test_config_read(void) {
     testcase = "tun-ip hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -852,7 +802,6 @@ void test_config_read(void) {
     testcase = "tun-ip 2001:db8::1/129\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -864,7 +813,6 @@ void test_config_read(void) {
     testcase = "tun-ip 2001:db8::1/-1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -876,7 +824,6 @@ void test_config_read(void) {
     testcase = "tun-ip 2001:db8::1/hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -889,7 +836,6 @@ void test_config_read(void) {
     testcase = "tun-ip 192.168.0.b\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -901,7 +847,6 @@ void test_config_read(void) {
     testcase = "tun-ip 192.168.0\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -913,7 +858,6 @@ void test_config_read(void) {
     testcase = "tun-ip 192.168.0.0/-1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -925,7 +869,6 @@ void test_config_read(void) {
     testcase = "tun-ip 192.168.0.0/33\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -937,7 +880,6 @@ void test_config_read(void) {
     testcase = "tun-route hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -949,7 +891,6 @@ void test_config_read(void) {
     testcase = "tun-route 2001:db8::1/129\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -961,7 +902,6 @@ void test_config_read(void) {
     testcase = "tun-route 2001:db8::1/-1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -973,7 +913,6 @@ void test_config_read(void) {
     testcase = "tun-route 2001:db8::1/hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -986,7 +925,6 @@ void test_config_read(void) {
     testcase = "tun-route 192.168.0.b\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -998,7 +936,6 @@ void test_config_read(void) {
     testcase = "tun-route 192.168.0\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1010,7 +947,6 @@ void test_config_read(void) {
     testcase = "tun-route 192.168.0.0/-1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1022,7 +958,6 @@ void test_config_read(void) {
     testcase = "tun-route 192.168.0.0/33\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1034,7 +969,6 @@ void test_config_read(void) {
     testcase = "unbknown 4\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1046,7 +980,6 @@ void test_config_read(void) {
     testcase = "log a b c d e f g h i j k l m n o p\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1058,7 +991,6 @@ void test_config_read(void) {
     testcase = "ipv4-addr 192.168.0.0 192.168.1.0\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(config_read(conffile),"Failed");
 
@@ -1091,9 +1023,7 @@ void test_config_read(void) {
     if(!fd) return;
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
-    expect((long)gcfg,"config_init");
     expect(!config_read(conffile),"Passed");
     strcpy(tcfg.data_dir,"/var/lib/tayga");
     strcpy(tcfg.tundev,"nat64");
@@ -1108,7 +1038,7 @@ void test_config_read(void) {
 #else
     tcfg.workers = -1;
 #endif
-    tcfg.log_opts = (LOG_OPT_DROP | LOG_OPT_ICMP | LOG_OPT_REJECT | LOG_OPT_SELF | LOG_OPT_DYN | LOG_OPT_CONFIG);
+    tcfg.log_opts = (LOG_OPT_ALL | LOG_OPT_CONFIG);
     tcfg.tun_up = 1;
     tmap4[0] = "192.168.5.42/32 type 0 mask 255.255.255.255";
     tmap4[1] = "192.168.255.0/24 type 2 mask 255.255.255.0";
@@ -1139,7 +1069,6 @@ void test_config_validate() {
 
     /* No config loading has been done */
     if(!print_fail_only) printf("TEST CASE: no config loaded\n");
-    free(gcfg);
     config_init();
     expect(config_validate(),"Validate Failed");
 
@@ -1151,7 +1080,6 @@ void test_config_validate() {
     testcase = "#hello\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     expect(!config_read(conffile),"Read Passed");
     expect(config_validate(),"Validate Failed");
@@ -1166,7 +1094,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1183,7 +1110,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1201,7 +1127,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1220,7 +1145,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1238,7 +1162,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1257,7 +1180,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1274,7 +1196,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1291,7 +1212,6 @@ void test_config_validate() {
         "ipv6-addr 2001:db8::1\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
@@ -1309,17 +1229,16 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 1;
     expect(!config_read(conffile),"Read Passed");
     /* Combined with offlink MTU test*/
-    gcfg->ipv6_offlink_mtu = 0;
+    gcfg.ipv6_offlink_mtu = 0;
     expect(!config_validate(),"Validate Passed");
-    expectl(gcfg->ipv6_offlink_mtu,MTU_MIN,"Min MTU");
+    expectl(gcfg.ipv6_offlink_mtu,MTU_MIN,"Min MTU");
     expectl(getenv_case,0,"Getenv Called");
     /* Combined with STATE_DIRECTORY test */
-    expects(gcfg->data_dir,"/var/lib/tayga",15,"data_dir");
+    expects(gcfg.data_dir,"/var/lib/tayga",15,"data_dir");
 
     /* state directory not absolute */
     if(!print_fail_only) printf("TEST CASE: state dir not absolute\n");
@@ -1332,7 +1251,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 2;
     expect(!config_read(conffile),"Read Passed");
@@ -1350,7 +1268,6 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 3;
     expect(!config_read(conffile),"Read Passed");
@@ -1368,13 +1285,12 @@ void test_config_validate() {
         "tun-device nat64\n";
     fwrite(testcase,strlen(testcase),1,fd);
     fclose(fd);
-    free(gcfg);
     config_init();
     getenv_case = 4;
     expect(!config_read(conffile),"Read Passed");
     expect(!config_validate(),"Validate Passed");
     expectl(getenv_case,0,"Getenv Called");
-    expects(gcfg->data_dir,"/var/lib/tayga",15,"data_dir");
+    expects(gcfg.data_dir,"/var/lib/tayga",15,"data_dir");
 }
 
 int main(void) {

@@ -11,10 +11,10 @@ struct list_head {
 };
 
 /* Declare an empty list */
-#define LIST_HEAD(x) struct list_head x = { &x, &x }
+#define LIST_HEAD(x) (struct list_head){ .next = &(x), .prev = &(x) }
 
 /* Initialize an empty list (required for all malloc'd list_heads) */
-static inline void INIT_LIST_HEAD(struct list_head *x)
+static inline void list_init(struct list_head *x)
 {
 	x->next = x;
 	x->prev = x;
