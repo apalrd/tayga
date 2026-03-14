@@ -24,7 +24,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-extern struct config *gcfg;
 time_t now;
 static const char *progname;
 static int signalfds[2];
@@ -117,18 +116,18 @@ static void signal_read(void)
 			/* Reload map-file */
 			addrmap_reload();
 			/* Dynamic map flush to file */
-			if (gcfg->dynamic_pool)
-				dynamic_maint(gcfg->dynamic_pool, 1);
+			if (gcfg.dynamic_pool)
+				dynamic_maint(gcfg.dynamic_pool, 1);
 			continue;
 		}
 		/* For any other signal prepare to exit cleanly */
-		if (gcfg->dynamic_pool) {
-			dynamic_maint(gcfg->dynamic_pool, 1);
+		if (gcfg.dynamic_pool) {
+			dynamic_maint(gcfg.dynamic_pool, 1);
 		}
 		slog(LOG_NOTICE, "Exiting on signal %d\n", sig);
-		if (gcfg->log_out == LOG_TO_SYSLOG) {
+		if (gcfg.log_out == LOG_TO_SYSLOG) {
 			closelog();
-		} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+		} else if (gcfg.log_out == LOG_TO_JOURNAL) {
 			journal_cleanup();
 		}
 		exit(0);
@@ -147,11 +146,11 @@ static void print_op_info(void)
 	static const char * map_origins[] = MAP_ORIGIN_LIST;
 	unsigned int type, origin;
 
-	inet_ntop(AF_INET, &gcfg->local_addr4, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET, &gcfg.local_addr4, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv4 address: %s\n", addrbuf);
-	inet_ntop(AF_INET6, &gcfg->local_addr6, addrbuf, sizeof(addrbuf));
+	inet_ntop(AF_INET6, &gcfg.local_addr6, addrbuf, sizeof(addrbuf));
 	slog(LOG_INFO, "TAYGA's IPv6 address: %s\n", addrbuf);
-	m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+	m6 = list_entry(gcfg.map6_list.prev, struct map6, list);
 	if (m6->type == MAP_TYPE_RFC6052) {
 		inet_ntop(AF_INET6, &m6->addr, addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "NAT64 prefix: %s/%d\n",
@@ -159,7 +158,7 @@ static void print_op_info(void)
 		if (m6->addr.s6_addr32[0] == WKPF
 			&& !m6->addr.s6_addr32[1]
 			&& !m6->addr.s6_addr32[2]
-			&& gcfg->wkpf_strict)
+			&& gcfg.wkpf_strict)
 			slog(LOG_NOTICE, "Note: traffic between IPv6 hosts and "
 					"private IPv4 addresses (i.e. to/from "
 					"64:ff9b::10.0.0.0/104, "
@@ -171,12 +170,12 @@ static void print_op_info(void)
 					"IPv6 hosts to communicate with "
 					"private IPv4 addresses.\n");
 	}
-	if (gcfg->dynamic_pool) {
-		inet_ntop(AF_INET, &gcfg->dynamic_pool->map4.addr,
+	if (gcfg.dynamic_pool) {
+		inet_ntop(AF_INET, &gcfg.dynamic_pool->map4.addr,
 				addrbuf, sizeof(addrbuf));
 		slog(LOG_INFO, "Dynamic pool: %s/%d\n", addrbuf,
-				gcfg->dynamic_pool->map4.prefix_len);
-		if (!gcfg->data_dir[0])
+				gcfg.dynamic_pool->map4.prefix_len);
+		if (!gcfg.data_dir[0])
 			slog(LOG_NOTICE, "Note: dynamically-assigned mappings "
 					"will not be saved across restarts.  "
 					"Specify data-dir in config if you would "
@@ -185,7 +184,7 @@ static void print_op_info(void)
 	}
 
 	slog(LOG_DEBUG,"Map4 List:\n");
-	list_for_each(entry, &gcfg->map4_list) {
+	list_for_each(entry, &gcfg.map4_list) {
 		s4 = list_entry(entry, struct map4, list);
 		type = (unsigned int)s4->type;
 		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
@@ -206,7 +205,7 @@ static void print_op_info(void)
 		}
 	}
 	slog(LOG_DEBUG,"Map6 List:\n");
-	list_for_each(entry, &gcfg->map6_list) {
+	list_for_each(entry, &gcfg.map6_list) {
 		s6 = list_entry(entry, struct map6, list);
 		type = (unsigned int)s6->type;
 		type = (type > MAP_TYPE_MAX) ? MAP_TYPE_MAX : type;
@@ -243,7 +242,7 @@ static void * worker(void * arg)
 	/* Enter worker loop */
 	slog(LOG_DEBUG,"Starting worker thread %d\n",idx);
 	for (;;) {
-		tun_read(recv_buf,gcfg->tun_fd_addl[idx]);
+		tun_read(recv_buf,gcfg.tun_fd_addl[idx]);
 	}	
 }
 #endif //__linux__
@@ -315,13 +314,13 @@ int main(int argc, char **argv)
 					do_rmtun = 1;
 					break;
 				case 2: /* --syslog */
-					gcfg->log_out = LOG_TO_SYSLOG;
+					gcfg.log_out = LOG_TO_SYSLOG;
 					break;
 				case 3: /* --stdout */
-					gcfg->log_out = LOG_TO_STDOUT;
+					gcfg.log_out = LOG_TO_STDOUT;
 					break;
 				case 4: /* --journal */
-					gcfg->log_out = LOG_TO_JOURNAL;
+					gcfg.log_out = LOG_TO_JOURNAL;
 					break;
 				default:
 					usage(1);
@@ -331,7 +330,7 @@ int main(int argc, char **argv)
 			conffile = optarg;
 			break;
 		case 'd':
-			gcfg->log_out = LOG_TO_STDOUT;
+			gcfg.log_out = LOG_TO_STDOUT;
 			detach = 0;
 			break;
 		case 'n':
@@ -365,10 +364,10 @@ int main(int argc, char **argv)
 	 */
 	if(do_mktun || do_rmtun) {
 		//Force stdout for these options
-		gcfg->log_out = LOG_TO_STDOUT;
-	} else if (gcfg->log_out == LOG_TO_SYSLOG) {
+		gcfg.log_out = LOG_TO_STDOUT;
+	} else if (gcfg.log_out == LOG_TO_SYSLOG) {
 		openlog("tayga", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	} else if (gcfg->log_out == LOG_TO_JOURNAL) {
+	} else if (gcfg.log_out == LOG_TO_JOURNAL) {
 		int r = journal_init("tayga");
 		if (r < 0) {
 			fprintf(stderr,"Error: Unable to initialize journal: %s\n", strerror(-r));
@@ -422,7 +421,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Chroot */
-	if (!gcfg->data_dir[0]) {
+	if (!gcfg.data_dir[0]) {
 		if (do_chroot) {
 			slog(LOG_CRIT, "Error: cannot chroot when no data-dir "
 					"is specified in %s\n", conffile);
@@ -433,22 +432,22 @@ int main(int argc, char **argv)
 					strerror(errno));
 			return 1;
 		}
-	} else if (chdir(gcfg->data_dir) < 0) {
+	} else if (chdir(gcfg.data_dir) < 0) {
 		if (user || errno != ENOENT) {
 			slog(LOG_CRIT, "Error: unable to chdir to %s, "
-					"aborting: %s\n", gcfg->data_dir,
+					"aborting: %s\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
-		if (mkdir(gcfg->data_dir, 0777) < 0) {
+		if (mkdir(gcfg.data_dir, 0777) < 0) {
 			slog(LOG_CRIT, "Error: unable to create %s, aborting: "
-					"%s\n", gcfg->data_dir,
+					"%s\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
-		if (chdir(gcfg->data_dir) < 0) {
+		if (chdir(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Error: created %s but unable to chdir "
-					"to it!?? (%s)\n", gcfg->data_dir,
+					"to it!?? (%s)\n", gcfg.data_dir,
 					strerror(errno));
 			return 1;
 		}
@@ -462,9 +461,9 @@ int main(int argc, char **argv)
 	}
 
 	/* If using a map-file, read it after doing chroot/chdir */
-	if(gcfg->map_file[0] && addrmap_reload() != ERROR_NONE) {
+	if(gcfg.map_file[0] && addrmap_reload() != ERROR_NONE) {
 		slog(LOG_CRIT, "Error: map-file %s is configured but not readable\n",
-			gcfg->map_file);
+			gcfg.map_file);
 		return 1;
 	}
 
@@ -497,7 +496,7 @@ int main(int argc, char **argv)
 	slog(LOG_DEBUG, "Compiled from " TAYGA_BRANCH "\n");
 	slog(LOG_DEBUG, "Commit " TAYGA_COMMIT "\n");
 
-	if (gcfg->cache_size) {
+	if (gcfg.cache_size) {
 		int urandom_fd = open("/dev/urandom", O_RDONLY);
 		if (urandom_fd < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/urandom, "
@@ -505,7 +504,7 @@ int main(int argc, char **argv)
 			exit(1);
 		}		
 		int len = 8 * sizeof(uint32_t);
-		int ret = read(urandom_fd, gcfg->rand, len);
+		int ret = read(urandom_fd, gcfg.rand, len);
 		if (ret < 0) {
 			slog(LOG_CRIT, "read /dev/urandom returned %s\n",
 					strerror(errno));
@@ -516,11 +515,11 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		gcfg->rand[0] |= 1; /* need an odd number for IPv4 hash */
+		gcfg.rand[0] |= 1; /* need an odd number for IPv4 hash */
 	}
 	
 	/* If workers is -1 (default), set to cpu cores */
-	if(gcfg->workers < 0) {
+	if(gcfg.workers < 0) {
 		int cpu_cores = sysconf(_SC_NPROCESSORS_ONLN);
 		if(cpu_cores > MAX_WORKERS) cpu_cores = MAX_WORKERS;
 		if(cpu_cores < 0) {
@@ -530,15 +529,15 @@ int main(int argc, char **argv)
 		else {
 			slog(LOG_DEBUG,"Using %d workers based on CPU core count\n",cpu_cores);
 		}
-		gcfg->workers = cpu_cores;
+		gcfg.workers = cpu_cores;
 	}
 
 	if(tun_setup(0, 0)) exit(1);
 
 	if (do_chroot) {
-		if (chroot(gcfg->data_dir) < 0) {
+		if (chroot(gcfg.data_dir) < 0) {
 			slog(LOG_CRIT, "Unable to chroot to %s: %s\n",
-					gcfg->data_dir, strerror(errno));
+					gcfg.data_dir, strerror(errno));
 			exit(1);
 		}
 		if (chdir("/")) {
@@ -573,18 +572,18 @@ int main(int argc, char **argv)
 	print_op_info();
 
 	/* Load dynamic maps if configured */
-	if (gcfg->data_dir[0])
-		load_dynamic(gcfg->dynamic_pool);
+	if (gcfg.data_dir[0])
+		load_dynamic(gcfg.dynamic_pool);
 
-	if (gcfg->cache_size)
+	if (gcfg.cache_size)
 		create_cache();
 
 	/* Initialize mutexes */
-	if (pthread_mutex_init(&gcfg->cache_mutex, NULL) != 0) {
+	if (pthread_mutex_init(&gcfg.cache_mutex, NULL) != 0) {
 		slog(LOG_CRIT, "Failed to initialize cache mutex\n");
 		exit(1);
 	}
-	if (pthread_mutex_init(&gcfg->map_mutex, NULL) != 0) {
+	if (pthread_mutex_init(&gcfg.map_mutex, NULL) != 0) {
 		slog(LOG_CRIT, "Failed to initialize map mutex\n");
 		exit(1);
 	}
@@ -599,11 +598,11 @@ int main(int argc, char **argv)
 	memset(pollfds, 0, 2 * sizeof(struct pollfd));
 	pollfds[0].fd = signalfds[0];
 	pollfds[0].events = POLLIN;
-	pollfds[1].fd = gcfg->tun_fd;
+	pollfds[1].fd = gcfg.tun_fd;
 	pollfds[1].events = POLLIN;
 
 	/* Tell systemd logger we are ready */
-	if(gcfg->log_out == LOG_TO_JOURNAL) {
+	if(gcfg.log_out == LOG_TO_JOURNAL) {
 		int r = notify("READY=1");
 		if (r < 0) {
 			slog(LOG_CRIT, "Failed to notify readiness to $NOTIFY_SOCKET: %s\n", strerror(-r));
@@ -614,9 +613,9 @@ int main(int argc, char **argv)
 #ifdef __linux__
 	/* Launch worker threads */
 	static int thread_ids[MAX_WORKERS];
-	for(int i = 0; i < gcfg->workers; i++) {
+	for(int i = 0; i < gcfg.workers; i++) {
 		thread_ids[i] = i;
-		ret = pthread_create(&gcfg->threads[i], NULL, worker, &thread_ids[i]);
+		ret = pthread_create(&gcfg.threads[i], NULL, worker, &thread_ids[i]);
 		if (ret != 0) {
 			slog(LOG_CRIT, "Failed to create worker thread %d: %s\n", 
 				i, strerror(ret));
@@ -639,18 +638,18 @@ int main(int argc, char **argv)
 		if (pollfds[0].revents)
 			signal_read();
 		if (pollfds[1].revents)
-			tun_read(recv_buf,gcfg->tun_fd);
-		if (gcfg->cache_size && (gcfg->last_cache_maint +
+			tun_read(recv_buf,gcfg.tun_fd);
+		if (gcfg.cache_size && (gcfg.last_cache_maint +
 						CACHE_CHECK_INTERVAL < now ||
-					gcfg->last_cache_maint > now)) {
+					gcfg.last_cache_maint > now)) {
 			addrmap_maint();
-			gcfg->last_cache_maint = now;
+			gcfg.last_cache_maint = now;
 		}
-		if (gcfg->dynamic_pool && (gcfg->last_dynamic_maint +
+		if (gcfg.dynamic_pool && (gcfg.last_dynamic_maint +
 						POOL_CHECK_INTERVAL < now ||
-					gcfg->last_dynamic_maint > now)) {
-			dynamic_maint(gcfg->dynamic_pool, 0);
-			gcfg->last_dynamic_maint = now;
+					gcfg.last_dynamic_maint > now)) {
+			dynamic_maint(gcfg.dynamic_pool, 0);
+			gcfg.last_dynamic_maint = now;
 		}
 	}
 	return 0;

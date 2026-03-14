@@ -226,7 +226,7 @@ struct map4 {
 	struct in_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list; /* gcfg->map4_list */
+	struct list_head list; /* gcfg.map4_list */
 };
 
 /// Mapping entry (IPv6)
@@ -235,7 +235,7 @@ struct map6 {
 	struct in6_addr mask;
 	int prefix_len;
 	int type;
-	struct list_head list; /* gcfg->map6_list */
+	struct list_head list; /* gcfg.map6_list */
 };
 
 /// Origin of static mapping entry
@@ -292,23 +292,23 @@ struct cache_entry {
 	time_t last_use;
 	uint32_t flags;
 	uint16_t ip4_ident;
-	struct list_head list;  /* gcfg->cache_active or gcfg->cache_pool */
-	struct list_head hash4; /* gcfg->hash_table4 */
-	struct list_head hash6; /* gcfg->hash_table6 */
+	struct list_head list;  /* gcfg.cache_active or gcfg.cache_pool */
+	struct list_head hash4; /* gcfg.hash_table4 */
+	struct list_head hash6; /* gcfg.hash_table6 */
 };
 
 /// IP Address or Route Entry (IPv4)
 struct tun_ip4 {
 	struct in_addr addr;
 	int prefix_len;
-	struct list_head list; /* gcfg->tun_ip4_list and gcfg->tun_rt4_list */
+	struct list_head list; /* gcfg.tun_ip4_list and gcfg.tun_rt4_list */
 };
 
 /// IP Address or Route Entry (IPv6)
 struct tun_ip6 {
 	struct in6_addr addr;
 	int prefix_len;
-	struct list_head list; /* gcfg->tun_ip6_list and gcfg->tun_rt6_list */
+	struct list_head list; /* gcfg.tun_ip6_list and gcfg.tun_rt6_list */
 };
 
 /// Cache flag bits
@@ -433,7 +433,7 @@ enum {
 
 
 /* TAYGA function prototypes */
-extern struct config *gcfg;
+extern struct config gcfg;
 extern time_t now;
 
 /* addrmap.c */
