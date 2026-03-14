@@ -286,8 +286,8 @@ int tun_setup(int do_mktun, int do_rmtun)
 	struct ifreq ifr;
 	int fd;
 
-	gcfg->tun_fd = open("/dev/net/tun", O_RDWR);
-	if (gcfg->tun_fd < 0) {
+	gcfg.tun_fd = open("/dev/net/tun", O_RDWR);
+	if (gcfg.tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 				strerror(errno));
 		return ERROR_REJECT;
@@ -295,48 +295,48 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	if (ioctl(gcfg->tun_fd, TUNSETIFF, &ifr) < 0) {
+	strcpy(ifr.ifr_name, gcfg.tundev);
+	if (ioctl(gcfg.tun_fd, TUNSETIFF, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
-				"%s\n", gcfg->tundev, strerror(errno));
+				"%s\n", gcfg.tundev, strerror(errno));
 		return ERROR_REJECT;
 	}
 
 	if (do_mktun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 1) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETPERSIST, 1) < 0) {
 			slog(LOG_CRIT, "Unable to set persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETOWNER, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETOWNER, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set owner on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 		}
-		if (ioctl(gcfg->tun_fd, TUNSETGROUP, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETGROUP, 0) < 0) {
 			slog(LOG_CRIT, "Unable to set group on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 		}
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return 0;
 	} else if (do_rmtun) {
-		if (ioctl(gcfg->tun_fd, TUNSETPERSIST, 0) < 0) {
+		if (ioctl(gcfg.tun_fd, TUNSETPERSIST, 0) < 0) {
 			slog(LOG_CRIT, "Unable to clear persist flag on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 		}
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return 0;
 	}
 
-	if(set_nonblock(gcfg->tun_fd)) return ERROR_REJECT;
+	if(set_nonblock(gcfg.tun_fd)) return ERROR_REJECT;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
@@ -347,7 +347,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	/* Query MTU from tun adapter */
 	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
+	strcpy(ifr.ifr_name, gcfg.tundev);
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
@@ -356,94 +356,94 @@ int tun_setup(int do_mktun, int do_rmtun)
 	close(fd);
 
 	/* MTU is less than 1280, not allowed */
-	gcfg->mtu = ifr.ifr_mtu;
-	if(gcfg->mtu < MTU_MIN) {
+	gcfg.mtu = ifr.ifr_mtu;
+	if(gcfg.mtu < MTU_MIN) {
 		slog(LOG_CRIT, "MTU of %d is too small, must be at least %d\n",
-				gcfg->mtu, MTU_MIN);
+				gcfg.mtu, MTU_MIN);
 		return ERROR_REJECT;
 	}
 
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg.tundev,
+			gcfg.mtu);
 
 	/* Get our own device ID for the tun setup operations */
-	int ifidx = if_nametoindex(gcfg->tundev);
+	int ifidx = if_nametoindex(gcfg.tundev);
 
     if (ifidx == 0) {
-		slog(LOG_INFO, "Failed to get if idx from tun device %s\n",gcfg->tundev);
+		slog(LOG_INFO, "Failed to get if idx from tun device %s\n",gcfg.tundev);
 		return ERROR_REJECT;
     }
 	/* Bring tun device up */
-	if(gcfg->tun_up) {
+	if(gcfg.tun_up) {
 		if(netlink_set_if_flags(ifidx,IFF_UP,IFF_UP)) return ERROR_REJECT;
-		slog(LOG_INFO, "Tun device %s is UP\n",gcfg->tundev);
+		slog(LOG_INFO, "Tun device %s is UP\n",gcfg.tundev);
 	}
 
 	/* Add IPs to the tun dev */
 	char addrbuf[INET6_ADDRSTRLEN];
 	struct list_head *entry;
-	list_for_each(entry, &gcfg->tun_ip4_list) {
+	list_for_each(entry, &gcfg.tun_ip4_list) {
 		struct tun_ip4 *ip4;
 		ip4 = list_entry(entry, struct tun_ip4, list);
 		if(netlink_addr_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 address %s/%d to tun device %s\n",
 			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
-			ip4->prefix_len,gcfg->tundev);
+			ip4->prefix_len,gcfg.tundev);
 	}
-	list_for_each(entry, &gcfg->tun_ip6_list) {
+	list_for_each(entry, &gcfg.tun_ip6_list) {
 		struct tun_ip6 *ip6;
 		ip6 = list_entry(entry, struct tun_ip6, list);
 		if(netlink_addr_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 address %s/%d to tun device %s\n",
 			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
-			ip6->prefix_len,gcfg->tundev);
+			ip6->prefix_len,gcfg.tundev);
 	}
 
 	/* Add routes to the tun dev */
-	list_for_each(entry, &gcfg->tun_rt4_list) {
+	list_for_each(entry, &gcfg.tun_rt4_list) {
 		struct tun_ip4 *ip4;
 		ip4 = list_entry(entry, struct tun_ip4, list);
 		if(netlink_route_dev_modify(ifidx,AF_INET,&ip4->addr,
 				ip4->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv4 route %s/%d to tun device %s\n",
 			inet_ntop(AF_INET,&ip4->addr,addrbuf,INET6_ADDRSTRLEN),
-			ip4->prefix_len,gcfg->tundev);
+			ip4->prefix_len,gcfg.tundev);
 	}
-	list_for_each(entry, &gcfg->tun_rt6_list) {
+	list_for_each(entry, &gcfg.tun_rt6_list) {
 		struct tun_ip6 *ip6;
 		ip6 = list_entry(entry, struct tun_ip6, list);
 		if(netlink_route_dev_modify(ifidx,AF_INET6,&ip6->addr,
 				ip6->prefix_len,1)) return ERROR_REJECT;
 		slog(LOG_INFO, "Added IPv6 route %s/%d to tun device %s\n",
 			inet_ntop(AF_INET6,&ip6->addr,addrbuf,INET6_ADDRSTRLEN),
-			ip6->prefix_len,gcfg->tundev);
+			ip6->prefix_len,gcfg.tundev);
 	}
 
 	/* Setup multiqueue additional queues */
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_flags = IFF_TUN | IFF_MULTI_QUEUE;
-	strcpy(ifr.ifr_name, gcfg->tundev);
-	for(int i = 0; i < gcfg->workers; i++) {
-		gcfg->tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
-		if (gcfg->tun_fd_addl[i] < 0) {
+	strcpy(ifr.ifr_name, gcfg.tundev);
+	for(int i = 0; i < gcfg.workers; i++) {
+		gcfg.tun_fd_addl[i] = open("/dev/net/tun", O_RDWR);
+		if (gcfg.tun_fd_addl[i] < 0) {
 			slog(LOG_CRIT, "Unable to open /dev/net/tun, aborting: %s\n",
 					strerror(errno));
 			exit(1);
 		}
-		if (ioctl(gcfg->tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
+		if (ioctl(gcfg.tun_fd_addl[i], TUNSETIFF, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to attach tun device %s, aborting: "
-					"%s\n", gcfg->tundev, strerror(errno));
+					"%s\n", gcfg.tundev, strerror(errno));
 			exit(1);
 		}
 	}
 
 	/* Disable queue of main tun if we have >0 workers */
-	if(gcfg->workers > 0) {
+	if(gcfg.workers > 0) {
 		memset(&ifr, 0, sizeof(ifr));
 		ifr.ifr_flags = IFF_DETACH_QUEUE;
-		if(ioctl(gcfg->tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
+		if(ioctl(gcfg.tun_fd, TUNSETQUEUE, (void *)&ifr)) slog(LOG_CRIT,"Unable to detach main queue\n");
 	}
 
 	//No error on setup
@@ -458,7 +458,7 @@ int tun_setup(int do_mktun, int do_rmtun)
 	int fd, do_rename = 0, multi_af;
 	char devname[64];
 
-	if (strncmp(gcfg->tundev, "tun", 3))
+	if (strncmp(gcfg.tundev, "tun", 3))
 		do_rename = 1;
 
 	if ((do_mktun || do_rmtun) && do_rename)
@@ -469,10 +469,10 @@ int tun_setup(int do_mktun, int do_rmtun)
 		return ERROR_REJECT;
 	}
 
-	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg->tundev);
+	snprintf(devname, sizeof(devname), "/dev/%s", do_rename ? "tun" : gcfg.tundev);
 
-	gcfg->tun_fd = open(devname, O_RDWR);
-	if (gcfg->tun_fd < 0) {
+	gcfg.tun_fd = open(devname, O_RDWR);
+	if (gcfg.tun_fd < 0) {
 		slog(LOG_CRIT, "Unable to open %s, aborting: %s\n",
 				devname, strerror(errno));
 		return ERROR_REJECT;
@@ -480,12 +480,12 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	if (do_mktun) {
 		slog(LOG_NOTICE, "Created persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return ERROR_NONE;
 	} else if (do_rmtun) {
 
 		/* Close socket before removal */
-		close(gcfg->tun_fd);
+		close(gcfg.tun_fd);
 
 		fd = socket(PF_INET, SOCK_DGRAM, 0);
 		if (fd < 0) {
@@ -495,32 +495,32 @@ int tun_setup(int do_mktun, int do_rmtun)
 		}
 
 		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, gcfg->tundev);
+		strcpy(ifr.ifr_name, gcfg.tundev);
 		if (ioctl(fd, SIOCIFDESTROY, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to destroy interface %s, aborting: %s\n",
-					gcfg->tundev, strerror(errno));
+					gcfg.tundev, strerror(errno));
 			return ERROR_REJECT;
 		}
 
 		close(fd);
 
 		slog(LOG_NOTICE, "Removed persistent tun device %s\n",
-				gcfg->tundev);
+				gcfg.tundev);
 		return ERROR_NONE;
 	}
 
 	/* Set multi-AF mode */
 	multi_af = 1;
-	if (ioctl(gcfg->tun_fd, TUNSIFHEAD, &multi_af) < 0) {
+	if (ioctl(gcfg.tun_fd, TUNSIFHEAD, &multi_af) < 0) {
 			slog(LOG_CRIT, "Unable to set multi-AF on %s, "
-					"aborting: %s\n", gcfg->tundev,
+					"aborting: %s\n", gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 	}
 
-	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg->tundev);
+	slog(LOG_CRIT, "Multi-AF mode set on %s\n", gcfg.tundev);
 
-	if(set_nonblock(gcfg->tun_fd)) return ERROR_REJECT;
+	if(set_nonblock(gcfg.tun_fd)) return ERROR_REJECT;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
@@ -531,18 +531,18 @@ int tun_setup(int do_mktun, int do_rmtun)
 
 	if (do_rename) {
 		memset(&ifr, 0, sizeof(ifr));
-		strcpy(ifr.ifr_name, fdevname(gcfg->tun_fd));
-		ifr.ifr_data = gcfg->tundev;
+		strcpy(ifr.ifr_name, fdevname(gcfg.tun_fd));
+		ifr.ifr_data = gcfg.tundev;
 		if (ioctl(fd, SIOCSIFNAME, &ifr) < 0) {
 			slog(LOG_CRIT, "Unable to rename interface %s to %s, aborting: %s\n",
-					fdevname(gcfg->tun_fd), gcfg->tundev,
+					fdevname(gcfg.tun_fd), gcfg.tundev,
 					strerror(errno));
 			return ERROR_REJECT;
 		}
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, gcfg->tundev);
+	strcpy(ifr.ifr_name, gcfg.tundev);
 	if (ioctl(fd, SIOCGIFMTU, &ifr) < 0) {
 		slog(LOG_CRIT, "Unable to query MTU, aborting: %s\n",
 				strerror(errno));
@@ -550,10 +550,10 @@ int tun_setup(int do_mktun, int do_rmtun)
 	}
 	close(fd);
 
-	gcfg->mtu = ifr.ifr_mtu;
+	gcfg.mtu = ifr.ifr_mtu;
 
-	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg->tundev,
-			gcfg->mtu);
+	slog(LOG_INFO, "Using tun device %s with MTU %d\n", gcfg.tundev,
+			gcfg.mtu);
     return ERROR_NONE;
 }
 #endif

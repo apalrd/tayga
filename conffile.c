@@ -18,7 +18,8 @@
 
 #include "tayga.h"
 
-struct config *gcfg;
+/* Global config */
+struct config gcfg;
 
 static int parse_prefix(int af, char *src, void *prefix, int *prefix_len)
 {
@@ -116,17 +117,17 @@ static int config_ipv4_addr(int ln, int arg_count, char **args)
 	//arg_count unused
 	(void)arg_count;
 
-	if (gcfg->local_addr4.s_addr) {
+	if (gcfg.local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: duplicate ipv4-addr directive on "
 				"line %d\n", ln);
 		return ERROR_REJECT;
 	}
-	if (!inet_pton(AF_INET, args[0], &gcfg->local_addr4)) {
+	if (!inet_pton(AF_INET, args[0], &gcfg.local_addr4)) {
 		slog(LOG_CRIT, "Expected an IPv4 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
 		return ERROR_REJECT;
 	}
-	int ret = validate_ip4_addr(&gcfg->local_addr4);
+	int ret = validate_ip4_addr(&gcfg.local_addr4);
 	if (ret == ERROR_LOCAL) {
 		slog(LOG_WARNING, "Using link local address %s in ipv4-addr "
 			"directive, use with caution\n", args[0]);
@@ -143,17 +144,17 @@ static int config_ipv6_addr(int ln, int arg_count, char **args)
 	//arg_count unused
 	(void)arg_count;
 
-	if (gcfg->local_addr6.s6_addr[0]) {
+	if (gcfg.local_addr6.s6_addr[0]) {
 		slog(LOG_CRIT, "Error: duplicate ipv6-addr directive on line "
 				"%d\n", ln);
 		return ERROR_REJECT;
 	}
-	if (!inet_pton(AF_INET6, args[0], &gcfg->local_addr6)) {
+	if (!inet_pton(AF_INET6, args[0], &gcfg.local_addr6)) {
 		slog(LOG_CRIT, "Expected an IPv6 address but found \"%s\" on "
 				"line %d\n", args[0], ln);
 		return ERROR_REJECT;
 	}
-	if (validate_ip6_addr(&gcfg->local_addr6) < 0) {
+	if (validate_ip6_addr(&gcfg.local_addr6) < 0) {
 		slog(LOG_CRIT, "Cannot use reserved address %s in ipv6-addr "
 				"directive, aborting...\n", args[0]);
 		return ERROR_REJECT;
@@ -216,12 +217,12 @@ static int config_wkpf_strict(int ln, int arg_count, char **args)
 	    !strcasecmp(args[0], "on") ||
 	    !strcasecmp(args[0], "yes") ||
 		!strcasecmp(args[0], "1")) {
-		gcfg->wkpf_strict = 1;
+		gcfg.wkpf_strict = 1;
 	} else if (!strcasecmp(args[0], "false") ||
 			   !strcasecmp(args[0], "off") ||
 			   !strcasecmp(args[0], "no") ||
 			   !strcasecmp(args[0], "0")) {
-		gcfg->wkpf_strict = 0;
+		gcfg.wkpf_strict = 0;
 	} else {
 		slog(LOG_CRIT, "Error: invalid value for wkpf-strict on line %d\n",ln);
 		return ERROR_REJECT;
@@ -236,13 +237,13 @@ static int config_udp_cksum_mode(int ln, int arg_count, char **args)
 
 	/* Drop, or some variant of that */
 	if (!strncasecmp(args[0], "dr",2)){
-		gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
+		gcfg.udp_cksum_mode = UDP_CKSUM_DROP;
 	/* Calculate, or some variant of that */
 	} else if (!strncasecmp(args[0], "calc",4)) {
-		gcfg->udp_cksum_mode = UDP_CKSUM_CALC;
+		gcfg.udp_cksum_mode = UDP_CKSUM_CALC;
 	} else if(!strncasecmp(args[0],"forw",4) ||
 		      !strncasecmp(args[0],"fwd",3)) {
-		gcfg->udp_cksum_mode = UDP_CKSUM_FWD;
+		gcfg.udp_cksum_mode = UDP_CKSUM_FWD;
 	} else {
 		slog(LOG_CRIT, "Error: invalid value for udp-cksum-mode on line %d\n",ln);
 		return ERROR_REJECT;
@@ -259,12 +260,12 @@ static int config_tun_up(int ln, int arg_count, char **args)
 	    !strcasecmp(args[0], "on") ||
 	    !strcasecmp(args[0], "yes") ||
 		!strcasecmp(args[0], "1")) {
-		gcfg->tun_up = 1;
+		gcfg.tun_up = 1;
 	} else if (!strcasecmp(args[0], "false") ||
 			   !strcasecmp(args[0], "off") ||
 			   !strcasecmp(args[0], "no") ||
 			   !strcasecmp(args[0], "0")) {
-		gcfg->tun_up = 0;
+		gcfg.tun_up = 0;
 	} else {
 		slog(LOG_CRIT, "Error: invalid value for tun-up on line %d\n",ln);
 		return ERROR_REJECT;
@@ -278,17 +279,17 @@ static int config_tun_device(int ln, int arg_count, char **args)
 	//arg_count unused
 	(void)arg_count;
 
-	if (gcfg->tundev[0]) {
+	if (gcfg.tundev[0]) {
 		slog(LOG_CRIT, "Error: duplicate tun-device directive on line "
 				"%d\n", ln);
 		return ERROR_REJECT;
 	}
-	if (strlen(args[0]) + 1 > sizeof(gcfg->tundev)) {
+	if (strlen(args[0]) + 1 > sizeof(gcfg.tundev)) {
 		slog(LOG_CRIT, "Device name \"%s\" is invalid on line %d\n",
 				args[0], ln);
 		return ERROR_REJECT;
 	}
-	strcpy(gcfg->tundev, args[0]);
+	strcpy(gcfg.tundev, args[0]);
 	return ERROR_NONE;
 }
 
@@ -333,7 +334,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 		}
 		ip6->prefix_len = prefix;
 		INIT_LIST_HEAD(&ip6->list);
-		list_add(&ip6->list,&gcfg->tun_ip6_list);
+		list_add(&ip6->list,&gcfg.tun_ip6_list);
 		return ERROR_NONE;
 	}
 	//Then try as IPv4
@@ -348,7 +349,7 @@ static int config_tun_ip(int ln, int arg_count, char **args)
 		}
 		ip4->prefix_len = prefix;
 		INIT_LIST_HEAD(&ip4->list);
-		list_add(&ip4->list,&gcfg->tun_ip4_list);
+		list_add(&ip4->list,&gcfg.tun_ip4_list);
 		return ERROR_NONE;
 	}
 	//Error handling
@@ -397,7 +398,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 		}
 		ip6->prefix_len = prefix;
 		INIT_LIST_HEAD(&ip6->list);
-		list_add(&ip6->list,&gcfg->tun_rt6_list);
+		list_add(&ip6->list,&gcfg.tun_rt6_list);
 		return ERROR_NONE;
 	}
 	//Then try as IPv4
@@ -412,7 +413,7 @@ static int config_tun_route(int ln, int arg_count, char **args)
 		}
 		ip4->prefix_len = prefix;
 		INIT_LIST_HEAD(&ip4->list);
-		list_add(&ip4->list,&gcfg->tun_rt4_list);
+		list_add(&ip4->list,&gcfg.tun_rt4_list);
 		return ERROR_NONE;
 	}
 	//Error handling
@@ -505,7 +506,7 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 	struct dynamic_pool *pool;
 	struct map4 *m4;
 
-	if (gcfg->dynamic_pool) {
+	if (gcfg.dynamic_pool) {
 		slog(LOG_CRIT, "Error: duplicate dynamic-pool directive on "
 				"line %d\n", ln);
 		return ERROR_REJECT;
@@ -556,7 +557,7 @@ static int config_dynamic_pool(int ln, int arg_count, char **args)
 	INIT_LIST_HEAD(&pool->free_head.list);
 	list_add(&pool->free_head.list, &pool->free_list);
 
-	gcfg->dynamic_pool = pool;
+	gcfg.dynamic_pool = pool;
 	return ERROR_NONE;
 }
 
@@ -565,7 +566,7 @@ static int config_data_dir(int ln, int arg_count, char **args)
 	//arg_count unused
 	(void)arg_count;
 
-	if (gcfg->data_dir[0]) {
+	if (gcfg.data_dir[0]) {
 		slog(LOG_CRIT, "Error: duplicate data-dir directive on line "
 				"%d\n", ln);
 		return ERROR_REJECT;
@@ -574,7 +575,7 @@ static int config_data_dir(int ln, int arg_count, char **args)
 		slog(LOG_CRIT, "Error: data-dir must be an absolute path\n");
 		return ERROR_REJECT;
 	}
-	strcpy(gcfg->data_dir, args[0]);
+	strcpy(gcfg.data_dir, args[0]);
 	return ERROR_NONE;
 }
 
@@ -583,12 +584,12 @@ static int config_map_file(int ln, int arg_count, char **args)
 	//arg_count unused
 	(void)arg_count;
 
-	if (gcfg->map_file[0]) {
+	if (gcfg.map_file[0]) {
 		slog(LOG_CRIT, "Error: duplicate map-file directive on line "
 				"%d\n", ln);
 		return ERROR_REJECT;
 	}
-	strcpy(gcfg->map_file, args[0]);
+	strcpy(gcfg.map_file, args[0]);
 	return ERROR_NONE;
 }
 
@@ -604,22 +605,22 @@ static int config_strict_fh(int ln, int arg_count, char **args)
 
 static int config_log(int ln, int arg_count, char **args)
 {
-	if(gcfg->log_opts) {
+	if(gcfg.log_opts) {
 		slog(LOG_CRIT, "Error: duplicate log directive on line "
 				"%d\n", ln);
 		return ERROR_REJECT;
 	}
 	/* Set this flag to detect duplicate entries */
-	gcfg->log_opts |= LOG_OPT_CONFIG;
+	gcfg.log_opts |= LOG_OPT_CONFIG;
 	/* For each arg we have */
 	for(int i = 0; i < arg_count; i++)
 	{
 		/* Check if this arg matches one of these keys, and enable that key */
-		if(!strcasecmp(args[i],"drop")) gcfg->log_opts |= LOG_OPT_DROP;
-		else if(!strcasecmp(args[i],"reject")) gcfg->log_opts |= LOG_OPT_REJECT;
-		else if(!strcasecmp(args[i],"icmp")) gcfg->log_opts |= LOG_OPT_ICMP;
-		else if(!strcasecmp(args[i],"self")) gcfg->log_opts |= LOG_OPT_SELF;
-		else if(!strcasecmp(args[i],"dyn")) gcfg->log_opts |= LOG_OPT_DYN;
+		if(!strcasecmp(args[i],"drop")) gcfg.log_opts |= LOG_OPT_DROP;
+		else if(!strcasecmp(args[i],"reject")) gcfg.log_opts |= LOG_OPT_REJECT;
+		else if(!strcasecmp(args[i],"icmp")) gcfg.log_opts |= LOG_OPT_ICMP;
+		else if(!strcasecmp(args[i],"self")) gcfg.log_opts |= LOG_OPT_SELF;
+		else if(!strcasecmp(args[i],"dyn")) gcfg.log_opts |= LOG_OPT_DYN;
 		else {
 			slog(LOG_CRIT, "Error: invalid value for log on line %d\n",ln);
 			return ERROR_REJECT;
@@ -634,7 +635,7 @@ static int config_offlink_mtu(int ln, int arg_count, char **args)
 	(void)arg_count;
 	
 	/* Offlink MTU already set? */
-	if (gcfg->ipv6_offlink_mtu) {
+	if (gcfg.ipv6_offlink_mtu) {
 		slog(LOG_CRIT, "Error: duplicate offlink-mtu directive on "
 				"line %d\n", ln);
 		return ERROR_REJECT;
@@ -656,7 +657,7 @@ static int config_offlink_mtu(int ln, int arg_count, char **args)
 		return ERROR_REJECT;
 	}
 	/* Set the offlink MTU */
-	gcfg->ipv6_offlink_mtu = mtu;
+	gcfg.ipv6_offlink_mtu = mtu;
 	return ERROR_NONE;
 }
 
@@ -671,7 +672,7 @@ static int config_workers(int ln, int arg_count, char **args)
 	long int workers;
 	
 	/* Offlink MTU already set? */
-	if (gcfg->workers != -1) {
+	if (gcfg.workers != -1) {
 		slog(LOG_CRIT, "Error: duplicate workers directive on "
 				"line %d\n", ln);
 		return ERROR_REJECT;
@@ -692,7 +693,7 @@ static int config_workers(int ln, int arg_count, char **args)
 		return ERROR_REJECT;
 	}
 	/* Set the offlink MTU */
-	gcfg->workers = workers;
+	gcfg.workers = workers;
 	return ERROR_NONE;
 #else
 	//args unused
@@ -734,29 +735,24 @@ struct {
 int config_init(void)
 {
 	/* Initialize configuration structure to defaults */
-	gcfg = (struct config *)malloc(sizeof(struct config));
-	if (!gcfg) {
-		slog(LOG_CRIT, "Unable to allocate config memory\n");
-		return ERROR_REJECT;
-	}
-	memset(gcfg, 0, sizeof(struct config));
-	INIT_LIST_HEAD(&gcfg->map4_list);
-	INIT_LIST_HEAD(&gcfg->map6_list);
-	gcfg->dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
-	gcfg->dyn_max_lease = 14 * 86400;
-	gcfg->max_commit_delay = gcfg->dyn_max_lease / 4;
-	gcfg->hash_bits = 7;
-	gcfg->cache_size = 8192;
-	INIT_LIST_HEAD(&gcfg->cache_pool);
-	INIT_LIST_HEAD(&gcfg->cache_active);
-	gcfg->wkpf_strict = 1;
-	gcfg->udp_cksum_mode = UDP_CKSUM_DROP;
-	gcfg->workers = -1;
-	INIT_LIST_HEAD(&gcfg->tun_ip4_list);
-	INIT_LIST_HEAD(&gcfg->tun_ip6_list);
-	INIT_LIST_HEAD(&gcfg->tun_rt4_list);
-	INIT_LIST_HEAD(&gcfg->tun_rt6_list);
-	gcfg->tun_up = 0;
+	memset(&gcfg, 0, sizeof(struct config));
+	INIT_LIST_HEAD(&gcfg.map4_list);
+	INIT_LIST_HEAD(&gcfg.map6_list);
+	gcfg.dyn_min_lease = 7200 + 4 * 60; /* just over two hours */
+	gcfg.dyn_max_lease = 14 * 86400;
+	gcfg.max_commit_delay = gcfg.dyn_max_lease / 4;
+	gcfg.hash_bits = 7;
+	gcfg.cache_size = 8192;
+	INIT_LIST_HEAD(&gcfg.cache_pool);
+	INIT_LIST_HEAD(&gcfg.cache_active);
+	gcfg.wkpf_strict = 1;
+	gcfg.udp_cksum_mode = UDP_CKSUM_DROP;
+	gcfg.workers = -1;
+	INIT_LIST_HEAD(&gcfg.tun_ip4_list);
+	INIT_LIST_HEAD(&gcfg.tun_ip6_list);
+	INIT_LIST_HEAD(&gcfg.tun_rt4_list);
+	INIT_LIST_HEAD(&gcfg.tun_rt6_list);
+	gcfg.tun_up = 0;
 	return ERROR_NONE;
 }
 
@@ -838,7 +834,7 @@ int config_validate(void)
 	char addrbuf[128];
 
 	/* Now, validate the inputs */
-	if (list_empty(&gcfg->map6_list)) {
+	if (list_empty(&gcfg.map6_list)) {
 		slog(LOG_CRIT, "Error: no translation maps or NAT64 prefix "
 				"configured\n");
 		return ERROR_REJECT;
@@ -849,47 +845,47 @@ int config_validate(void)
 	 * And it can still be overridden by the conf file
 	 */
 	char * sd = getenv("STATE_DIRECTORY");
-	if(sd && !gcfg->data_dir[0]) {
+	if(sd && !gcfg.data_dir[0]) {
 		if (sd[0] != '/') {
 			slog(LOG_CRIT, "Error: STATE_DIRECTORY must be an "
 				"absolute path\n");
 			return ERROR_REJECT;
 		}
 		/* Copy env var into data_dir */
-		if(strlen(sd) + 1 > sizeof(gcfg->data_dir)) {
+		if(strlen(sd) + 1 > sizeof(gcfg.data_dir)) {
 			slog(LOG_CRIT, "Error: STATE_DIRECTORY is too long, "
 					"aborting...\n");
 			return ERROR_REJECT;
 		}
 		/* Copy state directory */
-		strcpy(gcfg->data_dir, sd);
+		strcpy(gcfg.data_dir, sd);
 		/* Check for a : which signifies that we have multiple dirs */
-		for(int i = 0; gcfg->data_dir[i]; i++) {
-			if(gcfg->data_dir[i] == ':') {
+		for(int i = 0; gcfg.data_dir[i]; i++) {
+			if(gcfg.data_dir[i] == ':') {
 				slog(LOG_WARNING, "STATE_DIRECTORY env var contains "
 						"multiple directories, using first one\n");
-				gcfg->data_dir[i] = 0;
+				gcfg.data_dir[i] = 0;
 				break;
 			}
 		}
 	}
 
-	m4 = list_entry(gcfg->map4_list.next, struct map4, list);
-	m6 = list_entry(gcfg->map6_list.next, struct map6, list);
+	m4 = list_entry(gcfg.map4_list.next, struct map4, list);
+	m6 = list_entry(gcfg.map6_list.next, struct map6, list);
 
 	if (m4->type == MAP_TYPE_RFC6052 && m6->type == MAP_TYPE_RFC6052) {
 		slog(LOG_DEBUG,"Disabling cache, not required\n");
-		gcfg->cache_size = 0;
+		gcfg.cache_size = 0;
 	}
 
-	if (!gcfg->local_addr4.s_addr) {
+	if (!gcfg.local_addr4.s_addr) {
 		slog(LOG_CRIT, "Error: no ipv4-addr directive found\n");
 		return ERROR_REJECT;
 	}
 
 	m = alloc_map_static(0);
 	if(!m) return ERROR_REJECT;
-	m->map4.addr = gcfg->local_addr4;
+	m->map4.addr = gcfg.local_addr4;
 	m->origin = MAP_ORIGIN_SELF;
 	if (insert_map4(&m->map4, &m4) < 0) {
 		abort_on_conflict4("Error: ipv4-addr", 0, m4);
@@ -897,18 +893,18 @@ int config_validate(void)
 	}
 
 	/* ipv6-addr is configured and is within the well known prefix */
-	if (gcfg->local_addr6.s6_addr32[0] == WKPF &&
-		gcfg->local_addr6.s6_addr32[1] == 0 &&
-		gcfg->local_addr6.s6_addr32[2] == 0 &&
-		gcfg->wkpf_strict)
+	if (gcfg.local_addr6.s6_addr32[0] == WKPF &&
+		gcfg.local_addr6.s6_addr32[1] == 0 &&
+		gcfg.local_addr6.s6_addr32[2] == 0 &&
+		gcfg.wkpf_strict)
 	{
 		slog(LOG_CRIT, "Error: ipv6-addr directive cannot contain an "
 				"address in the Well-Known Prefix "
 				"(64:ff9b::/96)\n");
 		return ERROR_REJECT;
 	/* ipv6-addr is configured but not within the well known prefix */
-	} else if (gcfg->local_addr6.s6_addr32[0]) {
-		m->map6.addr = gcfg->local_addr6;
+	} else if (gcfg.local_addr6.s6_addr32[0]) {
+		m->map6.addr = gcfg.local_addr6;
 		if (insert_map6(&m->map6, &m6) < 0) {
 			if (m6->type == MAP_TYPE_RFC6052) {
 				inet_ntop(AF_INET6, &m6->addr,
@@ -925,16 +921,16 @@ int config_validate(void)
 		}
 	/* ipv6-addr is zero (not set), generate from ipv4-addr and prefix */
 	} else {
-		m6 = list_entry(gcfg->map6_list.prev, struct map6, list);
+		m6 = list_entry(gcfg.map6_list.prev, struct map6, list);
 		if (m6->type != MAP_TYPE_RFC6052) {
 			slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 					"specified if no NAT64 prefix is "
 					"configured\n");
 			return ERROR_REJECT;
 		}
-		if (append_to_prefix(&gcfg->local_addr6, &gcfg->local_addr4,
+		if (append_to_prefix(&gcfg.local_addr6, &gcfg.local_addr4,
 					&m6->addr, m6->prefix_len)) {
-			if(gcfg->wkpf_strict)
+			if(gcfg.wkpf_strict)
 			{
 				slog(LOG_CRIT, "Error: ipv6-addr directive must be "
 						"specified if prefix is 64:ff9b::/96 "
@@ -943,14 +939,14 @@ int config_validate(void)
 				return ERROR_REJECT;
 			}
 		}
-		m->map6.addr = gcfg->local_addr6;
+		m->map6.addr = gcfg.local_addr6;
 	}
 
 	/* Offlink MTU defaults to 1280 if not set */
-	if (gcfg->ipv6_offlink_mtu <= MTU_MIN) gcfg->ipv6_offlink_mtu = MTU_MIN;
+	if (gcfg.ipv6_offlink_mtu <= MTU_MIN) gcfg.ipv6_offlink_mtu = MTU_MIN;
 
 	/* Tundev must be provided */
-	if(strlen(gcfg->tundev) < 1) {
+	if(strlen(gcfg.tundev) < 1) {
 		slog(LOG_CRIT, "Error: no tun-device directive found\n");
 		return ERROR_REJECT;
 	}

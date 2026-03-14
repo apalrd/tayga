@@ -45,7 +45,7 @@ void slog_impl(int priority, const char *file, const char *line, const char *fun
 	(void)func;
 
 	va_start(ap, format);
-	switch (gcfg->log_out) {
+	switch (gcfg.log_out) {
         default:
 		case LOG_TO_STDOUT:
 			vprintf(format, ap);

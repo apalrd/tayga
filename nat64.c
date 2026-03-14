@@ -66,10 +66,10 @@ struct ip4_error {
 static void log_pkt4(int err, struct pkt *p, const char *msg)
 {
 	const char * type = "";
-	if	   (gcfg->log_opts & err & LOG_OPT_SELF) 	type = "SELF";
-	else if(gcfg->log_opts & err & LOG_OPT_DROP) 	type = "DROP";
-	else if(gcfg->log_opts & err & LOG_OPT_REJECT) 	type = "REJECT";
-	else if(gcfg->log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
+	if	   (gcfg.log_opts & err & LOG_OPT_SELF) 	type = "SELF";
+	else if(gcfg.log_opts & err & LOG_OPT_DROP) 	type = "DROP";
+	else if(gcfg.log_opts & err & LOG_OPT_REJECT) 	type = "REJECT";
+	else if(gcfg.log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
 	else return;
 
 	/* Convert the src / dest IPv4 to strings */
@@ -102,10 +102,10 @@ static void log_pkt4(int err, struct pkt *p, const char *msg)
 static void log_pkt6(int err, struct pkt *p, const char *msg)
 {
 	const char * type = "";
-	if	   (gcfg->log_opts & err & LOG_OPT_SELF) 	type = "SELF";
-	else if(gcfg->log_opts & err & LOG_OPT_DROP) 	type = "DROP";
-	else if(gcfg->log_opts & err & LOG_OPT_REJECT) 	type = "REJECT";
-	else if(gcfg->log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
+	if	   (gcfg.log_opts & err & LOG_OPT_SELF) 	type = "SELF";
+	else if(gcfg.log_opts & err & LOG_OPT_DROP) 	type = "DROP";
+	else if(gcfg.log_opts & err & LOG_OPT_REJECT) 	type = "REJECT";
+	else if(gcfg.log_opts & err & LOG_OPT_ICMP) 	type = "ICMP";
 	else return;
 
 	/* Convert the src / dest IPv6 to strings */
@@ -241,7 +241,7 @@ static void host_send_icmp4(uint8_t tos, struct in_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -263,7 +263,7 @@ static void host_send_icmp4_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
-	host_send_icmp4(0, &gcfg->local_addr4, &orig->ip4->src, &icmp,
+	host_send_icmp4(0, &gcfg.local_addr4, &orig->ip4->src, &icmp,
 			(uint8_t *)orig->ip4, orig_len);
 }
 
@@ -328,7 +328,7 @@ static int xlate_payload_4to6(struct pkt *p, struct ip6 *ip6, int em)
 		tck = (uint16_t *)(p->data + 6);
 		if (!*tck) {
 			/* UDP packet has no checksum, how do we deal? */
-			switch(gcfg->udp_cksum_mode) {
+			switch(gcfg.udp_cksum_mode) {
 			default:
 			case UDP_CKSUM_DROP:
 				/* Do not handle zero checksum packets */
@@ -371,9 +371,9 @@ static void xlate_4to6_data(struct pkt *p)
 	uint32_t frag_size;
 	int ret;
 
-	frag_size = gcfg->ipv6_offlink_mtu;
-	if (frag_size > gcfg->mtu)
-		frag_size = gcfg->mtu;
+	frag_size = gcfg.ipv6_offlink_mtu;
+	if (frag_size > gcfg.mtu)
+		frag_size = gcfg.mtu;
 	frag_size -= sizeof(struct ip6);
 
 	ret = map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest);
@@ -410,9 +410,9 @@ static void xlate_4to6_data(struct pkt *p)
 	   1456 bytes of payload == 1504 bytes.) */
 	if ((off & (IP4_F_MASK | IP4_F_MF)) == 0) {
 		if (off & IP4_F_DF) {
-			if (gcfg->mtu - MTU_ADJ < p->header_len + p->data_len) {
+			if (gcfg.mtu - MTU_ADJ < p->header_len + p->data_len) {
 				log_pkt4(LOG_OPT_ICMP,p,"Packet Too Big");
-				host_send_icmp4_error(3, 4, gcfg->mtu - MTU_ADJ, p);
+				host_send_icmp4_error(3, 4, gcfg.mtu - MTU_ADJ, p);
 				return;
 			}
 			no_frag_hdr = 1;
@@ -435,7 +435,7 @@ static void xlate_4to6_data(struct pkt *p)
 		iov[1].iov_base = p->data;
 		iov[1].iov_len = p->data_len;
 
-		if (writev(gcfg->tun_fd, iov, 2) < 0)
+		if (writev(gcfg.tun_fd, iov, 2) < 0)
 			slog(LOG_WARNING, "error writing packet to tun "
 					"device: %s\n", strerror(errno));
 	} else {
@@ -470,7 +470,7 @@ static void xlate_4to6_data(struct pkt *p)
 							htons(IP4_F_MF)))
 				header.ip6_frag.offset_flags |= htons(IP6_F_MF);
 
-			if (writev(gcfg->tun_fd, iov, 2) < 0) {
+			if (writev(gcfg.tun_fd, iov, 2) < 0) {
 				slog(LOG_WARNING, "error writing packet to "
 						"tun device: %s\n",
 						strerror(errno));
@@ -644,8 +644,8 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 				mtu = est_mtu(ntohs(p_em.ip4->length));
 			mtu += MTU_ADJ;
 			/* Path MTU > our own MTU */
-			if (mtu > gcfg->mtu)
-				mtu = gcfg->mtu;
+			if (mtu > gcfg.mtu)
+				mtu = gcfg.mtu;
 			/* Set MTU to 1280 to prevent generation of atomic fragments */
 			if (mtu < MTU_MIN) {
 				mtu = MTU_MIN;
@@ -705,7 +705,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	if (map_ip4_to_ip6(&header.ip6.src, &p->ip4->src)) {
 		log_pkt4(LOG_OPT_DROP,p,"Need to rely on fake source");
 		//Fake source IP is our own IP
-		header.ip6.src = gcfg->local_addr6;
+		header.ip6.src = gcfg.local_addr6;
 	}
 
 	if (map_ip4_to_ip6(&header.ip6.dest, &p->ip4->dest)) {
@@ -732,7 +732,7 @@ static void xlate_4to6_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -753,7 +753,7 @@ void handle_ip4(struct pkt *p)
 	}
 
 	/* Packet for ourselves*/
-	if (p->ip4->dest.s_addr == gcfg->local_addr4.s_addr) {
+	if (p->ip4->dest.s_addr == gcfg.local_addr4.s_addr) {
 		if (p->data_proto == 1)
 			host_handle_icmp4(p);
 		else {
@@ -800,7 +800,7 @@ static void host_send_icmp6(uint8_t tc, struct in6_addr *src,
 	iov[0].iov_len = sizeof(header);
 	iov[1].iov_base = data;
 	iov[1].iov_len = data_len;
-	if (writev(gcfg->tun_fd, iov, data_len ? 2 : 1) < 0)
+	if (writev(gcfg.tun_fd, iov, data_len ? 2 : 1) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -822,7 +822,7 @@ static void host_send_icmp6_error(uint8_t type, uint8_t code, uint32_t word,
 	icmp.type = type;
 	icmp.code = code;
 	icmp.word = htonl(word);
-	host_send_icmp6(0, &gcfg->local_addr6, &orig->ip6->src, &icmp,
+	host_send_icmp6(0, &gcfg.local_addr6, &orig->ip6->src, &icmp,
 			(uint8_t *)orig->ip6, orig_len);
 }
 
@@ -916,7 +916,7 @@ static int xlate_payload_6to4(struct pkt *p, struct ip4 *ip4, int em)
 		tck = (uint16_t *)(p->data + 6);
 		if (!*tck) {
 			/* UDP packet has no checksum, how do we deal? */
-			switch(gcfg->udp_cksum_mode) {
+			switch(gcfg.udp_cksum_mode) {
 			default:
 			case UDP_CKSUM_DROP:
 				/* Do not handle zero checksum packets */
@@ -980,9 +980,9 @@ static void xlate_6to4_data(struct pkt *p)
 		return;
 	}
 
-	if (sizeof(struct ip6) + p->header_len + p->data_len > gcfg->mtu) {
+	if (sizeof(struct ip6) + p->header_len + p->data_len > gcfg.mtu) {
 		log_pkt6(LOG_OPT_ICMP,p,"Packet Too Big");
-		host_send_icmp6_error(2, 0, gcfg->mtu, p);
+		host_send_icmp6_error(2, 0, gcfg.mtu, p);
 		return;
 	}
 
@@ -1001,7 +1001,7 @@ static void xlate_6to4_data(struct pkt *p)
 	iov[1].iov_base = p->data;
 	iov[1].iov_len = p->data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -1176,8 +1176,8 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 			log_pkt6(LOG_OPT_DROP,p,"No MTU in Packet Too Big");
 			return;
 		}
-		if (mtu > gcfg->mtu)
-			mtu = gcfg->mtu;
+		if (mtu > gcfg.mtu)
+			mtu = gcfg.mtu;
 		mtu -= MTU_ADJ;
 		header.icmp.word = htonl(mtu);
 		break;
@@ -1246,7 +1246,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	if (map_ip6_to_ip4(&header.ip4.src, &p->ip6->src, 0)) {
 		log_pkt6(LOG_OPT_ICMP,p,"Need to rely on fake source");
 		//fake source IP is our own IP
-		header.ip4.src = gcfg->local_addr4;
+		header.ip4.src = gcfg.local_addr4;
 	}
 
 	if (map_ip6_to_ip4(&header.ip4.dest, &p->ip6->dest, 0)) {
@@ -1273,7 +1273,7 @@ static void xlate_6to4_icmp_error(struct pkt *p)
 	iov[1].iov_base = p_em.data;
 	iov[1].iov_len = p_em.data_len;
 
-	if (writev(gcfg->tun_fd, iov, 2) < 0)
+	if (writev(gcfg.tun_fd, iov, 2) < 0)
 		slog(LOG_WARNING, "error writing packet to tun device: %s\n",
 			strerror(errno));
 }
@@ -1294,7 +1294,7 @@ void handle_ip6(struct pkt *p)
 		return;
 	}
 
-	if (IN6_ARE_ADDR_EQUAL(&p->ip6->dest, &gcfg->local_addr6)) {
+	if (IN6_ARE_ADDR_EQUAL(&p->ip6->dest, &gcfg.local_addr6)) {
 		if (p->data_proto == 58)
 			host_handle_icmp6(p);
 		else {
