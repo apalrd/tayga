@@ -49,6 +49,11 @@ void slog_impl(int priority, const char *file, const char *line, const char *fun
         default:
 		case LOG_TO_STDOUT:
 			vprintf(format, ap);
+			/* stdout is fully buffered when it is a pipe (as under a
+			 * service manager): flush, so that each message is seen
+			 * when it is logged, not when the buffer fills or tayga
+			 * exits, and isn't lost if tayga is killed */
+			fflush(stdout);
 			break;
 		case LOG_TO_SYSLOG:
 			vsyslog(priority, format, ap);
